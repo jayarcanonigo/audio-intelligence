@@ -25,7 +25,7 @@ export default function Home() {
     const formData = new FormData();
     formData.append("file", file);
 
-    await fetch("http://localhost:8000/upload", {
+    await fetch("http://162.0.234.94:8000/upload", {
       method: "POST",
       body: formData,
     });
@@ -38,7 +38,7 @@ export default function Home() {
   const searchTimeline = async () => {
     setLoading(true);
 
-    const url = `http://localhost:8000/search?first=${encodeURIComponent(
+    const url = `http://162.0.234.94:8000/search?first=${encodeURIComponent(
       first
     )}&last=${encodeURIComponent(last)}`;
 
@@ -58,7 +58,7 @@ export default function Home() {
   const searchPhrase = async () => {
     setLoading(true);
 
-    const url = `http://localhost:8000/search-phrase?q=${encodeURIComponent(
+    const url = `http://162.0.234.94:8000/search-phrase?q=${encodeURIComponent(
       phrase
     )}`;
 
