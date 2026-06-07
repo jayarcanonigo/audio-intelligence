@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
 
@@ -10,7 +13,9 @@ export default function Home() {
 
   const [phrase, setPhrase] = useState("");
 
-  const [timeline, setTimeline] = useState<any>(null);
+  const [timelineResults, setTimelineResults] = useState<any[]>([]);
+  const [totalMatches, setTotalMatches] = useState(0);
+
   const [singleResults, setSingleResults] = useState<any[]>([]);
 
   const [mode, setMode] = useState("");
@@ -18,179 +23,286 @@ export default function Home() {
 
   // ---------------- UPLOAD ----------------
   const uploadAudio = async () => {
-    if (!file) return;
+    if (!file) {
+      alert("Please select a file.");
+      return;
+    }
 
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const formData = new FormData();
-    formData.append("file", file);
+      const formData = new FormData();
+      formData.append("file", file);
 
-    await fetch("http://162.0.234.94:8000/upload", {
-      method: "POST",
-      body: formData,
-    });
+      const response = await fetch(`${API_URL}/upload`, {
+        method: "POST",
+        body: formData,
+      });
 
-    setLoading(false);
-    alert("Upload done!");
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      alert("Upload completed!");
+    } catch (error) {
+      console.error(error);
+      alert("Upload failed.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // ---------------- TWO-PHRASE SEARCH ----------------
+  // ---------------- TIMELINE SEARCH ----------------
   const searchTimeline = async () => {
-    setLoading(true);
+    if (!first || !last) {
+      alert("Please enter both phrases.");
+      return;
+    }
 
-    const url = `http://162.0.234.94:8000/search?first=${encodeURIComponent(
-      first
-    )}&last=${encodeURIComponent(last)}`;
+    try {
+      setLoading(true);
 
-    const res = await fetch(url);
-    const data = await res.json();
+      const params = new URLSearchParams({
+        first,
+        last,
+      });
 
-    console.log("TIMELINE RESULT:", data);
+      const res = await fetch(`${API_URL}/search?${params}`);
 
-    setMode(data.mode);
-    setTimeline(data);
-    setSingleResults([]);
+      if (!res.ok) {
+        throw new Error("Search failed");
+      }
 
-    setLoading(false);
+      const data = await res.json();
+
+      console.log("TIMELINE RESULT:", data);
+
+      setMode("timeline");
+
+      setTimelineResults(data.results || []);
+      setTotalMatches(data.total || 0);
+
+      setSingleResults([]);
+    } catch (error) {
+      console.error(error);
+      alert("Timeline search failed.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ---------------- SINGLE PHRASE SEARCH ----------------
   const searchPhrase = async () => {
-    setLoading(true);
+    if (!phrase) {
+      alert("Please enter a phrase.");
+      return;
+    }
 
-    const url = `http://162.0.234.94:8000/search-phrase?q=${encodeURIComponent(
-      phrase
-    )}`;
+    try {
+      setLoading(true);
 
-    const res = await fetch(url);
-    const data = await res.json();
+      const params = new URLSearchParams({
+        q: phrase,
+      });
 
-    console.log("SINGLE RESULT:", data);
+      const res = await fetch(`${API_URL}/search-phrase?${params}`);
 
-    setMode(data.mode);
-    setSingleResults(data.results || []);
-    setTimeline(null);
+      if (!res.ok) {
+        throw new Error("Search failed");
+      }
 
-    setLoading(false);
+      const data = await res.json();
+
+      console.log("SINGLE RESULT:", data);
+
+      setMode("single");
+
+      setSingleResults(data.results || []);
+
+      setTimelineResults([]);
+      setTotalMatches(0);
+    } catch (error) {
+      console.error(error);
+      alert("Phrase search failed.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div style={{ padding: 20, fontFamily: "Arial" }}>
+    <div
+      style={{
+        padding: 20,
+        fontFamily: "Arial",
+        maxWidth: 1000,
+        margin: "0 auto",
+      }}
+    >
       <h2>📻 Radio Search System</h2>
 
-      {/* ---------------- UPLOAD ---------------- */}
+      <p>
+        API: <b>{API_URL}</b>
+      </p>
+
+      {/* Upload */}
       <div style={{ marginBottom: 20 }}>
         <input
           type="file"
           accept="audio/*"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
         />
-        <button onClick={uploadAudio} disabled={loading}>
+
+        <button
+          onClick={uploadAudio}
+          disabled={loading}
+          style={{
+            marginLeft: 10,
+            padding: "8px 16px",
+          }}
+        >
           Upload Audio
         </button>
       </div>
 
       <hr />
 
-      {/* ---------------- TWO PHRASE SEARCH ---------------- */}
-      <h3>🔎 Timeline Search (First + Last Phrase)</h3>
+      {/* Timeline Search */}
+      <h3>🔎 Timeline Search</h3>
 
       <input
         placeholder="First phrase"
         value={first}
         onChange={(e) => setFirst(e.target.value)}
-        style={{ width: 220, marginRight: 10 }}
+        style={{
+          width: 300,
+          marginRight: 10,
+          padding: 8,
+        }}
       />
 
       <input
         placeholder="Last phrase"
         value={last}
         onChange={(e) => setLast(e.target.value)}
-        style={{ width: 220, marginRight: 10 }}
+        style={{
+          width: 300,
+          marginRight: 10,
+          padding: 8,
+        }}
       />
 
-      <button onClick={searchTimeline} disabled={loading}>
+      <button
+        onClick={searchTimeline}
+        disabled={loading}
+        style={{
+          padding: "8px 16px",
+        }}
+      >
         Search Timeline
       </button>
 
       <hr />
 
-      {/* ---------------- SINGLE SEARCH ---------------- */}
+      {/* Single Search */}
       <h3>🔍 Single Phrase Search</h3>
 
       <input
         placeholder="Enter phrase"
         value={phrase}
         onChange={(e) => setPhrase(e.target.value)}
-        style={{ width: 300, marginRight: 10 }}
+        style={{
+          width: 400,
+          marginRight: 10,
+          padding: 8,
+        }}
       />
 
-      <button onClick={searchPhrase} disabled={loading}>
+      <button
+        onClick={searchPhrase}
+        disabled={loading}
+        style={{
+          padding: "8px 16px",
+        }}
+      >
         Search Phrase
       </button>
 
-      {/* ---------------- RESULTS ---------------- */}
+      {loading && (
+        <div style={{ marginTop: 20 }}>
+          <p>Loading...</p>
+        </div>
+      )}
+
+      {/* Results */}
       <div style={{ marginTop: 30 }}>
         <h3>Results</h3>
 
-        {/* ---------------- TIMELINE RESULT ---------------- */}
-        {timeline && timeline.found && (
-          <div
-            style={{
-              background: "#e8f4ff",
-              padding: 15,
-              borderRadius: 8,
-              marginBottom: 20,
-            }}
-          >
-            <h4>📍 Timeline Result</h4>
+        {/* TIMELINE RESULTS */}
+        {timelineResults.length > 0 && (
+          <>
+            <h4>📍 Timeline Matches ({totalMatches})</h4>
 
-            <p>
-              <b>Start Segment:</b> {timeline.first_segment.index}
-            </p>
-            <p>{timeline.first_segment.text}</p>
-            <small>⏱ {timeline.first_segment.time}</small>
+            {timelineResults.map((item, index) => (
+              <div
+                key={index}
+                style={{
+                  background: "#e8f4ff",
+                  padding: 15,
+                  borderRadius: 8,
+                  marginBottom: 15,
+                  border: "1px solid #cce5ff",
+                }}
+              >
+                <h4>Match #{index + 1}</h4>
 
-            <hr />
+                <p>
+                  <b>Segment Range:</b>{" "}
+                  {item.start_segment} → {item.end_segment}
+                </p>
 
-            <p>
-              <b>End Segment:</b> {timeline.last_segment.index}
-            </p>
-            <p>{timeline.last_segment.text}</p>
-            <small>⏱ {timeline.last_segment.time}</small>
+                <p>
+                  <b>Start Time:</b> {item.start_time}
+                </p>
 
-            <hr />
-
-            <p>
-              <b>Range:</b> {timeline.range.start_segment} →{" "}
-              {timeline.range.end_segment}
-            </p>
-          </div>
+                <p>
+                  <b>End Time:</b> {item.end_time}
+                </p>
+              </div>
+            ))}
+          </>
         )}
 
-        {/* ---------------- SINGLE RESULTS ---------------- */}
-        {singleResults.length > 0 &&
-          singleResults.map((r, i) => (
-            <div
-              key={i}
-              style={{
-                background: "#eee",
-                padding: 10,
-                marginBottom: 10,
-                borderRadius: 5,
-              }}
-            >
-              <p>{r.text}</p>
-              <small>
-                ⏱ {r.start_time} → {r.end_time}
-              </small>
-            </div>
-          ))}
+        {/* SINGLE PHRASE RESULTS */}
+        {singleResults.length > 0 && (
+          <>
+            <h4>🔍 Phrase Matches ({singleResults.length})</h4>
 
-        {/* ---------------- NO RESULT ---------------- */}
-        {mode && !timeline?.found && singleResults.length === 0 && (
-          <p style={{ color: "red" }}>No results found</p>
+            {singleResults.map((r, i) => (
+              <div
+                key={i}
+                style={{
+                  background: "#f3f3f3",
+                  padding: 12,
+                  marginBottom: 10,
+                  borderRadius: 8,
+                }}
+              >
+                <p>{r.text}</p>
+
+                <small>
+                  ⏱ {r.start_time} → {r.end_time}
+                </small>
+              </div>
+            ))}
+          </>
         )}
+
+        {/* NO RESULTS */}
+        {mode &&
+          timelineResults.length === 0 &&
+          singleResults.length === 0 && (
+            <p style={{ color: "red" }}>No results found.</p>
+          )}
       </div>
     </div>
   );
