@@ -1,0 +1,167 @@
+.page {
+  padding: 24px;
+  background: #0b1220;
+  color: #e5e7eb;
+  min-height: 100vh;
+  font-family: Inter, sans-serif;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.subtitle {
+  opacity: 0.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.uploadRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 0;
+}
+
+.fileInput,
+.searchInput {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #fff;
+}
+
+.searchInput {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.primaryBtn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #2563eb;
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.statusRow {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  font-size: 13px;
+}
+
+.logBox {
+  margin-top: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.boxTitle {
+  font-size: 13px;
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
+
+.logItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+}
+
+.logText {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.timeText {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.smallBtn {
+  background: #22c55e;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.downloadBtn {
+  background: #10b981;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.cell {
+  max-width: 260px;
+  word-break: break-word;
+}
+
+.deleteBtn {
+  background: #ef4444;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.primaryBtn:disabled {
+  background: #374151;
+  cursor: not-allowed;
+  opacity: 0.6;
+}

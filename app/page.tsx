@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   uploadAudio,
   getStatus,
@@ -8,48 +8,72 @@ import {
   resetSession,
 } from "@/services/api";
 
+import styles from "./page.module.css";
+
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
 
-  const [search, setSearch] = useState(""); // ✅ RESTORED SEARCH
+  const [search, setSearch] = useState("");
 
+  const [phrase1, setPhrase1] = useState("");
+  const [phrase2, setPhrase2] = useState("");
+  const [disabledLogs, setDisabledLogs] = useState<number[]>([]);
   const [status, setStatus] = useState("idle");
   const [processedTime, setProcessedTime] = useState("00:00:00");
   const [currentSegment, setCurrentSegment] = useState(0);
 
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
   const [checked, setChecked] = useState<number[]>([]);
-
   const [downloading, setDownloading] = useState(false);
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isActive, setIsActive] = useState(false);
+  const [isUploaded, setIsUploaded] = useState(false);
 
-  // ---------------- LOG STREAM ----------------
+  const seenLogsRef = useRef<Set<number>>(new Set());
+
+  const isProcessing =
+    status === "uploading" ||
+    status === "starting" ||
+    status === "transcribing";
+
+  /* ---------------- LOG STREAM ---------------- */
   useEffect(() => {
+    if (!isActive) return;
+
     const fetchLogs = async () => {
       const res = await fetch(`${API_URL}/logs?t=${Date.now()}`, {
         cache: "no-store",
       });
 
       const data = await res.json();
-      setLogs(data.logs || []);
+      const list = Array.isArray(data) ? data : data.logs || [];
+
+      const fresh = list.filter((log: any) => {
+        if (!log?.id) return false;
+        if (seenLogsRef.current.has(log.id)) return false;
+
+        seenLogsRef.current.add(log.id);
+        return true;
+      });
+
+      if (fresh.length) {
+        setLogs((prev) => [...prev, ...fresh]);
+      }
     };
 
     fetchLogs();
     const interval = setInterval(fetchLogs, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isActive]);
 
-  // ---------------- STATUS ----------------
+  /* ---------------- STATUS ---------------- */
   const startPolling = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-
-    intervalRef.current = setInterval(async () => {
+    const interval = setInterval(async () => {
       const data = await getStatus();
 
       setStatus(data.status);
@@ -57,186 +81,390 @@ export default function Home() {
       setCurrentSegment(data.current_segment);
 
       if (data.status === "completed" || data.status === "error") {
-        clearInterval(intervalRef.current!);
-        intervalRef.current = null;
+        clearInterval(interval);
+        setIsActive(false);
       }
     }, 1000);
   };
 
-  // ---------------- UPLOAD ----------------
+  /* ---------------- UPLOAD ---------------- */
   const handleUpload = async () => {
     if (!file) return alert("Select a file");
 
+    setIsUploaded(true);
     setStatus("uploading");
+
     setLogs([]);
     setResults([]);
     setChecked([]);
+    seenLogsRef.current.clear();
+
+    setIsActive(false);
 
     await resetSession();
     await uploadAudio(file);
 
     const fresh = await getLogs();
-    setLogs(fresh.logs || []);
+    const initial = Array.isArray(fresh) ? fresh : fresh.logs || [];
 
+    setLogs(initial);
+    seenLogsRef.current = new Set(initial.map((l: any) => l.id));
+
+    setIsActive(true);
     startPolling();
   };
 
-  // ---------------- CHECK ----------------
-  const handleCheck = (index: number) => {
-    setResults((prev) => [
+  /* ---------------- CHECK ---------------- */
+  const handleCheck = (log: any) => {
+  if (disabledLogs.includes(log.id)) return;
+
+  setResults((prev) => [
       ...prev,
       {
-        id: index,
-        text: logs[index],
+        id: log.id,
+        text: log?.message || "",
+        start: log?.start_time || "",
+        end: log?.end_time || "",
         time: new Date().toLocaleTimeString(),
       },
     ]);
 
-    setChecked((prev) => [...prev, index]);
+    setChecked((prev) => [...prev, log.id]);
+    setDisabledLogs((prev) => [...prev, log.id]);
   };
 
-  // ---------------- REMOVE ----------------
-  const handleRemove = (id: number) => {
-    setResults((prev) => prev.filter((r) => r.id !== id));
-    setChecked((prev) => prev.filter((x) => x !== id));
-  };
+  /* ---------------- REMOVE ---------------- */
+const handleRemove = (id: number) => {
+  const row = results.find((r) => r.id === id);
 
-  // ---------------- DOWNLOAD ----------------
-  const handleDownload = async () => {
-    try {
-      setDownloading(true);
+  // remove range-based locks
+  if (row?.segmentIds?.length) {
+    setDisabledLogs((prev) =>
+      prev.filter((x) => !row.segmentIds.includes(x))
+    );
+  }
 
-      const res = await fetch("/api/download-excel", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ results }),
-      });
-
-      if (!res.ok) throw new Error("Download failed");
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "radio_segments.xlsx";
-
-      document.body.appendChild(a);
-      a.click();
-
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      alert("Download failed");
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  // FILTERED LOGS (search)
-  const filteredLogs = logs.filter((l) =>
-    l.toLowerCase().includes(search.toLowerCase())
+  // remove single lock (IMPORTANT FIX)
+  setDisabledLogs((prev) =>
+    prev.filter((x) => x !== id)
   );
 
+  setResults((prev) => prev.filter((r) => r.id !== id));
+  setChecked((prev) => prev.filter((x) => x !== id));
+};
+  /* ---------------- DOWNLOAD ---------------- */
+ const handleDownload = async () => {
+  const exportData = results.map((r) => ({
+    Text: r.text,
+    Start: r.start || "-",
+    End: r.end || "-",
+  }));
+
+  const res = await fetch("/api/download-excel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ results: exportData }),
+  });
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "radio_segments.xlsx";
+  a.click();
+};
+const handleAddRange = () => {
+  if (!phrase1 || !phrase2) {
+    alert("Select Phrase 1 and Phrase 2");
+    return;
+  }
+
+  const q1 = phrase1.toLowerCase();
+  const q2 = phrase2.toLowerCase();
+
+  const visited = new Set<number>();
+
+  const ranges: any[] = [];
+
+  for (let i = 0; i < logs.length; i++) {
+    if (visited.has(i)) continue;
+
+    const isP1 = (logs[i]?.message || "")
+      .toLowerCase()
+      .includes(q1);
+
+    if (!isP1) continue;
+
+    // find nearest P2 AFTER P1
+    let endIndex = -1;
+
+    for (let j = i + 1; j < logs.length; j++) {
+      const isP2 = (logs[j]?.message || "")
+        .toLowerCase()
+        .includes(q2);
+
+      if (isP2) {
+        endIndex = j;
+        break;
+      }
+    }
+
+    if (endIndex === -1) continue;
+
+    const rangeLogs = logs.slice(i, endIndex + 1);
+
+    const ids = rangeLogs.map((x) => x.id);
+
+    // ❗ NEW: skip if already used
+    const alreadyUsed = ids.some((id) =>
+      disabledLogs.includes(id)
+    );
+
+    if (alreadyUsed) continue;
+
+    rangeLogs.forEach((_, idx) => visited.add(i + idx));
+
+    ranges.push({
+      id: Date.now() + i,
+      text: rangeLogs.map((x) => x.message).join(" "),
+      start: rangeLogs[0]?.start_time || "",
+      end: rangeLogs[rangeLogs.length - 1]?.end_time || "",
+      time: new Date().toLocaleTimeString(),
+      segmentIds: ids, // ❗ NEW
+    });
+
+    i = endIndex;
+  }
+
+  setResults((prev) => [...prev, ...ranges]);
+
+  // ❗ NEW: disable all added segments
+  const allIds = ranges.flatMap((r) => r.segmentIds || []);
+  setDisabledLogs((prev) => [...prev, ...allIds]);
+};
+  /* ---------------- FILTER ---------------- */
+  const filteredLogs = useMemo(() => {
+    const q = search.toLowerCase();
+
+    return logs.filter((l) => {
+      const text = l?.message || "";
+      return text.toLowerCase().includes(q);
+    });
+  }, [logs, search]);
+
+  /* ---------------- UI ---------------- */
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>📻 Radio Search Dashboard</h1>
-        <p style={styles.subtitle}>
-          Real-time transcription & segment tracking system
+    <div className={styles.page}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>📻 Radio Search Dashboard</h1>
+        <p className={styles.subtitle}>
+          Hover buttons + highlighted phrase matching
         </p>
       </div>
 
-      <div style={styles.grid}>
+      <div className={styles.grid}>
         {/* LEFT */}
-        <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Upload Audio</h3>
+        <div className={styles.card}>
+          <h3 className={styles.sectionTitle}>Upload Audio</h3>
 
-          {/* FILE + BUTTON ROW */}
-          <div style={styles.uploadRow}>
+          <div className={styles.uploadRow}>
             <input
               type="file"
               accept="audio/*"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
-              style={styles.fileInput}
+              className={styles.fileInput}
             />
 
-            <button style={styles.primaryBtn} onClick={handleUpload}>
-              Start Processing
+            <button
+              className={styles.primaryBtn}
+              onClick={handleUpload}
+              disabled={isUploaded || isProcessing}
+            >
+              {isProcessing
+                ? "Processing..."
+                : isUploaded
+                ? "Uploaded"
+                : "Start Processing"}
             </button>
           </div>
 
-          {/* ✅ SEARCH RESTORED UNDER FILE */}
           <input
             type="text"
             placeholder="Search logs..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={styles.searchInput}
+            className={styles.searchInput}
           />
 
-          <div style={styles.statusRow}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              value={phrase1}
+              onChange={(e) => setPhrase1(e.target.value)}
+              placeholder="Phrase 1"
+              className={styles.searchInput}
+            />
+
+            <input
+              value={phrase2}
+              onChange={(e) => setPhrase2(e.target.value)}
+              placeholder="Phrase 2"
+              className={styles.searchInput}
+            />
+
+            <button
+              type="button"
+              className={styles.smallBtn}
+              onClick={() => {
+                setPhrase1("");
+                setPhrase2("");
+              }}
+            >
+              Clear
+            </button>
+
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={handleAddRange}
+            >
+              Add
+            </button>
+          </div>
+          <div className={styles.statusRow}>
             <span><b>Status:</b> {status}</span>
             <span><b>Segment:</b> {currentSegment}</span>
             <span><b>Time:</b> {processedTime}</span>
           </div>
 
-          <div style={styles.logBox}>
-            <h4 style={styles.boxTitle}>Live Logs</h4>
+          <div className={styles.logBox}>
+            <h4 className={styles.boxTitle}>Live Logs</h4>
 
-            {filteredLogs.length === 0 ? (
-              <p style={{ opacity: 0.5 }}>Waiting for logs...</p>
-            ) : (
-              filteredLogs.map((log, i) => (
-                <div key={i} style={styles.logItem}>
-                  <span style={styles.logText}>{log}</span>
+            {filteredLogs.map((log) => {
+              const text = log?.message || "";
+              const disabled = disabledLogs.includes(log.id);
+              const isP1 =
+                phrase1 &&
+                text.toLowerCase().includes(phrase1.toLowerCase());
 
-                  {!checked.includes(i) && (
-                    <button
-                      style={styles.smallBtn}
-                      onClick={() => handleCheck(i)}
+              const isP2 =
+                phrase2 &&
+                text.toLowerCase().includes(phrase2.toLowerCase());
+
+              return (
+                <div
+                  key={log.id}
+                  className={styles.logItem}
+                    style={{
+                      borderLeft: isP1
+                        ? "4px solid #22c55e"
+                        : "4px solid transparent",
+
+                      borderRight: isP2
+                        ? "4px solid #f59e0b"
+                        : "4px solid transparent",
+                    }}
+                >
+                  {/* LEFT BUTTONS */}
+                  <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                      className={styles.smallBtn}
+                      onClick={() => setPhrase1(text)}
+                      disabled={disabled}
+                      style={{
+                        background: isP1 ? "#22c55e" : undefined,
+                        opacity: disabled ? 0.4 : 1,
+                      }}
                     >
-                      +
+                      P1
                     </button>
-                  )}
+
+               <button
+                className={styles.smallBtn}
+                onClick={() => handleCheck(log)}
+                disabled={disabled}
+                style={{
+                  opacity: disabled ? 0.4 : 1,
+                  pointerEvents: disabled ? "none" : "auto",
+                }}
+              >
+                +
+              </button>
+                  </div>
+
+                  {/* TEXT */}
+           <div style={{ flex: 1, marginLeft: 10 }}>
+              <span
+                className={styles.logText}
+                style={{
+                  backgroundColor: isP1
+                    ? "rgba(34,197,94,0.15)"
+                    : isP2
+                    ? "rgba(245,158,11,0.15)"
+                    : "transparent",
+                  padding: "2px 4px",
+                  borderRadius: 4,
+                }}
+              >
+                {text}
+              </span>
+
+              {/* ⏱ TIME INFO */}
+              <div style={{ fontSize: 11, opacity: 0.6, marginTop: 3 }}>
+                ⏱ {log?.start_time || "-"} → {log?.end_time || "-"}
+              </div>
+            </div>
+
+                  {/* RIGHT BUTTON */}
+                  <button
+                      className={styles.smallBtn}
+                      onClick={() => setPhrase2(text)}
+                      disabled={disabled}
+                      style={{
+                        background: isP2 ? "#f59e0b" : undefined,
+                        opacity: disabled ? 0.4 : 1,
+                      }}
+                    >
+                      P2
+                    </button>
                 </div>
-              ))
-            )}
+              );
+            })}
           </div>
         </div>
 
         {/* RIGHT */}
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <h3 style={styles.sectionTitle}>Selected Segments</h3>
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <h3 className={styles.sectionTitle}>Selected Segments</h3>
 
-            <button style={styles.downloadBtn} onClick={handleDownload}>
-              {downloading ? "Exporting..." : "⬇ Export Excel"}
+            <button
+              className={styles.downloadBtn}
+              onClick={handleDownload}
+            >
+              ⬇ Export Excel
             </button>
           </div>
 
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Text</th>
-                <th>Time</th>
-                <th></th>
-              </tr>
-            </thead>
+          <table className={styles.table}>
+           <thead>
+            <tr>
+              <th>Text</th>
+              <th>Start</th>
+              <th>End</th>
+              <th></th>
+            </tr>
+          </thead>
 
             <tbody>
               {results.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.id}</td>
-                  <td style={styles.cell}>{r.text}</td>
-                  <td>{r.time}</td>
+                  <td className={styles.cell}>{r.text}</td>
+                  <td>{r.start || "-"}</td>
+                  <td>{r.end || "-"}</td>
                   <td>
                     <button
-                      style={styles.deleteBtn}
+                      className={styles.deleteBtn}
                       onClick={() => handleRemove(r.id)}
                     >
                       remove
@@ -257,162 +485,3 @@ export default function Home() {
     </div>
   );
 }
-
-/* ================= STYLES ================= */
-const styles: any = {
-  page: {
-    padding: 24,
-    background: "#0b1220",
-    color: "#e5e7eb",
-    minHeight: "100vh",
-    fontFamily: "Inter, sans-serif",
-  },
-
-  header: {
-    textAlign: "center",
-    marginBottom: 18,
-  },
-
-  title: {
-    fontSize: 28,
-    fontWeight: 700,
-  },
-
-  subtitle: {
-    opacity: 0.6,
-  },
-
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 20,
-  },
-
-  card: {
-    background: "#111827",
-    border: "1px solid #1f2937",
-    borderRadius: 12,
-    padding: 16,
-  },
-
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 600,
-  },
-
-  uploadRow: {
-    display: "flex",
-    gap: 10,
-    alignItems: "center",
-    marginTop: 10,
-    marginBottom: 10,
-  },
-
-  fileInput: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
-    background: "#0b1220",
-    border: "1px solid #374151",
-    color: "#fff",
-  },
-
-  searchInput: {
-    width: "100%",
-    padding: 10,
-    marginBottom: 10,
-    borderRadius: 8,
-    background: "#0b1220",
-    border: "1px solid #374151",
-    color: "#fff",
-  },
-
-  primaryBtn: {
-    padding: "10px 14px",
-    borderRadius: 8,
-    background: "#3b82f6",
-    border: "none",
-    color: "#fff",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-
-  statusRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginTop: 12,
-    padding: 10,
-    borderRadius: 8,
-    background: "#0b1220",
-    border: "1px solid #1f2937",
-    fontSize: 13,
-  },
-
-  logBox: {
-    marginTop: 12,
-    maxHeight: 320,
-    overflowY: "auto",
-  },
-
-  boxTitle: {
-    fontSize: 13,
-    opacity: 0.7,
-    marginBottom: 8,
-  },
-
-  logItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    padding: "6px 0",
-    borderBottom: "1px solid #1f2937",
-  },
-
-  logText: {
-    fontSize: 12,
-    opacity: 0.9,
-  },
-
-  smallBtn: {
-    background: "#22c55e",
-    border: "none",
-    borderRadius: 6,
-    padding: "2px 8px",
-    cursor: "pointer",
-  },
-
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-
-  downloadBtn: {
-    background: "#10b981",
-    border: "none",
-    padding: "8px 12px",
-    borderRadius: 8,
-    color: "#fff",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: 13,
-  },
-
-  cell: {
-    maxWidth: 260,
-    wordBreak: "break-word",
-  },
-
-  deleteBtn: {
-    background: "#ef4444",
-    border: "none",
-    padding: "4px 8px",
-    borderRadius: 6,
-    color: "#fff",
-    cursor: "pointer",
-  },
-};
