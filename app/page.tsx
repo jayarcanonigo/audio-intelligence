@@ -272,7 +272,10 @@ const handleAddRange = () => {
             <input
               type="file"
               accept="audio/*"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              onChange={(e) => {
+                setFile(e.target.files?.[0] || null);
+                setIsUploaded(false);
+              }}
               className={styles.fileInput}
             />
 
