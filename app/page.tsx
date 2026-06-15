@@ -34,13 +34,17 @@ export default function Home() {
   const [isUploaded, setIsUploaded] = useState(false);
 
   const seenLogsRef = useRef<Set<number>>(new Set());
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  
 
+  
   const isProcessing =
     status === "uploading" ||
     status === "starting" ||
     status === "transcribing";
 
   /* ---------------- LOG STREAM ---------------- */
+  
   useEffect(() => {
     if (!isActive) return;
 
@@ -294,13 +298,14 @@ const handleAddRange = () => {
 
           <input
             type="text"
+            ref={searchInputRef}
             placeholder="Search logs..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className={styles.searchInput}
           />
 
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input
               value={phrase1}
               onChange={(e) => setPhrase1(e.target.value)}
@@ -321,6 +326,7 @@ const handleAddRange = () => {
               onClick={() => {
                 setPhrase1("");
                 setPhrase2("");
+                setSearch("");
               }}
             >
               Clear
@@ -396,8 +402,18 @@ const handleAddRange = () => {
                   </div>
 
                   {/* TEXT */}
-           <div style={{ flex: 1, marginLeft: 10 }}>
-              <span
+          <div
+            style={{ flex: 1, marginLeft: 10 }}
+            onDoubleClick={() => {
+              setSearch(text);
+
+              setTimeout(() => {
+                searchInputRef.current?.focus();
+                searchInputRef.current?.select();
+              }, 0);
+            }}
+          >
+            <span
                 className={styles.logText}
                 style={{
                   backgroundColor: isP1
@@ -407,16 +423,26 @@ const handleAddRange = () => {
                     : "transparent",
                   padding: "2px 4px",
                   borderRadius: 4,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  color: "#2563eb",
+                }}
+                onDoubleClick={() => {
+                  setSearch(text);
+
+                  setTimeout(() => {
+                    searchInputRef.current?.focus();
+                    searchInputRef.current?.select();
+                  }, 0);
                 }}
               >
                 {text}
               </span>
-
-              {/* ⏱ TIME INFO */}
-              <div style={{ fontSize: 11, opacity: 0.6, marginTop: 3 }}>
-                ⏱ {log?.start_time || "-"} → {log?.end_time || "-"}
-              </div>
+            {/* ⏱ TIME INFO */}
+            <div style={{ fontSize: 11, opacity: 0.6, marginTop: 3 }}>
+              ⏱ {log?.start_time || "-"} → {log?.end_time || "-"}
             </div>
+          </div>
 
                   {/* RIGHT BUTTON */}
                   <button
