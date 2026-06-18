@@ -6,6 +6,7 @@ import {
   getStatus,
   getLogs,
   resetSession,
+  stopProcess,
 } from "@/services/api";
 
 import styles from "./page.module.css";
@@ -15,9 +16,10 @@ const API_URL =
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
-
+  const [sessionId, setSessionId] = useState("");
   const [search, setSearch] = useState("");
-
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
   const [phrase1, setPhrase1] = useState("");
   const [phrase2, setPhrase2] = useState("");
   const [disabledLogs, setDisabledLogs] = useState<number[]>([]);
@@ -41,83 +43,237 @@ export default function Home() {
   const isProcessing =
     status === "uploading" ||
     status === "starting" ||
-    status === "transcribing";
+    status === "transcribing" ||
+    status === "stopping";
 
   /* ---------------- LOG STREAM ---------------- */
   
   useEffect(() => {
-    if (!isActive) return;
+      if (!isActive || !sessionId) return;
 
-    const fetchLogs = async () => {
-      const res = await fetch(`${API_URL}/logs?t=${Date.now()}`, {
-        cache: "no-store",
-      });
 
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : data.logs || [];
+      const fetchLogs = async () => {
 
-      const fresh = list.filter((log: any) => {
-        if (!log?.id) return false;
-        if (seenLogsRef.current.has(log.id)) return false;
+        const res = await fetch(
+          `${API_URL}/logs/${sessionId}?t=${Date.now()}`,
+          {
+            cache: "no-store",
+          }
+        );
 
-        seenLogsRef.current.add(log.id);
-        return true;
-      });
 
-      if (fresh.length) {
-        setLogs((prev) => [...prev, ...fresh]);
-      }
-    };
+        const data = await res.json();
 
-    fetchLogs();
-    const interval = setInterval(fetchLogs, 1000);
+        const list = Array.isArray(data)
+          ? data
+          : data.logs || [];
 
-    return () => clearInterval(interval);
-  }, [isActive]);
+
+        const fresh = list.filter((log: any) => {
+
+          if (!log?.id) return false;
+
+          if (seenLogsRef.current.has(log.id))
+            return false;
+
+
+          seenLogsRef.current.add(log.id);
+
+          return true;
+        });
+
+
+
+        if (fresh.length) {
+
+          setLogs((prev) => [
+            ...prev,
+            ...fresh
+          ]);
+
+
+
+          // Auto add advertisements to Selected Segments
+
+          const ads = fresh.filter(
+            (log: any) =>
+              log.advertisement === true
+          );
+
+
+
+          if (ads.length) {
+
+            setResults((prev) => [
+
+              ...prev,
+
+              ...ads.map((log: any) => ({
+
+                id: log.id,
+
+                text: log.message || "",
+
+                start: log.start_time || "",
+
+                end: log.end_time || "",
+
+                time: new Date()
+                  .toLocaleTimeString(),
+
+                advertisement: true,
+
+              }))
+
+            ]);
+
+
+
+            setDisabledLogs((prev) => [
+
+              ...prev,
+
+              ...ads.map(
+                (log:any)=>log.id
+              )
+
+            ]);
+
+          }
+        }
+      };
+
+
+
+      fetchLogs();
+
+
+      const interval = setInterval(
+        fetchLogs,
+        1000
+      );
+
+
+      return () =>
+        clearInterval(interval);
+
+
+    }, [isActive, sessionId]);
 
   /* ---------------- STATUS ---------------- */
-  const startPolling = () => {
-    const interval = setInterval(async () => {
-      const data = await getStatus();
+const startPolling = (id: string) => {
+  if (!id) return;
 
-      setStatus(data.status);
-      setProcessedTime(data.processed_time);
-      setCurrentSegment(data.current_segment);
+  const interval = setInterval(async () => {
+    try {
+      const data = await getStatus(id);     
 
-      if (data.status === "completed" || data.status === "error") {
+      setStatus(data.status ?? "idle");
+      setProcessedTime(data.processed_time ?? "00:00:00");
+      setCurrentSegment(data.current_segment ?? 0);
+
+      if (
+        data.status === "completed" ||
+        data.status === "error" ||
+        data.status === "stopped"
+      ) {
         clearInterval(interval);
         setIsActive(false);
       }
-    }, 1000);
+
+    } catch (error) {
+      console.error("Polling error:", error);
+      clearInterval(interval);
+    }
+
+  }, 1000);
+
+  return interval;
+};
+
+  const handleEdit = (row: any) => {
+    setEditingId(row.id);
+    setEditText(row.text);
   };
 
+
+  const handleSaveEdit = (id: number) => {
+    setResults((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? { ...r, text: editText }
+          : r
+      )
+    );
+
+    setEditingId(null);
+    setEditText("");
+  };
+
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditText("");
+  };
   /* ---------------- UPLOAD ---------------- */
-  const handleUpload = async () => {
-    if (!file) return alert("Select a file");
+ const handleUpload = async () => {
 
-    setIsUploaded(true);
-    setStatus("uploading");
+  if (!file)
+    return alert("Select a file");
+  setIsUploaded(true);
+  setStatus("uploading");
+  setLogs([]);
+  setResults([]);
+  setChecked([]);
+  seenLogsRef.current.clear();
+  setIsActive(false);
+  try {
 
-    setLogs([]);
-    setResults([]);
-    setChecked([]);
-    seenLogsRef.current.clear();
+    if(sessionId){
+      await resetSession(sessionId);
+    }
+    const result =
+      await uploadAudio(file);
+    if(!result.session_id){
+      throw new Error(
+        "No session id returned"
+      );
 
-    setIsActive(false);
+    }
+    const newSessionId =
+      result.session_id;
 
-    await resetSession();
-    await uploadAudio(file);
+    setSessionId(newSessionId);
+    const fresh =
+      await getLogs(newSessionId);
 
-    const fresh = await getLogs();
-    const initial = Array.isArray(fresh) ? fresh : fresh.logs || [];
+    const initial =
+      Array.isArray(fresh)
+      ? fresh
+      : fresh.logs || [];
 
     setLogs(initial);
-    seenLogsRef.current = new Set(initial.map((l: any) => l.id));
+    seenLogsRef.current =
+      new Set(
+        initial.map(
+          (l:any)=>l.id
+        )
+      );
 
     setIsActive(true);
-    startPolling();
-  };
 
+   startPolling(newSessionId);
+
+
+  } catch(error){
+
+    console.error(error);
+
+    setStatus("error");
+
+  }
+
+};
   /* ---------------- CHECK ---------------- */
   const handleCheck = (log: any) => {
   if (disabledLogs.includes(log.id)) return;
@@ -272,30 +428,67 @@ const handleAddRange = () => {
         <div className={styles.card}>
           <h3 className={styles.sectionTitle}>Upload Audio</h3>
 
-          <div className={styles.uploadRow}>
-            <input
-              type="file"
-              accept="audio/*"
-              onChange={(e) => {
-                setFile(e.target.files?.[0] || null);
-                setIsUploaded(false);
-              }}
-              className={styles.fileInput}
-            />
+    <div className={styles.uploadRow}>
+        <input
+          type="file"
+          accept="audio/*"
+          onChange={(e) => {
+            const selectedFile = e.target.files?.[0];
 
-            <button
-              className={styles.primaryBtn}
-              onClick={handleUpload}
-              disabled={isUploaded || isProcessing}
-            >
-              {isProcessing
-                ? "Processing..."
-                : isUploaded
-                ? "Uploaded"
-                : "Start Processing"}
-            </button>
-          </div>
+            if (selectedFile) {
+              setFile(selectedFile);
+              setIsUploaded(false);
+              setStatus("idle");
+            }
+          }}
+          className={styles.fileInput}
+        />
 
+
+        <button
+          className={styles.primaryBtn}
+          onClick={handleUpload}
+          disabled={isProcessing}
+        >
+          {isProcessing
+            ? "Processing..."
+            : "Start Processing"}
+        </button>
+
+
+        <button
+          className={styles.deleteBtn}
+          onClick={async () => {
+            if (!sessionId) return;
+
+            try {
+              await stopProcess(sessionId);
+
+              // stop polling logs
+              setIsActive(false);
+
+              // enable Start Processing again
+              setStatus("idle");
+              setProcessedTime("00:00:00");
+              setCurrentSegment(0);
+
+              // IMPORTANT:
+              // do not clear file here
+              // setFile(null);  <-- REMOVE
+
+              setIsUploaded(false);
+
+            } catch(error) {
+              console.error("Stop failed", error);
+            }
+
+          }}
+          disabled={!sessionId || !isProcessing}
+        >
+          ⛔ Stop
+        </button>
+
+      </div>
           <input
             type="text"
             ref={searchInputRef}
@@ -464,15 +657,21 @@ const handleAddRange = () => {
 
         {/* RIGHT */}
         <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <h3 className={styles.sectionTitle}>Selected Segments</h3>
+        <div className={styles.cardHeader}>
 
-            <button
-              className={styles.downloadBtn}
-              onClick={handleDownload}
-            >
-              ⬇ Export Excel
-            </button>
+          <h3 className={styles.sectionTitle}>
+            Selected Segments
+          </h3>
+
+          <button
+            className={styles.downloadBtn}
+            onClick={handleDownload}
+            title="Export Excel"
+          >
+            📥
+          </button>
+
+
           </div>
 
           <table className={styles.table}>
@@ -486,19 +685,87 @@ const handleAddRange = () => {
           </thead>
 
             <tbody>
-              {results.map((r) => (
+            {[...results]
+              .sort((a, b) => {
+                const timeA = a.start || "99:99:99";
+                const timeB = b.start || "99:99:99";
+
+                return timeA.localeCompare(timeB);
+              })
+              .map((r) => (
                 <tr key={r.id}>
-                  <td className={styles.cell}>{r.text}</td>
+                 
+              <td className={styles.cell}>
+
+              {editingId === r.id ? (
+
+                <textarea
+                  value={editText}
+                  onChange={(e) =>
+                    setEditText(e.target.value)
+                  }
+                  className={styles.editText}
+                  rows={3}
+                />
+
+              ) : (
+
+                r.text
+
+              )}
+
+              </td>
+
                   <td>{r.start || "-"}</td>
                   <td>{r.end || "-"}</td>
                   <td>
-                    <button
-                      className={styles.deleteBtn}
-                      onClick={() => handleRemove(r.id)}
-                    >
-                      remove
-                    </button>
-                  </td>
+              {editingId === r.id ? (
+
+                <>
+                  <button
+                    className={styles.saveBtn}
+                    onClick={() =>
+                      handleSaveEdit(r.id)
+                    }
+                    title="Save"
+                  >
+                    💾
+                  </button>
+
+                  <button
+                    className={styles.deleteBtn}
+                    onClick={handleCancelEdit}
+                    title="Cancel"
+                  >
+                    ❌
+                  </button>
+                </>
+
+              ) : (
+
+                <>
+                  <button
+                    className={styles.editBtn}
+                    onClick={() => handleEdit(r)}
+                    title="Edit"
+                  >
+                    ✏️
+                  </button>
+
+                  <button
+                    className={styles.deleteBtn}
+                    onClick={() =>
+                      handleRemove(r.id)
+                    }
+                    title="Remove"
+                  >
+                    🗑️
+                  </button>
+                </>
+
+              )}
+
+              </td>
                 </tr>
               ))}
             </tbody>
