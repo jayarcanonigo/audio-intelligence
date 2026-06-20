@@ -5,7 +5,7 @@ import tempfile, threading, os, re, time, uuid
 
 app = FastAPI(title="Radio Search API")
 
-app.add_middleware(
+app.add_middleware( 
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
