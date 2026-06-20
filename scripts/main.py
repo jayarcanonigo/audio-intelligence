@@ -46,6 +46,9 @@ def normalize(text):
     return re.sub(r"[^\w\s]", " ", text.lower()).split()
 
 
+AD_MERGE_GAP = 5
+
+
 AD_KEYWORDS = [
     "sponsored",
     "brought to you",
@@ -68,6 +71,7 @@ AD_KEYWORDS = [
 
 
 def check_custom_keywords(text, keywords):
+
     if not keywords:
         return False
 
@@ -96,6 +100,37 @@ def is_advertisement(text):
     return score >= 2
 
 
+def merge_advertisement(session, new_segment):
+
+    transcript = session["transcript"]
+
+    if not transcript:
+        transcript.append(new_segment)
+        return
+
+    previous = transcript[-1]
+
+    gap = new_segment["start"] - previous["end"]
+
+    if (
+        previous["advertisement"]
+        and new_segment["advertisement"]
+        and gap <= AD_MERGE_GAP
+    ):
+
+        previous["end"] = new_segment["end"]
+
+        previous["end_time"] = new_segment["end_time"]
+
+        previous["text"] += " " + new_segment["text"]
+
+        previous["text_tokens"] = normalize(previous["text"])
+
+        return
+
+    transcript.append(new_segment)
+
+
 def add_log(sid, msg, start=None, end=None, advertisement=False):
 
     if sid not in sessions:
@@ -111,6 +146,7 @@ def add_log(sid, msg, start=None, end=None, advertisement=False):
     }
 
     with lock:
+
         sessions[sid]["logs"].append(item)
 
         if len(sessions[sid]["logs"]) > 500:
@@ -148,11 +184,15 @@ def transcribe_audio(path, sid):
 
             if session["stop"]:
 
-                session["progress"].update({"status": "stopped", "message": "Stopped"})
+                session["progress"].update(
+                    {"status": "stopped", "message": "Stopped", "error": None}
+                )
 
-                add_log(sid, "Stopped by user")
+                add_log(sid, "Processing stopped")
 
-                break
+                return
+
+            text = seg.text.strip()
 
             text = seg.text.strip()
 
@@ -180,7 +220,7 @@ def transcribe_audio(path, sid):
             }
 
             with lock:
-                session["transcript"].append(data)
+                merge_advertisement(session, data)
 
             session["progress"].update(
                 {
@@ -215,6 +255,7 @@ def transcribe_audio(path, sid):
 
         try:
             os.remove(path)
+
         except:
             pass
 
@@ -230,11 +271,9 @@ async def upload(file: UploadFile = File(...), keywords: str = Form("")):
     sid = str(uuid.uuid4())
 
     try:
-
         keyword_list = [x.strip() for x in json.loads(keywords) if x.strip()]
 
     except:
-
         keyword_list = []
 
     sessions[sid] = {
@@ -305,11 +344,11 @@ def stop(sid: str):
 
     sessions[sid]["stop"] = True
 
-    sessions[sid]["progress"].update({"status": "stopping", "message": "Stopping..."})
+    sessions[sid]["progress"].update({"status": "stopped", "message": "Stopped"})
 
-    add_log(sid, "Stop requested")
+    add_log(sid, "Processing stopped")
 
-    return {"status": "stopping", "session_id": sid}
+    return {"status": "stopped", "session_id": sid}
 
 
 @app.post("/reset/{sid}")

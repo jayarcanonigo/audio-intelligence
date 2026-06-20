@@ -32,6 +32,8 @@ export default function Home() {
   const [results, setResults] = useState<any[]>([]);
   const [checked, setChecked] = useState<number[]>([]);
   const [downloading, setDownloading] = useState(false);
+  const statusIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const logIntervalRef = useRef<NodeJS.Timeout | null>(null); 
   const [filterText, setFilterText] = useState("");
 
   const [isActive, setIsActive] = useState(false);
@@ -49,147 +51,204 @@ export default function Home() {
 
   /* ---------------- LOG STREAM ---------------- */
   
-  useEffect(() => {
-      if (!isActive || !sessionId) return;
+useEffect(() => {
+  if (!isActive || !sessionId) return;
 
+  let cancelled = false;
 
-      const fetchLogs = async () => {
-
-        const res = await fetch(
-          `${API_URL}/logs/${sessionId}?t=${Date.now()}`,
-          {
-            cache: "no-store",
-          }
-        );
-
-
-        const data = await res.json();
-
-        const list = Array.isArray(data)
-          ? data
-          : data.logs || [];
-
-
-        const fresh = list.filter((log: any) => {
-
-          if (!log?.id) return false;
-
-          if (seenLogsRef.current.has(log.id))
-            return false;
-
-
-          seenLogsRef.current.add(log.id);
-
-          return true;
-        });
-
-
-
-        if (fresh.length) {
-
-          setLogs((prev) => [
-            ...prev,
-            ...fresh
-          ]);
-
-
-
-          // Auto add advertisements to Selected Segments
-
-          const ads = fresh.filter(
-            (log: any) =>
-              log.advertisement === true
-          );
-
-
-
-          if (ads.length) {
-
-            setResults((prev) => [
-
-              ...prev,
-
-              ...ads.map((log: any) => ({
-
-                id: log.id,
-
-                text: log.message || "",
-
-                start: log.start_time || "",
-
-                end: log.end_time || "",
-
-                time: new Date()
-                  .toLocaleTimeString(),
-
-                advertisement: true,
-
-              }))
-
-            ]);
-
-
-
-            setDisabledLogs((prev) => [
-
-              ...prev,
-
-              ...ads.map(
-                (log:any)=>log.id
-              )
-
-            ]);
-
-          }
+  const fetchLogs = async () => {
+    try {
+      const res = await fetch(
+        `${API_URL}/logs/${sessionId}?t=${Date.now()}`,
+        {
+          cache: "no-store",
         }
-      };
+      );
+
+      if (cancelled) return;
+
+      const data = await res.json();
+
+      if (cancelled) return;
+
+      const list = Array.isArray(data)
+        ? data
+        : data.logs || [];
 
 
+      const fresh = list.filter((log: any) => {
 
-      fetchLogs();
+        if (!log?.id)
+          return false;
 
 
-      const interval = setInterval(
-        fetchLogs,
-        1000
+        if (seenLogsRef.current.has(log.id))
+          return false;
+
+
+        seenLogsRef.current.add(log.id);
+
+        return true;
+
+      });
+
+
+      if (cancelled || !fresh.length)
+        return;
+
+
+      setLogs((prev) => [
+        ...prev,
+        ...fresh
+      ]);
+
+
+      const ads = fresh.filter(
+        (log:any) =>
+          log.advertisement === true
       );
 
 
-      return () =>
-        clearInterval(interval);
+      if (ads.length) {
+
+        setResults((prev) => [
+
+          ...prev,
+
+          ...ads.map((log:any)=>({
+
+            id: log.id,
+
+            text: log.message || "",
+
+            start: log.start_time || "",
+
+            end: log.end_time || "",
+
+            time:
+              new Date()
+              .toLocaleTimeString(),
+
+            advertisement:true,
+
+          }))
+
+        ]);
 
 
-    }, [isActive, sessionId]);
+        setDisabledLogs((prev)=>[
 
+          ...prev,
+
+          ...ads.map(
+            (log:any)=>log.id
+          )
+
+        ]);
+
+      }
+
+
+    } catch(error) {
+
+      if(!cancelled){
+        console.error(
+          "Log fetch error:",
+          error
+        );
+      }
+
+    }
+
+  };
+
+
+  fetchLogs();
+
+
+  logIntervalRef.current = setInterval(
+    fetchLogs,
+    1000
+  );
+
+
+  return () => {
+
+    cancelled = true;
+
+
+    if(logIntervalRef.current){
+
+      clearInterval(
+        logIntervalRef.current
+      );
+
+      logIntervalRef.current = null;
+
+    }
+
+  };
+
+
+}, [isActive, sessionId]);
   /* ---------------- STATUS ---------------- */
 const startPolling = (id: string) => {
   if (!id) return;
 
-  const interval = setInterval(async () => {
+
+  if(statusIntervalRef.current){
+    clearInterval(statusIntervalRef.current);
+  }
+
+
+  statusIntervalRef.current = setInterval(async()=>{
+
     try {
-      const data = await getStatus(id);     
-
+      const data = await getStatus(id);
       setStatus(data.status ?? "idle");
-      setProcessedTime(data.processed_time ?? "00:00:00");
-      setCurrentSegment(data.current_segment ?? 0);
-
-      if (
+      setProcessedTime(
+        data.processed_time ?? "00:00:00"
+      );
+      setCurrentSegment(
+        data.current_segment ?? 0
+      );
+      if(
         data.status === "completed" ||
         data.status === "error" ||
         data.status === "stopped"
-      ) {
-        clearInterval(interval);
+      ){
+
+        if(statusIntervalRef.current){
+
+          clearInterval(
+            statusIntervalRef.current
+          );
+
+          statusIntervalRef.current=null;
+        }
         setIsActive(false);
       }
+    }catch(error){
 
-    } catch (error) {
-      console.error("Polling error:", error);
-      clearInterval(interval);
+      console.error(
+        "Polling error:",
+        error
+      );
+
+
+      if(statusIntervalRef.current){
+
+        clearInterval(
+          statusIntervalRef.current
+        );
+
+        statusIntervalRef.current=null;
+      }
+
     }
 
-  }, 1000);
 
-  return interval;
+  },1000);
 };
   
   const handleEdit = (row: any) => {
@@ -486,20 +545,34 @@ const handleAddRange = () => {
         </button>
         <button
           className={styles.smallBtn}
-          onClick={async () => {
-            if (!sessionId) return;
+         onClick={async () => {
+            if(!sessionId) return;
 
             try {
+
               await stopProcess(sessionId);
 
-              setIsActive(false);
-              setStatus("idle");
-              setProcessedTime("00:00:00");
-              setCurrentSegment(0);
-              setIsUploaded(false);
+              setStatus("stopped");
 
-            } catch(error) {
-              console.error("Stop failed", error);
+              setIsActive(false);
+
+
+              if(logIntervalRef.current){
+                clearInterval(logIntervalRef.current);
+                logIntervalRef.current=null;
+              }
+
+
+              if(statusIntervalRef.current){
+                clearInterval(statusIntervalRef.current);
+                statusIntervalRef.current=null;
+              }
+
+
+            } catch(error){
+
+              console.error("Stop failed",error);
+
             }
 
           }}
