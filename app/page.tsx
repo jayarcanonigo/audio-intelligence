@@ -10,6 +10,7 @@ import {
 } from "@/services/api";
 
 import styles from "./page.module.css";
+import FilterModal from "@/components/FilterModal";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -26,18 +27,18 @@ export default function Home() {
   const [status, setStatus] = useState("idle");
   const [processedTime, setProcessedTime] = useState("00:00:00");
   const [currentSegment, setCurrentSegment] = useState(0);
-
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
   const [checked, setChecked] = useState<number[]>([]);
   const [downloading, setDownloading] = useState(false);
+  const [filterText, setFilterText] = useState("");
 
   const [isActive, setIsActive] = useState(false);
   const [isUploaded, setIsUploaded] = useState(false);
 
   const seenLogsRef = useRef<Set<number>>(new Set());
   const searchInputRef = useRef<HTMLInputElement>(null);
-  
 
   
   const isProcessing =
@@ -190,7 +191,7 @@ const startPolling = (id: string) => {
 
   return interval;
 };
-
+  
   const handleEdit = (row: any) => {
     setEditingId(row.id);
     setEditText(row.text);
@@ -232,8 +233,17 @@ const startPolling = (id: string) => {
     if(sessionId){
       await resetSession(sessionId);
     }
-    const result =
-      await uploadAudio(file);
+    const keywords = filterText
+        .split("\n")
+        .map((x) => x.trim())
+        .filter(Boolean);
+
+
+      const result =
+        await uploadAudio(
+          file,
+          keywords
+        );
     if(!result.session_id){
       throw new Error(
         "No session id returned"
@@ -416,12 +426,21 @@ const handleAddRange = () => {
   /* ---------------- UI ---------------- */
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>📻 Radio Search Dashboard</h1>
-        <p className={styles.subtitle}>
-          Hover buttons + highlighted phrase matching
-        </p>
-      </div>
+         <FilterModal
+      open={showFilterModal}
+      onClose={() => setShowFilterModal(false)}
+      onApply={(value) => setFilterText(value)}
+      defaultValue={filterText}
+    />
+     <div className={styles.header}>
+      <h1 className={styles.title}>
+        📻 Radio Search Dashboard
+      </h1>
+
+      <p className={styles.subtitle}>
+        AI Transcription • Smart Segment Merging • Advertisement Detection • Highlighted Phrase Matching
+      </p>
+    </div>
 
       <div className={styles.grid}>
         {/* LEFT */}
@@ -455,27 +474,28 @@ const handleAddRange = () => {
             : "Start Processing"}
         </button>
 
+      </div>
 
+      <div className={styles.filterRow}>
+
+      <button
+          className={styles.smallBtn}
+          onClick={() => setShowFilterModal(true)}
+        >
+          🔎 Filter
+        </button>
         <button
-          className={styles.deleteBtn}
+          className={styles.smallBtn}
           onClick={async () => {
             if (!sessionId) return;
 
             try {
               await stopProcess(sessionId);
 
-              // stop polling logs
               setIsActive(false);
-
-              // enable Start Processing again
               setStatus("idle");
               setProcessedTime("00:00:00");
               setCurrentSegment(0);
-
-              // IMPORTANT:
-              // do not clear file here
-              // setFile(null);  <-- REMOVE
-
               setIsUploaded(false);
 
             } catch(error) {
@@ -489,14 +509,16 @@ const handleAddRange = () => {
         </button>
 
       </div>
-          <input
-            type="text"
-            ref={searchInputRef}
-            placeholder="Search logs..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={styles.searchInput}
-          />
+          <div className={styles.searchBox}>
+            <input
+              type="text"
+              ref={searchInputRef}
+              placeholder="Search logs..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input
@@ -776,7 +798,7 @@ const handleAddRange = () => {
               No segments selected yet
             </p>
           )}
-        </div>
+        </div>       
       </div>
     </div>
   );

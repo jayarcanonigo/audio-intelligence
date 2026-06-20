@@ -230,3 +230,15 @@
   align-items: center;
   flex-wrap: wrap;
 }
+
+.filterRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+.searchBox {
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+}

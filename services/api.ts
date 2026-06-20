@@ -6,13 +6,24 @@ const API_URL =
 // UPLOAD
 // -------------------------
 
-export async function uploadAudio(file: File) {
+export async function uploadAudio(
+  file: File,
+  keywords: string[] = []
+) {
 
   const formData = new FormData();
+
 
   formData.append(
     "file",
     file
+  );
+
+
+  // Convert array to JSON string
+  formData.append(
+    "keywords",
+    JSON.stringify(keywords)
   );
 
 
@@ -30,6 +41,7 @@ export async function uploadAudio(file: File) {
 
 
   return res.json();
+
 }
 
 
@@ -41,7 +53,6 @@ export async function uploadAudio(file: File) {
 export async function getStatus(
   sessionId: string
 ) {
-
 
   const res = await fetch(
     `${API_URL}/status/${sessionId}`
@@ -66,7 +77,6 @@ export async function getStatus(
 export async function getLogs(
   sessionId: string
 ) {
-
 
   const res = await fetch(
     `${API_URL}/logs/${sessionId}?t=${Date.now()}`,
@@ -95,7 +105,6 @@ export async function getTranscript(
   sessionId: string
 ) {
 
-
   const res = await fetch(
     `${API_URL}/transcript/${sessionId}`
   );
@@ -119,7 +128,6 @@ export async function getTranscript(
 export async function stopProcess(
   sessionId: string
 ) {
-
 
   const res = await fetch(
     `${API_URL}/stop/${sessionId}`,
@@ -147,7 +155,6 @@ export async function stopProcess(
 export async function resetSession(
   sessionId: string
 ) {
-
 
   const res = await fetch(
     `${API_URL}/reset/${sessionId}`,

@@ -1,7 +1,7 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from faster_whisper import WhisperModel
-import tempfile, threading, os, re, time, uuid
+import tempfile, threading, os, re, time, uuid, json
 
 app = FastAPI(title="Radio Search API")
 
@@ -47,7 +47,6 @@ def normalize(text):
 
 
 AD_KEYWORDS = [
-    # Strong sponsor phrases
     "sponsored",
     "brought to you",
     "hatid ng",
@@ -55,8 +54,6 @@ AD_KEYWORDS = [
     "inihahatid ng",
     "ipinagmamalaki ng",
     "ang programang ito ay hatid",
-
-    # Time check
     "time check",
     "time check brought to you by",
     "the time is",
@@ -67,46 +64,22 @@ AD_KEYWORDS = [
     "hatid na time check",
     "ang time check ay hatid ng",
     "oras hatid ng",
-
-    # Purchase intent
-    "call now",
-    "tumawag",
-    "tawagan",
-    "hotline",
-    "text us",
-
-    "buy now",
-    "bumili",
-    "bilhin",
-    "order now",
-    "mag order",
-    "mag-order",
-    "umorder",
-
-    # Promotions
-    "promo",
-    "promosyon",
-    "discount",
-    "diskwento",
-    "special offer",
-    "limited time",
-
-    # Marketing language
-    "sulit",
-    "tipid",
-    "libreng",
-    "samantalahin",
-    "huwag palampasin",
-    "magmadali",
-    "sa halagang",
-    "sa murang halaga",
-    "abot kaya",
-
 ]
 
 
+def check_custom_keywords(text, keywords):
+    if not keywords:
+        return False
+
+    text = text.lower()
+
+    return any(k.strip().lower() in text for k in keywords if k.strip())
+
+
 def is_advertisement(text):
+
     text = re.sub(r"[^a-z0-9\s]", "", text.lower())
+
     text = " ".join(text.split())
 
     score = sum(2 for x in AD_KEYWORDS if x in text)
@@ -124,8 +97,10 @@ def is_advertisement(text):
 
 
 def add_log(sid, msg, start=None, end=None, advertisement=False):
+
     if sid not in sessions:
         return
+
     item = {
         "id": time.time_ns(),
         "time": time.strftime("%H:%M:%S"),
@@ -134,15 +109,20 @@ def add_log(sid, msg, start=None, end=None, advertisement=False):
         "end_time": end,
         "advertisement": advertisement,
     }
+
     with lock:
         sessions[sid]["logs"].append(item)
+
         if len(sessions[sid]["logs"]) > 500:
             sessions[sid]["logs"] = sessions[sid]["logs"][-500:]
 
 
 def transcribe_audio(path, sid):
+
     session = sessions[sid]
+
     try:
+
         start = time.time()
 
         session["progress"].update(
@@ -165,9 +145,13 @@ def transcribe_audio(path, sid):
         count = 0
 
         for seg in segments:
+
             if session["stop"]:
+
                 session["progress"].update({"status": "stopped", "message": "Stopped"})
+
                 add_log(sid, "Stopped by user")
+
                 break
 
             text = seg.text.strip()
@@ -180,7 +164,9 @@ def transcribe_audio(path, sid):
             start_t = format_time(seg.start)
             end_t = format_time(seg.end)
 
-            ad = is_advertisement(text)
+            ad = is_advertisement(text) or check_custom_keywords(
+                text, session.get("keywords", [])
+            )
 
             data = {
                 "index": count - 1,
@@ -220,10 +206,13 @@ def transcribe_audio(path, sid):
         add_log(sid, f"Completed {count} segments")
 
     except Exception as e:
+
         session["progress"].update({"status": "error", "error": str(e)})
+
         add_log(sid, f"ERROR: {e}")
 
     finally:
+
         try:
             os.remove(path)
         except:
@@ -236,14 +225,24 @@ def root():
 
 
 @app.post("/upload")
-async def upload(file: UploadFile = File(...)):
+async def upload(file: UploadFile = File(...), keywords: str = Form("")):
+
     sid = str(uuid.uuid4())
+
+    try:
+
+        keyword_list = [x.strip() for x in json.loads(keywords) if x.strip()]
+
+    except:
+
+        keyword_list = []
 
     sessions[sid] = {
         "stop": False,
         "progress": create_progress(),
         "logs": [],
         "transcript": [],
+        "keywords": keyword_list,
     }
 
     content = await file.read()
@@ -254,12 +253,17 @@ async def upload(file: UploadFile = File(...)):
     ext = os.path.splitext(file.filename)[1] or ".mp3"
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+
         tmp.write(content)
         path = tmp.name
 
     sessions[sid]["progress"].update({"status": "starting", "message": "Uploading..."})
 
     add_log(sid, "File uploaded")
+
+    if keyword_list:
+
+        add_log(sid, "Filters: " + ", ".join(keyword_list))
 
     threading.Thread(target=transcribe_audio, args=(path, sid), daemon=True).start()
 
@@ -268,6 +272,7 @@ async def upload(file: UploadFile = File(...)):
 
 @app.get("/status/{sid}")
 def status(sid: str):
+
     if sid not in sessions:
         return {"error": "not found"}
 
@@ -276,6 +281,7 @@ def status(sid: str):
 
 @app.get("/logs/{sid}")
 def logs(sid: str):
+
     if sid not in sessions:
         return []
 
@@ -284,6 +290,7 @@ def logs(sid: str):
 
 @app.get("/transcript/{sid}")
 def transcript(sid: str):
+
     if sid not in sessions:
         return []
 
@@ -292,6 +299,7 @@ def transcript(sid: str):
 
 @app.post("/stop/{sid}")
 def stop(sid: str):
+
     if sid not in sessions:
         return {"status": "not_found"}
 
@@ -306,6 +314,7 @@ def stop(sid: str):
 
 @app.post("/reset/{sid}")
 def reset(sid: str):
+
     if sid not in sessions:
         return {"status": "not_found"}
 
