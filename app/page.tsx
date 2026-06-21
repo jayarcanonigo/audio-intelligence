@@ -506,82 +506,87 @@ const handleAddRange = () => {
         <div className={styles.card}>
           <h3 className={styles.sectionTitle}>Upload Audio</h3>
 
-    <div className={styles.uploadRow}>
-        <input
-          type="file"
-          accept="audio/*"
-          onChange={(e) => {
-            const selectedFile = e.target.files?.[0];
+    <div className={styles.controlRow}>
+      <input
+        type="file"
+        accept="audio/*"
+        onChange={(e) => {
 
-            if (selectedFile) {
-              setFile(selectedFile);
-              setIsUploaded(false);
-              setStatus("idle");
-            }
-          }}
-          className={styles.fileInput}
-        />
+          const selectedFile = e.target.files?.[0];
 
+          if(selectedFile){
+            setFile(selectedFile);
+            setIsUploaded(false);
+            setStatus("idle");
+          }
 
-        <button
-          className={styles.primaryBtn}
-          onClick={handleUpload}
-          disabled={isProcessing}
-        >
-          {isProcessing
-            ? "Processing..."
-            : "Start Processing"}
-        </button>
+        }}
+        className={styles.fileInput}
+      />
 
-      </div>
-
-      <div className={styles.filterRow}>
 
       <button
-          className={styles.smallBtn}
-          onClick={() => setShowFilterModal(true)}
-        >
-          🔎 Filter
-        </button>
-        <button
-          className={styles.smallBtn}
-         onClick={async () => {
-            if(!sessionId) return;
-
-            try {
-
-              await stopProcess(sessionId);
-
-              setStatus("stopped");
-
-              setIsActive(false);
+        className={styles.primaryBtn}
+        onClick={handleUpload}
+        disabled={isProcessing}
+      >
+        {isProcessing
+          ? "Processing..."
+          : "▶ Start"}
+      </button>
 
 
-              if(logIntervalRef.current){
-                clearInterval(logIntervalRef.current);
-                logIntervalRef.current=null;
-              }
+      <button
+        className={styles.smallBtn}
+        onClick={() => setShowFilterModal(true)}
+      >
+        🔎 Filter
+      </button>
 
 
-              if(statusIntervalRef.current){
-                clearInterval(statusIntervalRef.current);
-                statusIntervalRef.current=null;
-              }
+      <button
+        className={styles.smallBtn}
+        onClick={async()=>{
+
+          if(!sessionId) return;
+
+          try {
+
+            await stopProcess(sessionId);
+
+            setStatus("stopped");
+            setIsActive(false);
 
 
-            } catch(error){
-
-              console.error("Stop failed",error);
-
+            if(logIntervalRef.current){
+              clearInterval(logIntervalRef.current);
+              logIntervalRef.current=null;
             }
 
-          }}
-          disabled={!sessionId || !isProcessing}
-        >
-          ⛔ Stop
-        </button>
 
-      </div>
+            if(statusIntervalRef.current){
+              clearInterval(statusIntervalRef.current);
+              statusIntervalRef.current=null;
+            }
+
+
+          }catch(error){
+
+            console.error(
+              "Stop failed",
+              error
+            );
+
+          }
+
+        }}
+        disabled={!sessionId || !isProcessing}
+      >
+        ⛔ Stop
+      </button>
+
+
+    </div>
           <div className={styles.searchBox}>
             <input
               type="text"
