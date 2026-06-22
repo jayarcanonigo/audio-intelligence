@@ -212,21 +212,16 @@ const startPolling = (id: string) => {
       setCurrentSegment(
         data.current_segment ?? 0
       );
-      if(
-        data.status === "completed" ||
-        data.status === "error" ||
-        data.status === "stopped"
-      ){
+      if (data.status === "completed") {
+        setTimeout(() => {
+          setIsActive(false);
 
-        if(statusIntervalRef.current){
+          if (statusIntervalRef.current) {
+            clearInterval(statusIntervalRef.current);
+            statusIntervalRef.current = null;
+          }
 
-          clearInterval(
-            statusIntervalRef.current
-          );
-
-          statusIntervalRef.current=null;
-        }
-        setIsActive(false);
+        }, 2000); // grace period for final logs
       }
     }catch(error){
 
@@ -275,73 +270,93 @@ const startPolling = (id: string) => {
     setEditingId(null);
     setEditText("");
   };
-  /* ---------------- UPLOAD ---------------- */
- const handleUpload = async () => {
 
-  if (!file)
-    return alert("Select a file");
+  const clearAllIntervals = () => {
+  if (statusIntervalRef.current) {
+    clearInterval(statusIntervalRef.current);
+    statusIntervalRef.current = null;
+  }
+
+  if (logIntervalRef.current) {
+    clearInterval(logIntervalRef.current);
+    logIntervalRef.current = null;
+  }
+};
+
+  /* ---------------- UPLOAD ---------------- */
+const handleUpload = async () => {
+  if (!file) return alert("Select a file");
+
   setIsUploaded(true);
   setStatus("uploading");
+
+  // 🔥 HARD STOP UI FIRST
+  setIsActive(false);
+
   setLogs([]);
   setResults([]);
   setChecked([]);
   seenLogsRef.current.clear();
-  setIsActive(false);
+
+  // 🔥 IMPORTANT: stop intervals BEFORE reset
+  if (statusIntervalRef.current) {
+    clearInterval(statusIntervalRef.current);
+    statusIntervalRef.current = null;
+  }
+
+  if (logIntervalRef.current) {
+    clearInterval(logIntervalRef.current);
+    logIntervalRef.current = null;
+  }
+
   try {
-
-    if(sessionId){
-      await resetSession(sessionId);
+    // 🔥 SAFE RESET WITH TRY/CATCH
+    if (sessionId) {
+      try {
+        await resetSession(sessionId);
+      } catch (e) {
+        console.error("reset failed:", e);
+      }
     }
+
+    // 🔥 small delay prevents race condition
+    await new Promise((r) => setTimeout(r, 300));
+
     const keywords = filterText
-        .split("\n")
-        .map((x) => x.trim())
-        .filter(Boolean);
+      .split("\n")
+      .map((x) => x.trim())
+      .filter(Boolean);
 
+    const result = await uploadAudio(file, keywords);
 
-      const result =
-        await uploadAudio(
-          file,
-          keywords
-        );
-    if(!result.session_id){
-      throw new Error(
-        "No session id returned"
-      );
-
+    if (!result.session_id) {
+      throw new Error("No session id returned");
     }
-    const newSessionId =
-      result.session_id;
+
+    const newSessionId = result.session_id;
 
     setSessionId(newSessionId);
-    const fresh =
-      await getLogs(newSessionId);
 
-    const initial =
-      Array.isArray(fresh)
+    const fresh = await getLogs(newSessionId);
+
+    const initial = Array.isArray(fresh)
       ? fresh
       : fresh.logs || [];
 
     setLogs(initial);
-    seenLogsRef.current =
-      new Set(
-        initial.map(
-          (l:any)=>l.id
-        )
-      );
+
+    seenLogsRef.current = new Set(
+      initial.map((l) => l.id)
+    );
 
     setIsActive(true);
 
-   startPolling(newSessionId);
+    startPolling(newSessionId);
 
-
-  } catch(error){
-
+  } catch (error) {
     console.error(error);
-
     setStatus("error");
-
   }
-
 };
   /* ---------------- CHECK ---------------- */
   const handleCheck = (log: any) => {
