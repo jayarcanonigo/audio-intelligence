@@ -48,6 +48,7 @@ export default function Home() {
     status === "uploading" ||
     status === "starting" ||
     status === "transcribing" ||
+    status === "restarting" ||
     status === "stopping";
 
   /* ---------------- LOG STREAM ---------------- */
@@ -347,7 +348,7 @@ const handleUpload = async () => {
     setLogs(initial);
 
     seenLogsRef.current = new Set(
-      initial.map((l) => l.id)
+      initial.map((l: any) => l.id)
     );
 
     setIsActive(true);
