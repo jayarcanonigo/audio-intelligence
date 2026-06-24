@@ -603,20 +603,39 @@ const handleAddRange = () => {
       </button>
       <button
         className={styles.smallBtn}
-        onClick={async () => {
+       onClick={async () => {
+
           try {
+
+            if(sessionId){
+
+              await stopProcess(sessionId);
+
+              setIsActive(false);
+
+              if(logIntervalRef.current){
+                clearInterval(logIntervalRef.current);
+                logIntervalRef.current = null;
+              }
+
+              if(statusIntervalRef.current){
+                clearInterval(statusIntervalRef.current);
+                statusIntervalRef.current = null;
+              }
+
+            }
 
             setStatus("restarting");
 
             const data = await restartServer();
 
-            if (data.success) {
-              setStatus("restarted");
-            } else {
-              setStatus("restart_failed");
-            }
+            setStatus(
+              data.success
+                ? "restarted"
+                : "restart_failed"
+            );
 
-          } catch (error) {
+          } catch(error) {
 
             console.error(
               "Restart failed",
@@ -626,6 +645,7 @@ const handleAddRange = () => {
             setStatus("restart_failed");
 
           }
+
         }}
       >
         🔄 Restart
