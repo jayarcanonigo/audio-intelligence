@@ -25,14 +25,14 @@ export default function Home() {
   const [phrase1, setPhrase1] = useState("");
   const [phrase2, setPhrase2] = useState("");
   const [disabledLogs, setDisabledLogs] = useState<number[]>([]);
-  const [checked, setChecked] = useState<number[]>([]);
-  const [downloading, setDownloading] = useState(false);
   const [status, setStatus] = useState("idle");
   const [processedTime, setProcessedTime] = useState("00:00:00");
   const [currentSegment, setCurrentSegment] = useState(0);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
+  const [checked, setChecked] = useState<number[]>([]);
+  const [downloading, setDownloading] = useState(false);
   const statusIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const logIntervalRef = useRef<NodeJS.Timeout | null>(null); 
   const [filterText, setFilterText] = useState("");
@@ -521,114 +521,118 @@ const handleAddRange = () => {
         {/* LEFT */}
         <div className={styles.card}>
           <h3 className={styles.sectionTitle}>Upload Audio</h3>
-          <div className={styles.controlRow}>
-            <input
-              type="file"
-              accept="audio/*"
-              onChange={(e) => {
 
-                const selectedFile = e.target.files?.[0];
+    <div className={styles.controlRow}>
+      <input
+        type="file"
+        accept="audio/*"
+        onChange={(e) => {
 
-                if(selectedFile){
-                  setFile(selectedFile);
-                  setIsUploaded(false);
-                  setStatus("idle");
-                }
+          const selectedFile = e.target.files?.[0];
 
-              }}
-              className={styles.fileInput}
-            />
+          if(selectedFile){
+            setFile(selectedFile);
+            setIsUploaded(false);
+            setStatus("idle");
+          }
 
-
-            <button
-              className={styles.primaryBtn}
-              onClick={handleUpload}
-              disabled={isProcessing}
-            >
-              {isProcessing
-                ? "Processing..."
-                : "▶ Start"}
-            </button>
+        }}
+        className={styles.fileInput}
+      />
 
 
-            <button
-              className={styles.smallBtn}
-              onClick={() => setShowFilterModal(true)}
-            >
-              🔎 Filter
-            </button>
+      <button
+        className={styles.primaryBtn}
+        onClick={handleUpload}
+        disabled={isProcessing}
+      >
+        {isProcessing
+          ? "Processing..."
+          : "▶ Start"}
+      </button>
 
 
-            <button
-              className={styles.smallBtn}
-              onClick={async()=>{
-
-                if(!sessionId) return;
-
-                try {
-
-                  await stopProcess(sessionId);
-
-                  setStatus("stopped");
-                  setIsActive(false);
-
-                  if(logIntervalRef.current){
-                    clearInterval(logIntervalRef.current);
-                    logIntervalRef.current=null;
-                  }
-
-                  if(statusIntervalRef.current){
-                    clearInterval(statusIntervalRef.current);
-                    statusIntervalRef.current=null;
-                  }
-
-                }catch(error){
-
-                  console.error(
-                    "Stop failed",
-                    error
-                  );
-
-                }
-
-              }}
-              disabled={!sessionId || !isProcessing}
-            >
-              ⛔ Stop
-            </button>
+      <button
+        className={styles.smallBtn}
+        onClick={() => setShowFilterModal(true)}
+      >
+        🔎 Filter
+      </button>
 
 
-            <button
-              className={styles.smallBtn}
-              onClick={async () => {
-                try {
+      <button
+        className={styles.smallBtn}
+        onClick={async()=>{
 
-                  setStatus("restarting");
+          if(!sessionId) return;
 
-                  const data = await restartServer();
+          try {
 
-                  setStatus(
-                    data.success
-                      ? "restarted"
-                      : "restart_failed"
-                  );
+            await stopProcess(sessionId);
 
-                } catch (error) {
+            setStatus("stopped");
+            setIsActive(false);
 
-                  console.error(
-                    "Restart failed",
-                    error
-                  );
 
-                  setStatus("restart_failed");
+            if(logIntervalRef.current){
+              clearInterval(logIntervalRef.current);
+              logIntervalRef.current=null;
+            }
 
-                }
-              }}
-            >
-              🔄 Restart
-            </button>
 
-          </div>
+            if(statusIntervalRef.current){
+              clearInterval(statusIntervalRef.current);
+              statusIntervalRef.current=null;
+            }
+
+
+          }catch(error){
+
+            console.error(
+              "Stop failed",
+              error
+            );
+
+          }
+
+        }}
+        disabled={!sessionId || !isProcessing}
+      >
+        ⛔ Stop
+      </button>
+      <button
+        className={styles.smallBtn}
+        onClick={async () => {
+          try {
+
+            setStatus("restarting");
+
+            const data = await restartServer();
+
+            if (data.success) {
+              setStatus("restarted");
+            } else {
+              setStatus("restart_failed");
+            }
+
+          } catch (error) {
+
+            console.error(
+              "Restart failed",
+              error
+            );
+
+            setStatus("restart_failed");
+
+          }
+        }}
+      >
+        🔄 Restart
+      </button>
+
+
+
+    </div>
           <div className={styles.searchBox}>
             <input
               type="text"
