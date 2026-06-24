@@ -25,6 +25,8 @@ export default function Home() {
   const [phrase1, setPhrase1] = useState("");
   const [phrase2, setPhrase2] = useState("");
   const [disabledLogs, setDisabledLogs] = useState<number[]>([]);
+  const [checked, setChecked] = useState<number[]>([]);
+  const [downloading, setDownloading] = useState(false);
   const [status, setStatus] = useState("idle");
   const [processedTime, setProcessedTime] = useState("00:00:00");
   const [currentSegment, setCurrentSegment] = useState(0);
