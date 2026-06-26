@@ -732,6 +732,9 @@ const handleAddRange = () => {
                       borderRight: isP2
                         ? "4px solid #f59e0b"
                         : "4px solid transparent",
+                    background: disabled
+                    ? "linear-gradient(135deg, #1e3a8a33, #3b82f633, #06b6d433)"
+                    : "transparent",
                     }}
                 >
                   {/* LEFT BUTTONS */}
