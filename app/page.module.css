@@ -207,7 +207,7 @@
 
 .logBox {
   margin-top: 14px;
-  max-height: 600px;
+  max-height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -257,7 +257,8 @@
 
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0 10px; /* 10px gap between rows */
 }
 
 .table th {
@@ -268,12 +269,73 @@
 
 .table td {
   padding: 12px;
-  border-top: 1px solid rgba(255,255,255,.06);
+  background: #0b1220;
+  border-top: none;
 }
 
+.table tbody tr td:first-child {
+  border-radius: 12px 0 0 12px;
+}
+
+.table tbody tr td:last-child {
+  border-radius: 0 12px 12px 0;
+}
+
+.table th {
+  padding: 12px;
+  text-align: left;
+  color: #94a3b8;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
 .cell {
   max-width: 260px;
   word-break: break-word;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+}
+
+.iconBtn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.actionCell {
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.iconBtn {
+  width: 28px;
+  height: 28px;
+  margin: 0 2px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: #334155;
+  color: white;
+  cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconBtn:hover {
+  background: #475569;
 }
 
 /* Action buttons */

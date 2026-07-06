@@ -12,6 +12,8 @@ import {
 
 import styles from "./page.module.css";
 import FilterModal from "@/components/FilterModal";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const FILTER_STORAGE_KEY = "radioFilterText";
@@ -35,6 +37,10 @@ export default function Home() {
   const [downloading, setDownloading] = useState(false);
   const statusIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const logIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
+  const logRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const stopListenerRef = useRef<(() => void) | null>(null);
 
   // 🔥 PERSISTED FILTER: load from localStorage on first render (SSR-safe)
   const [filterText, setFilterText] = useState(() => {
@@ -159,6 +165,17 @@ export default function Home() {
     setEditText(row.text);
   };
 
+  const audioUrl = useMemo(() => {
+    if (!file) return "";
+    return URL.createObjectURL(file);
+  }, [file]);
+
+  useEffect(() => {
+    return () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [audioUrl]);
+
   const handleSaveEdit = (id: number) => {
     setResults((prev) => prev.map((r) => (r.id === id ? { ...r, text: editText } : r)));
     setEditingId(null);
@@ -251,6 +268,7 @@ export default function Home() {
     ]);
     setChecked((prev) => [...prev, log.id]);
     setDisabledLogs((prev) => [...prev, log.id]);
+    toast.success("✅ Segment successfully added!");
   };
 
   /* ---------------- REMOVE ---------------- */
@@ -268,6 +286,65 @@ export default function Home() {
     setChecked((prev) => prev.filter((x) => x !== id));
   };
 
+  const parseTime = (time: string) => {
+  if (!time) return 0;
+
+  const [h, m, s] = time.split(":");
+
+  return (
+    Number(h) * 3600 +
+    Number(m) * 60 +
+    parseFloat(s)
+  );
+};
+
+const handleStopSegment = () => {
+  const audio = audioRef.current;
+  if (!audio) return;
+
+  audio.pause();
+
+  if (stopListenerRef.current) {
+    audio.removeEventListener("timeupdate", stopListenerRef.current);
+    stopListenerRef.current = null;
+  }
+
+  audio.currentTime = 0;
+};
+
+const handlePlaySegment = async (row: any) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const start = parseTime(row.start);
+    const end = parseTime(row.end);
+
+    audio.pause();
+
+    if (stopListenerRef.current) {
+      audio.removeEventListener("timeupdate", stopListenerRef.current);
+    }
+
+    audio.currentTime = start;
+
+    const stop = () => {
+      if (audio.currentTime >= end) {
+        audio.pause();
+        audio.removeEventListener("timeupdate", stop);
+        stopListenerRef.current = null;
+      }
+    };
+
+    stopListenerRef.current = stop;
+
+    audio.addEventListener("timeupdate", stop);
+
+    try {
+      await audio.play();
+    } catch (err) {
+      console.error(err);
+    }
+  };
   /* ---------------- DOWNLOAD ---------------- */
   const handleDownload = async () => {
     const exportData = results.map((r) => ({ Text: r.text, Start: r.start || "-", End: r.end || "-" }));
@@ -315,9 +392,6 @@ export default function Home() {
       const rangeLogs = logs.slice(i, endIndex + 1);
       const ids = rangeLogs.map((x) => x.id);
 
-      // ❗ skip if already used
-      const alreadyUsed = ids.some((id) => disabledLogs.includes(id));
-      if (alreadyUsed) continue;
 
       rangeLogs.forEach((_, idx) => visited.add(i + idx));
 
@@ -333,11 +407,36 @@ export default function Home() {
       i = endIndex;
     }
 
-    setResults((prev) => [...prev, ...ranges]);
+  
+    // IDs in the new range
+    const newIds = new Set(ranges.flatMap((r) => r.segmentIds));
 
-    // ❗ disable all added segments
-    const allIds = ranges.flatMap((r) => r.segmentIds || []);
-    setDisabledLogs((prev) => [...prev, ...allIds]);
+    // Remove overlapping rows
+    const updatedResults = results.filter((row) => {
+      const ids = row.segmentIds ?? [row.id];
+      return !ids.some((id: number) => newIds.has(id));
+    });
+
+    // Add the new range
+    const finalResults = [...updatedResults, ...ranges];
+
+    setResults(finalResults);
+
+    // Rebuild disabled logs from scratch
+    const newDisabled: number[] = [];
+
+    finalResults.forEach((row) => {
+      if (row.segmentIds) {
+        newDisabled.push(...row.segmentIds);
+      } else {
+        newDisabled.push(row.id);
+      }
+    });
+
+    setDisabledLogs([...new Set(newDisabled)]);
+    setPhrase1("");
+    setPhrase2("");
+    toast.success("✅ Segment successfully added!");
   };
 
   /* ---------------- FILTER ---------------- */
@@ -492,11 +591,19 @@ export default function Home() {
               return (
                 <div
                   key={log.id}
+                  ref={(el) => {
+                    logRefs.current[log.id] = el;
+                  }}
                   className={styles.logItem}
                   style={{
                     borderLeft: isP1 ? "4px solid #22c55e" : "4px solid transparent",
                     borderRight: isP2 ? "4px solid #f59e0b" : "4px solid transparent",
-                    background: disabled ? "linear-gradient(135deg, #1e3a8a33, #3b82f633, #06b6d433)" : "transparent",
+                    background:
+                      selectedResultId === log.id
+                        ? "rgba(59,130,246,.2)"
+                        : disabled
+                        ? "linear-gradient(135deg,#1e3a8a33,#3b82f633,#06b6d433)"
+                        : "transparent",
                   }}
                 >
                   {/* LEFT BUTTONS */}
@@ -504,9 +611,9 @@ export default function Home() {
                     <button
                       className={styles.smallBtn}
                       onClick={() => setPhrase1(text)}
-                      disabled={disabled}
-                      style={{ background: isP1 ? "#22c55e" : undefined, opacity: disabled ? 0.4 : 1 }}
-                    >
+                                        style={{
+                        background: isP1 ? "#22c55e" : undefined,
+                      }} >
                       P1
                     </button>
                     <button
@@ -559,9 +666,9 @@ export default function Home() {
                   <button
                     className={styles.smallBtn}
                     onClick={() => setPhrase2(text)}
-                    disabled={disabled}
-                    style={{ background: isP2 ? "#f59e0b" : undefined, opacity: disabled ? 0.4 : 1 }}
-                  >
+                                      style={{
+                    background: isP2 ? "#f59e0b" : undefined,
+                  }}  >
                     P2
                   </button>
                 </div>
@@ -590,7 +697,21 @@ export default function Home() {
               {[...results]
                 .sort((a, b) => (a.start || "99:99:99").localeCompare(b.start || "99:99:99"))
                 .map((r) => (
-                  <tr key={r.id}>
+                  <tr key={r.id}
+                   onClick={() => {
+                    setSelectedResultId(r.id);
+
+                    logRefs.current[r.id]?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "center",
+                    });
+                  }}
+                  style={{
+                    cursor: "pointer",
+                    background:
+                      selectedResultId === r.id ? "rgba(59,130,246,.15)" : undefined,
+                  }}
+                  >
                     <td className={styles.cell}>
                       {editingId === r.id ? (
                         <textarea value={editText} onChange={(e) => setEditText(e.target.value)} className={styles.editText} rows={3} />
@@ -608,9 +729,49 @@ export default function Home() {
                         </>
                       ) : (
                         <>
-                          <button className={styles.editBtn} onClick={() => handleEdit(r)} title="Edit">✏️</button>
-                          <button className={styles.deleteBtn} onClick={() => handleRemove(r.id)} title="Remove">🗑️</button>
-                        </>
+                        <button
+                          className={styles.iconBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlaySegment(r);
+                          }}
+                          title="Play"
+                        >
+                          ▶️
+                        </button>
+
+                        <button
+                          className={styles.iconBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStopSegment();
+                          }}
+                          title="Stop"
+                        >
+                          ⏹️
+                        </button>
+                        <button
+                          className={styles.iconBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(r);
+                          }}
+                          title="Edit"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          className={styles.iconBtn}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemove(r.id);
+                          }}
+                          title="Remove"
+                        >
+                          🗑️
+                        </button>
+                         
+                            </>
                       )}
                     </td>
                   </tr>
@@ -621,6 +782,13 @@ export default function Home() {
           {results.length === 0 && <p style={{ opacity: 0.5, marginTop: 10 }}>No segments selected yet</p>}
         </div>
       </div>
+      {audioUrl && (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          preload="metadata"
+        />
+      )}
     </div>
   );
 }
