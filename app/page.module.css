@@ -203,13 +203,221 @@
   border: 1px solid rgba(255,255,255,.05);
 }
 
+.bottomToolbar{
+    position: sticky;
+    bottom: 20px;
+
+    margin-top: 18px;
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    padding: 16px 20px;
+
+    background: rgba(15,23,42,.92);
+    backdrop-filter: blur(16px);
+
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 20px;
+
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+
+    z-index: 999;
+}
+
+.bottomToolbar .searchInput{
+    flex:1;
+    margin:0;
+}
+
+/* ==========================
+   Footer Toolbar
+========================== */
+
+.footerBar{
+  position: sticky;
+  bottom: 16px;
+
+  margin-top: 18px;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+
+  padding: 14px 18px;
+
+  background: rgba(15,23,42,.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 18px;
+
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+
+  z-index: 100;
+}
+
+.footerLeft{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  flex: 1;
+  min-width: 0;
+}
+
+.footerLeft .searchInput{
+  flex: 1;
+  margin: 0;
+  min-width: 220px;
+}
+
+.footerLeft button{
+  white-space: nowrap;
+}
+
+.audioPlayer{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  flex: 1;
+
+  min-width: 340px;
+}
+
+.audioPlayer button{
+  width: 36px;
+  height: 36px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: #334155;
+  color: #fff;
+
+  cursor: pointer;
+
+  transition: .2s;
+}
+
+.audioPlayer button:hover{
+  background: #475569;
+}
+
+.audio{
+  flex: 1;
+  min-width: 260px;
+  height: 42px;
+}
+
+.audioTime{
+  color: #cbd5e1;
+  font-size: 14px;
+  font-weight: 600;
+
+  white-space: nowrap;
+
+  min-width: 90px;
+  text-align: right;
+}
+
+/* ==========================
+   Responsive
+========================== */
+
+@media (max-width: 1200px){
+
+  .footerBar{
+    flex-wrap: wrap;
+  }
+
+  .footerLeft{
+    width: 100%;
+  }
+
+  .audioPlayer{
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .audio{
+    width: 100%;
+  }
+
+  .audioTime{
+    text-align: left;
+  }
+
+}
+
+@media (max-width: 768px){
+
+  .footerLeft{
+    flex-wrap: wrap;
+  }
+
+  .footerLeft .searchInput{
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .footerLeft button{
+    flex: 1;
+  }
+
+  .audioPlayer{
+    flex-wrap: wrap;
+  }
+
+  .audio{
+    width: 100%;
+  }
+
+}
 /* Logs */
 
 .logBox {
   margin-top: 14px;
-  max-height: 100%;
+  flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  min-height: 0;
+}
+
+.logList {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding-right: 6px;
+}
+
+.logFooter {
+  position: sticky;
+  bottom: 0;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 12px;
+
+  background: rgba(15, 23, 42, .95);
+  backdrop-filter: blur(12px);
+
+  border-top: 1px solid rgba(255,255,255,.08);
+
+  z-index: 100;
+}
+
+.logFooter .searchInput {
+  flex: 1;
+  margin: 0;
 }
 
 .boxTitle {
@@ -369,11 +577,11 @@
 
 /* Scrollbar */
 
-.logBox::-webkit-scrollbar {
+.logList::-webkit-scrollbar {
   width: 8px;
 }
 
-.logBox::-webkit-scrollbar-thumb {
+.logList::-webkit-scrollbar-thumb {
   background: #7c3aed;
   border-radius: 10px;
 }

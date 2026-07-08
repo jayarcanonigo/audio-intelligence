@@ -26,6 +26,9 @@ export default function Home() {
   const [editText, setEditText] = useState("");
   const [phrase1, setPhrase1] = useState("");
   const [phrase2, setPhrase2] = useState("");
+  const [selectedP1Id, setSelectedP1Id] = useState<number | null>(null);
+  const [selectedP2Id, setSelectedP2Id] = useState<number | null>(null);
+  const selectedRowRefs = useRef<Record<number, HTMLTableRowElement | null>>({});
   const [disabledLogs, setDisabledLogs] = useState<number[]>([]);
   const [status, setStatus] = useState("idle");
   const [processedTime, setProcessedTime] = useState("00:00:00");
@@ -41,6 +44,30 @@ export default function Home() {
   const logRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const audioRef = useRef<HTMLAudioElement>(null);
   const stopListenerRef = useRef<(() => void) | null>(null);
+  const [currentTime, setCurrentTime] = useState("00:00");
+  const [duration, setDuration] = useState("00:00");
+
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+
+    if (h > 0) {
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
+
+  const handleLoadedMetadata = () => {
+    if (!audioRef.current) return;
+    setDuration(formatTime(audioRef.current.duration));
+  };
+
+  const handleTimeUpdate = () => {
+    if (!audioRef.current) return;
+    setCurrentTime(formatTime(audioRef.current.currentTime));
+  };
 
   // 🔥 PERSISTED FILTER: load from localStorage on first render (SSR-safe)
   const [filterText, setFilterText] = useState(() => {
@@ -172,7 +199,9 @@ export default function Home() {
 
   useEffect(() => {
     return () => {
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
     };
   }, [audioUrl]);
 
@@ -186,6 +215,16 @@ export default function Home() {
     setEditingId(null);
     setEditText("");
   };
+
+  const handleClear = () => {
+  setSearch("");
+  setPhrase1("");
+  setPhrase2("");
+  setSelectedP1Id(null);
+  setSelectedP2Id(null);
+
+  searchInputRef.current?.focus();
+};
 
   const clearAllIntervals = () => {
     if (statusIntervalRef.current) {
@@ -313,38 +352,38 @@ const handleStopSegment = () => {
 };
 
 const handlePlaySegment = async (row: any) => {
-    const audio = audioRef.current;
-    if (!audio) return;
+  const audio = audioRef.current;
+  if (!audio) return;
 
-    const start = parseTime(row.start);
-    const end = parseTime(row.end);
+  audio.pause();
 
-    audio.pause();
+  if (stopListenerRef.current) {
+    audio.removeEventListener("timeupdate", stopListenerRef.current);
+    stopListenerRef.current = null;
+  }
 
-    if (stopListenerRef.current) {
-      audio.removeEventListener("timeupdate", stopListenerRef.current);
-    }
+  const start = parseTime(row.start);
+  const end = parseTime(row.end);
 
-    audio.currentTime = start;
+  audio.currentTime = start;
 
-    const stop = () => {
-      if (audio.currentTime >= end) {
-        audio.pause();
-        audio.removeEventListener("timeupdate", stop);
-        stopListenerRef.current = null;
-      }
-    };
-
-    stopListenerRef.current = stop;
-
-    audio.addEventListener("timeupdate", stop);
-
-    try {
-      await audio.play();
-    } catch (err) {
-      console.error(err);
+  const stop = () => {
+    if (audio.currentTime >= end) {
+      audio.pause();
+      audio.removeEventListener("timeupdate", stop);
+      stopListenerRef.current = null;
     }
   };
+
+  stopListenerRef.current = stop;
+  audio.addEventListener("timeupdate", stop);
+
+  try {
+    await audio.play();
+  } catch (err) {
+    console.error(err);
+  }
+};
   /* ---------------- DOWNLOAD ---------------- */
   const handleDownload = async () => {
     const exportData = results.map((r) => ({ Text: r.text, Start: r.start || "-", End: r.end || "-" }));
@@ -361,84 +400,73 @@ const handlePlaySegment = async (row: any) => {
     a.click();
   };
 
-  const handleAddRange = () => {
-    if (!phrase1 || !phrase2) {
-      alert("Select Phrase 1 and Phrase 2");
-      return;
-    }
+const handleAddRange = () => {
+  if (selectedP1Id == null || selectedP2Id == null) {
+    alert("Select P1 and P2");
+    return;
+  }
 
-    const q1 = phrase1.toLowerCase();
-    const q2 = phrase2.toLowerCase();
-    const visited = new Set<number>();
-    const ranges: any[] = [];
+  const startIndex = logs.findIndex((l) => l.id === selectedP1Id);
+  const endIndex = logs.findIndex((l) => l.id === selectedP2Id);
 
-    for (let i = 0; i < logs.length; i++) {
-      if (visited.has(i)) continue;
+  if (startIndex === -1 || endIndex === -1) {
+    toast.error("Invalid selection.");
+    return;
+  }
 
-      const isP1 = (logs[i]?.message || "").toLowerCase().includes(q1);
-      if (!isP1) continue;
+  if (startIndex >= endIndex) {
+    toast.error("P2 must be after P1.");
+    return;
+  }
 
-      // find nearest P2 AFTER P1
-      let endIndex = -1;
-      for (let j = i + 1; j < logs.length; j++) {
-        const isP2 = (logs[j]?.message || "").toLowerCase().includes(q2);
-        if (isP2) {
-          endIndex = j;
-          break;
-        }
-      }
-      if (endIndex === -1) continue;
+  const rangeLogs = logs.slice(startIndex, endIndex + 1);
+  const ids = rangeLogs.map((x) => x.id);
 
-      const rangeLogs = logs.slice(i, endIndex + 1);
-      const ids = rangeLogs.map((x) => x.id);
-
-
-      rangeLogs.forEach((_, idx) => visited.add(i + idx));
-
-      ranges.push({
-        id: Date.now() + i,
-        text: rangeLogs.map((x) => x.message).join(" "),
-        start: rangeLogs[0]?.start_time || "",
-        end: rangeLogs[rangeLogs.length - 1]?.end_time || "",
-        time: new Date().toLocaleTimeString(),
-        segmentIds: ids, // ❗ used to release locks on remove
-      });
-
-      i = endIndex;
-    }
-
-  
-    // IDs in the new range
-    const newIds = new Set(ranges.flatMap((r) => r.segmentIds));
-
-    // Remove overlapping rows
-    const updatedResults = results.filter((row) => {
-      const ids = row.segmentIds ?? [row.id];
-      return !ids.some((id: number) => newIds.has(id));
-    });
-
-    // Add the new range
-    const finalResults = [...updatedResults, ...ranges];
-
-    setResults(finalResults);
-
-    // Rebuild disabled logs from scratch
-    const newDisabled: number[] = [];
-
-    finalResults.forEach((row) => {
-      if (row.segmentIds) {
-        newDisabled.push(...row.segmentIds);
-      } else {
-        newDisabled.push(row.id);
-      }
-    });
-
-    setDisabledLogs([...new Set(newDisabled)]);
-    setPhrase1("");
-    setPhrase2("");
-    toast.success("✅ Segment successfully added!");
+  const newSegment = {
+    id: Date.now(),
+    text: rangeLogs.map((x) => x.message).join(" "),
+    start: rangeLogs[0].start_time,
+    end: rangeLogs[rangeLogs.length - 1].end_time,
+    time: new Date().toLocaleTimeString(),
+    segmentIds: ids,
   };
 
+  // Remove any existing rows that overlap this range
+  const updatedResults = results.filter((row) => {
+    const rowIds = row.segmentIds ?? [row.id];
+    return !rowIds.some((id: number) => ids.includes(id));
+  });
+
+  const finalResults = [...updatedResults, newSegment];
+
+  setResults(finalResults);
+
+  // Rebuild disabled logs
+  const disabled = finalResults.flatMap((row) =>
+    row.segmentIds ?? [row.id]
+  );
+
+  setDisabledLogs([...new Set(disabled)]);
+
+  // Clear selections
+  setPhrase1("");
+  setPhrase2("");
+  setSelectedP1Id(null);
+  setSelectedP2Id(null);
+
+  // Highlight new row
+  setSelectedResultId(newSegment.id);
+
+  // Scroll to the new row
+  requestAnimationFrame(() => {
+    selectedRowRefs.current[newSegment.id]?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  });
+
+  toast.success("✅ Segment successfully added!");
+};
   /* ---------------- FILTER ---------------- */
   const filteredLogs = useMemo(() => {
     const q = search.toLowerCase();
@@ -542,37 +570,6 @@ const handlePlaySegment = async (row: any) => {
               🔄 Restart
             </button>
           </div>
-
-          <div className={styles.searchBox}>
-            <input
-              type="text"
-              ref={searchInputRef}
-              placeholder="Search logs..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={styles.searchInput}
-            />
-          </div>
-
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input value={phrase1} onChange={(e) => setPhrase1(e.target.value)} placeholder="Phrase 1" className={styles.searchInput} />
-            <input value={phrase2} onChange={(e) => setPhrase2(e.target.value)} placeholder="Phrase 2" className={styles.searchInput} />
-            <button
-              type="button"
-              className={styles.smallBtn}
-              onClick={() => {
-                setPhrase1("");
-                setPhrase2("");
-                setSearch("");
-              }}
-            >
-              Clear
-            </button>
-            <button type="button" className={styles.primaryBtn} onClick={handleAddRange}>
-              Add
-            </button>
-          </div>
-
           <div className={styles.statusRow}>
             <span><b>Status:</b> {status}</span>
             <span><b>Segment:</b> {currentSegment}</span>
@@ -585,8 +582,8 @@ const handlePlaySegment = async (row: any) => {
             {filteredLogs.map((log) => {
               const text = log?.message || "";
               const disabled = disabledLogs.includes(log.id);
-              const isP1 = phrase1 && text.toLowerCase().includes(phrase1.toLowerCase());
-              const isP2 = phrase2 && text.toLowerCase().includes(phrase2.toLowerCase());
+              const isP1 = selectedP1Id === log.id;
+              const isP2 = selectedP2Id === log.id;
 
               return (
                 <div
@@ -610,7 +607,10 @@ const handlePlaySegment = async (row: any) => {
                   <div style={{ display: "flex", gap: 6 }}>
                     <button
                       className={styles.smallBtn}
-                      onClick={() => setPhrase1(text)}
+                      onClick={() => {
+                        setPhrase1(text);
+                        setSelectedP1Id(log.id);
+                      }}
                                         style={{
                         background: isP1 ? "#22c55e" : undefined,
                       }} >
@@ -630,8 +630,8 @@ const handlePlaySegment = async (row: any) => {
                   <div
                     style={{ flex: 1, marginLeft: 10 }}
                     onDoubleClick={() => {
-                      setSearch(text);
-                      setTimeout(() => {
+                        setSearch("");
+                        setTimeout(() => {
                         searchInputRef.current?.focus();
                         searchInputRef.current?.select();
                       }, 0);
@@ -663,14 +663,18 @@ const handlePlaySegment = async (row: any) => {
                   </div>
 
                   {/* RIGHT BUTTON */}
-                  <button
-                    className={styles.smallBtn}
-                    onClick={() => setPhrase2(text)}
-                                      style={{
+               <button
+                  className={styles.smallBtn}
+                  onClick={() => {
+                    setPhrase2(text);
+                    setSelectedP2Id(log.id);
+                  }}
+                  style={{
                     background: isP2 ? "#f59e0b" : undefined,
-                  }}  >
-                    P2
-                  </button>
+                  }}
+                >
+                  P2
+                </button>
                 </div>
               );
             })}
@@ -698,9 +702,12 @@ const handlePlaySegment = async (row: any) => {
                 .sort((a, b) => (a.start || "99:99:99").localeCompare(b.start || "99:99:99"))
                 .map((r) => (
                   <tr key={r.id}
+                      ref={(el) => {
+                    selectedRowRefs.current[r.id] = el;
+                  }}
                    onClick={() => {
                     setSelectedResultId(r.id);
-
+                    handlePlaySegment(r);
                     logRefs.current[r.id]?.scrollIntoView({
                       behavior: "smooth",
                       block: "center",
@@ -728,28 +735,7 @@ const handlePlaySegment = async (row: any) => {
                           <button className={styles.deleteBtn} onClick={handleCancelEdit} title="Cancel">❌</button>
                         </>
                       ) : (
-                        <>
-                        <button
-                          className={styles.iconBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePlaySegment(r);
-                          }}
-                          title="Play"
-                        >
-                          ▶️
-                        </button>
-
-                        <button
-                          className={styles.iconBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStopSegment();
-                          }}
-                          title="Stop"
-                        >
-                          ⏹️
-                        </button>
+                        <>                        
                         <button
                           className={styles.iconBtn}
                           onClick={(e) => {
@@ -781,14 +767,51 @@ const handlePlaySegment = async (row: any) => {
 
           {results.length === 0 && <p style={{ opacity: 0.5, marginTop: 10 }}>No segments selected yet</p>}
         </div>
-      </div>
-      {audioUrl && (
-        <audio
-          ref={audioRef}
-          src={audioUrl}
-          preload="metadata"
-        />
-      )}
+
+        <div className={styles.footerBar}>
+          <input
+            ref={searchInputRef}
+            className={styles.searchInput}
+            placeholder="Search Logs..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+
+          <button
+            className={styles.smallBtn}
+            onClick={handleClear}
+          >
+            Clear
+          </button>
+
+          <button
+            className={styles.primaryBtn}
+            onClick={handleAddRange}
+            disabled={selectedP1Id == null || selectedP2Id == null}
+          >
+            Add Segment
+          </button>
+
+          {audioUrl ? (
+              <audio
+                ref={audioRef}
+                src={audioUrl}
+                controls
+                className={styles.audio}
+                onLoadedMetadata={handleLoadedMetadata}
+                onTimeUpdate={handleTimeUpdate}
+              />
+            ) : (
+              <div className={styles.audioPlaceholder}>
+                No audio selected
+              </div>
+            )}
+
+          <span className={styles.audioTime}>
+            {currentTime} / {duration}
+          </span>
+        </div>
+      </div>     
     </div>
   );
 }
