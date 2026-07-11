@@ -94,3 +94,27 @@ export async function restartServer() {
 
   return res.json();
 }
+
+export async function downloadAudio(
+  sessionId: string,
+  start: number,
+  end: number
+) {
+  const response = await fetch(`${API_URL}/download-audio`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      session_id: sessionId,
+      start,
+      end,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to download audio.");
+  }
+
+  return response.blob();
+}

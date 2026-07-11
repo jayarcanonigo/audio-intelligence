@@ -8,6 +8,7 @@ import {
   resetSession,
   stopProcess,
   restartServer,
+  downloadAudio,
 } from "@/services/api";
 
 import styles from "./page.module.css";
@@ -46,6 +47,7 @@ export default function Home() {
   const stopListenerRef = useRef<(() => void) | null>(null);
   const [currentTime, setCurrentTime] = useState("00:00");
   const [duration, setDuration] = useState("00:00");
+  const [currentAudioTime, setCurrentAudioTime] = useState(0);
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
@@ -64,10 +66,60 @@ export default function Home() {
     setDuration(formatTime(audioRef.current.duration));
   };
 
-  const handleTimeUpdate = () => {
-    if (!audioRef.current) return;
-    setCurrentTime(formatTime(audioRef.current.currentTime));
-  };
+ const handleTimeUpdate = () => {
+  if (!audioRef.current) return;
+
+  setCurrentTime(formatTime(audioRef.current.currentTime));
+
+  // Keep the raw seconds for matching logs
+  setCurrentAudioTime(audioRef.current.currentTime);
+};
+
+const handleDownloadAudio = async (segment: any) => {
+  try {
+    const blob = await downloadAudio(
+      sessionId,
+      parseTime(segment.start),
+      parseTime(segment.end)
+    );
+
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${segment.start}-${segment.end}.mp3`;
+    a.click();
+
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error(err);
+    toast.error("Download failed.");
+  }
+};
+
+const toSeconds = (time?: string) => {
+  if (!time || time === "null") return null;
+
+  const parts = time.split(":");
+  if (parts.length !== 3) return null;
+
+  const [h, m, s] = parts;
+
+  const hours = Number(h);
+  const mins = Number(m);
+  const secs = Number(s);
+
+  if (
+    Number.isNaN(hours) ||
+    Number.isNaN(mins) ||
+    Number.isNaN(secs)
+  ) {
+    return null;
+  }
+
+  return hours * 3600 + mins * 60 + secs;
+};
+
 
   // 🔥 PERSISTED FILTER: load from localStorage on first render (SSR-safe)
   const [filterText, setFilterText] = useState(() => {
@@ -385,7 +437,7 @@ const handlePlaySegment = async (row: any) => {
   }
 };
   /* ---------------- DOWNLOAD ---------------- */
-  const handleDownload = async () => {
+  const handleDownloadExcel  = async () => {
     const exportData = results.map((r) => ({ Text: r.text, Start: r.start || "-", End: r.end || "-" }));
     const res = await fetch("/api/download-excel", {
       method: "POST",
@@ -457,13 +509,7 @@ const handleAddRange = () => {
   // Highlight new row
   setSelectedResultId(newSegment.id);
 
-  // Scroll to the new row
-  requestAnimationFrame(() => {
-    selectedRowRefs.current[newSegment.id]?.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
-  });
+
 
   toast.success("✅ Segment successfully added!");
 };
@@ -473,6 +519,26 @@ const handleAddRange = () => {
     return logs.filter((l) => (l?.message || "").toLowerCase().includes(q));
   }, [logs, search]);
 
+useEffect(() => {
+  const currentLog = filteredLogs.find((log) => {
+    const start = toSeconds(log.start_time);
+    const end = toSeconds(log.end_time);
+
+    return (
+      start !== null &&
+      end !== null &&
+      currentAudioTime >= start &&
+      currentAudioTime <= end
+    );
+  });
+
+  if (!currentLog) return;
+
+  logRefs.current[currentLog.id]?.scrollIntoView({
+    behavior: "smooth",
+    block: "center",
+  });
+}, [currentAudioTime, filteredLogs]);
   /* ---------------- UI ---------------- */
   return (
     <div className={styles.page}>
@@ -584,6 +650,20 @@ const handleAddRange = () => {
               const disabled = disabledLogs.includes(log.id);
               const isP1 = selectedP1Id === log.id;
               const isP2 = selectedP2Id === log.id;
+              const hasValidTime =
+              log.start_time &&
+              log.end_time &&
+              log.start_time !== "null" &&
+              log.end_time !== "null";
+
+            const start = toSeconds(log.start_time);
+            const end = toSeconds(log.end_time);
+
+            const isPlaying =
+              start !== null &&
+              end !== null &&
+              currentAudioTime >= start &&
+              currentAudioTime <= end;
 
               return (
                 <div
@@ -595,12 +675,14 @@ const handleAddRange = () => {
                   style={{
                     borderLeft: isP1 ? "4px solid #22c55e" : "4px solid transparent",
                     borderRight: isP2 ? "4px solid #f59e0b" : "4px solid transparent",
-                    background:
-                      selectedResultId === log.id
-                        ? "rgba(59,130,246,.2)"
-                        : disabled
-                        ? "linear-gradient(135deg,#1e3a8a33,#3b82f633,#06b6d433)"
-                        : "transparent",
+                   background:
+                    isPlaying
+                      ? "#dbeafe"
+                      : selectedResultId === log.id
+                      ? "rgba(59,130,246,.2)"
+                      : disabled
+                      ? "linear-gradient(135deg,#1e3a8a33,#3b82f633,#06b6d433)"
+                      : "transparent",
                   }}
                 >
                   {/* LEFT BUTTONS */}
@@ -685,80 +767,103 @@ const handleAddRange = () => {
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <h3 className={styles.sectionTitle}>Selected Segments</h3>
-            <button className={styles.downloadBtn} onClick={handleDownload} title="Export Excel">📥</button>
+            <button className={styles.downloadBtn} onClick={handleDownloadExcel} title="Export Excel">📥</button>
           </div>
 
           <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Text</th>
-                <th>Start</th>
-                <th>End</th>
-                <th></th>
-              </tr>
-            </thead>
+           <thead>
+            <tr>
+              <th style={{ width: "60%" }}>Transcript</th>
+              <th style={{ width: "12%" }}>Start</th>
+              <th style={{ width: "12%" }}>End</th>
+              <th style={{ width: "16%", textAlign: "center" }}>Actions</th>
+            </tr>
+          </thead>
             <tbody>
               {[...results]
                 .sort((a, b) => (a.start || "99:99:99").localeCompare(b.start || "99:99:99"))
                 .map((r) => (
-                  <tr key={r.id}
-                      ref={(el) => {
-                    selectedRowRefs.current[r.id] = el;
-                  }}
-                   onClick={() => {
-                    setSelectedResultId(r.id);
-                    handlePlaySegment(r);
-                    logRefs.current[r.id]?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "center",
-                    });
-                  }}
-                  style={{
-                    cursor: "pointer",
-                    background:
-                      selectedResultId === r.id ? "rgba(59,130,246,.15)" : undefined,
-                  }}
+                  <tr
+                    key={r.id}
+                    className={selectedResultId === r.id ? styles.selectedRow : ""}
+                    onClick={() => {
+                      setSelectedResultId(r.id);
+                      handlePlaySegment(r);
+                    }}
                   >
-                    <td className={styles.cell}>
+                    <td className={styles.transcriptCell}>
                       {editingId === r.id ? (
-                        <textarea value={editText} onChange={(e) => setEditText(e.target.value)} className={styles.editText} rows={3} />
+                        <textarea
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          className={styles.editText}
+                        />
                       ) : (
-                        r.text
+                        <div className={styles.transcript}>
+                          {r.text}
+                        </div>
                       )}
                     </td>
-                    <td>{r.start || "-"}</td>
-                    <td>{r.end || "-"}</td>
+
+                    <td className={styles.timeCell}>{r.start}</td>
+
+                    <td className={styles.timeCell}>{r.end}</td>
+
                     <td>
-                      {editingId === r.id ? (
-                        <>
-                          <button className={styles.saveBtn} onClick={() => handleSaveEdit(r.id)} title="Save">💾</button>
-                          <button className={styles.deleteBtn} onClick={handleCancelEdit} title="Cancel">❌</button>
-                        </>
-                      ) : (
-                        <>                        
-                        <button
-                          className={styles.iconBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(r);
-                          }}
-                          title="Edit"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className={styles.iconBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemove(r.id);
-                          }}
-                          title="Remove"
-                        >
-                          🗑️
-                        </button>
-                         
-                            </>
-                      )}
+                      <div className={styles.actionButtons}>
+                        {editingId === r.id ? (
+                          <>
+                            <button
+                              className={styles.saveBtn}
+                              onClick={() => handleSaveEdit(r.id)}
+                            >
+                              💾
+                            </button>
+
+                            <button
+                              className={styles.deleteBtn}
+                              onClick={handleCancelEdit}
+                            >
+                              ❌
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              className={styles.iconBtn}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadAudio(r);
+                              }}
+                              title="Download"
+                            >
+                              📥
+                            </button>
+
+                            <button
+                              className={styles.iconBtn}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(r);
+                              }}
+                              title="Edit"
+                            >
+                              ✏️
+                            </button>
+
+                            <button
+                              className={styles.iconBtn}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemove(r.id);
+                              }}
+                              title="Delete"
+                            >
+                              🗑️
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

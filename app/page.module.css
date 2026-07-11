@@ -156,6 +156,65 @@
   background: rgba(0,229,255,.15);
 }
 
+.selectedRow {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.transcriptCell {
+  max-width: 600px;
+}
+
+.transcript {
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.timeCell {
+  text-align: center;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.actionButtons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconBtn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: #273449;
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.iconBtn:hover {
+  background: #3b82f6;
+  transform: translateY(-1px);
+}
+
+.table th {
+  text-align: left;
+  padding: 12px;
+}
+
+.table td {
+  padding: 14px 12px;
+  vertical-align: middle;
+ font-size: 12px;
+
+}
+
+.table tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
 /* Layout */
 
 .uploadRow,
@@ -508,16 +567,15 @@
 }
 
 .iconBtn {
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  display: flex;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .actionCell {
