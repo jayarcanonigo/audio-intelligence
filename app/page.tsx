@@ -39,6 +39,7 @@ export default function Home() {
   const [results, setResults] = useState<any[]>([]);
   const [checked, setChecked] = useState<number[]>([]);
   const [downloading, setDownloading] = useState(false);
+  const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
   const statusIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const logIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
@@ -393,7 +394,9 @@ const handleStopSegment = () => {
   const audio = audioRef.current;
   if (!audio) return;
 
-  audio.pause();
+    if (!audio.paused) {
+      audio.pause();
+    }
 
   if (stopListenerRef.current) {
     audio.removeEventListener("timeupdate", stopListenerRef.current);
@@ -407,23 +410,34 @@ const handlePlaySegment = async (row: any) => {
   const audio = audioRef.current;
   if (!audio) return;
 
-  audio.pause();
+  const start = row.start ?? row.start_time;
+  const end = row.end ?? row.end_time;
+
+  if (!start || !end) {
+    console.log("Missing times", row);
+    return;
+  }
+
+    if (!audio.paused) {
+      audio.pause();
+    }
 
   if (stopListenerRef.current) {
     audio.removeEventListener("timeupdate", stopListenerRef.current);
     stopListenerRef.current = null;
   }
 
-  const start = parseTime(row.start);
-  const end = parseTime(row.end);
-
-  audio.currentTime = start;
+  audio.currentTime = parseTime(start);
 
   const stop = () => {
-    if (audio.currentTime >= end) {
-      audio.pause();
+    if (audio.currentTime >= parseTime(end)) {
+      if (!audio.paused) {
+        audio.pause();
+      }
       audio.removeEventListener("timeupdate", stop);
       stopListenerRef.current = null;
+       // Clear selected log row
+     setSelectedLogId(null);
     }
   };
 
@@ -432,9 +446,11 @@ const handlePlaySegment = async (row: any) => {
 
   try {
     await audio.play();
-  } catch (err) {
-    console.error(err);
-  }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        console.error(err);
+      }
+    }
 };
   /* ---------------- DOWNLOAD ---------------- */
   const handleDownloadExcel  = async () => {
@@ -667,19 +683,31 @@ useEffect(() => {
 
               return (
                 <div
-                  key={log.id}
+                key={log.id}
+                onClick={() => {
+                   handlePlaySegment(
+                    log
+                  );
+                  setSelectedLogId(log.id);
+                 
+                }}
                   ref={(el) => {
                     logRefs.current[log.id] = el;
                   }}
                   className={styles.logItem}
                   style={{
-                    borderLeft: isP1 ? "4px solid #22c55e" : "4px solid transparent",
-                    borderRight: isP2 ? "4px solid #f59e0b" : "4px solid transparent",
-                   background:
+                    borderLeft:
                     isPlaying
-                      ? "#dbeafe"
-                      : selectedResultId === log.id
-                      ? "rgba(59,130,246,.2)"
+                      ? "5px solid #22c55e"
+                      : selectedLogId === log.id
+                      ? "5px solid #2563eb"
+                      : "4px solid transparent",
+
+                  background:
+                    isPlaying
+                      ? "#ecfdf5"
+                      : selectedLogId === log.id
+                      ? "#f8fafc"
                       : disabled
                       ? "linear-gradient(135deg,#1e3a8a33,#3b82f633,#06b6d433)"
                       : "transparent",
@@ -689,7 +717,8 @@ useEffect(() => {
                   <div style={{ display: "flex", gap: 6 }}>
                     <button
                       className={styles.smallBtn}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setPhrase1(text);
                         setSelectedP1Id(log.id);
                       }}
@@ -700,7 +729,10 @@ useEffect(() => {
                     </button>
                     <button
                       className={styles.smallBtn}
-                      onClick={() => handleCheck(log)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCheck(log);
+                      }}
                       disabled={disabled}
                       style={{ opacity: disabled ? 0.4 : 1, pointerEvents: disabled ? "none" : "auto" }}
                     >
@@ -710,14 +742,7 @@ useEffect(() => {
 
                   {/* TEXT */}
                   <div
-                    style={{ flex: 1, marginLeft: 10 }}
-                    onDoubleClick={() => {
-                        setSearch("");
-                        setTimeout(() => {
-                        searchInputRef.current?.focus();
-                        searchInputRef.current?.select();
-                      }, 0);
-                    }}
+                    style={{ flex: 1, marginLeft: 10 }}                   
                   >
                     <span
                       className={styles.logText}
@@ -739,15 +764,23 @@ useEffect(() => {
                     >
                       {text}
                     </span>
-                    <div style={{ fontSize: 11, opacity: 0.6, marginTop: 3 }}>
-                      ⏱ {log?.start_time || "-"} → {log?.end_time || "-"}
-                    </div>
+                    <div
+                        style={{
+                          fontSize: 11,
+                          marginTop: 3,
+                          color: isPlaying ? "#374151" : "#9ca3af",
+                          fontWeight: isPlaying ? 600 : 400,
+                        }}
+                      >
+                        ⏱ {log.start_time || "-"} → {log.end_time || "-"}
+                      </div>
                   </div>
 
                   {/* RIGHT BUTTON */}
                <button
                   className={styles.smallBtn}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setPhrase2(text);
                     setSelectedP2Id(log.id);
                   }}
