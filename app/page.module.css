@@ -514,6 +514,20 @@
   opacity: .6;
 }
 
+.timeInput {
+  width: 60px;
+  text-align: center;
+  padding: 4px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.timeInput:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
 /* Table */
 
 .cardHeader {

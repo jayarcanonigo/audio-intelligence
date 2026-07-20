@@ -7,10 +7,9 @@ import {
   getLogs,
   resetSession,
   stopProcess,
-  restartServer,
-  downloadAudio,
+  restartServer
 } from "@/services/api";
-
+import { fetchFile } from "@ffmpeg/util";
 import styles from "./page.module.css";
 import FilterModal from "@/components/FilterModal";
 import { ToastContainer, toast } from "react-toastify";
@@ -27,6 +26,7 @@ export default function Home() {
   const [editText, setEditText] = useState("");
   const [phrase1, setPhrase1] = useState("");
   const [phrase2, setPhrase2] = useState("");
+  const ffmpegRef = useRef<any>(null);
   const [selectedP1Id, setSelectedP1Id] = useState<number | null>(null);
   const [selectedP2Id, setSelectedP2Id] = useState<number | null>(null);
   const selectedRowRefs = useRef<Record<number, HTMLTableRowElement | null>>({});
@@ -50,17 +50,44 @@ export default function Home() {
   const [duration, setDuration] = useState("00:00");
   const [currentAudioTime, setCurrentAudioTime] = useState(0);
 
-  const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
+const updateDisplayTime = (
+  id: number,
+  field: "start" | "end",
+  value: string
+) => {
+  // Keep only digits and colon
+  value = value.replace(/[^\d:]/g, "");
 
-    if (h > 0) {
-      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-    }
+  const parts = value.split(":");
 
-    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  };
+  if (parts.length !== 2) return;
+
+  let [mm, ss] = parts;
+
+  mm = mm.padStart(2, "0").slice(-2);
+  ss = ss.padStart(2, "0").slice(-2);
+
+  setResults(prev =>
+    prev.map(r =>
+      r.id === id
+        ? {
+            ...r,
+            [field]: `00:${mm}:${ss}`,
+          }
+        : r
+    )
+  );
+};
+const displayTime = (time: string = "") => {
+  const parts = time.split(":");
+  return parts.length === 3 ? `${parts[1]}:${parts[2]}` : time;
+};
+const formatTime = (seconds: number) => {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+};
 
   const handleLoadedMetadata = () => {
     if (!audioRef.current) return;
@@ -76,15 +103,60 @@ export default function Home() {
   setCurrentAudioTime(audioRef.current.currentTime);
 };
 
+const handleTimeChange = (
+  id: number,
+  field: "start" | "end",
+  value: string
+) => {
+  setResults(prev =>
+    prev.map(seg =>
+      seg.id === id
+        ? { ...seg, [field]: value }
+        : seg
+    )
+  );
+};
+
 const handleDownloadAudio = async (segment: any) => {
+  if (!file) return;
+
+  setDownloading(true);
+
   try {
-    const blob = await downloadAudio(
-      sessionId,
-      parseTime(segment.start),
-      parseTime(segment.end)
+    if (!ffmpegRef.current) {
+      const { FFmpeg } = await import("@ffmpeg/ffmpeg");
+
+      ffmpegRef.current = new FFmpeg();
+
+      await ffmpegRef.current.load();
+    }
+
+    const ffmpeg = ffmpegRef.current;
+
+    await ffmpeg.writeFile(
+      "input.mp3",
+      await fetchFile(file)
     );
 
-    const url = window.URL.createObjectURL(blob);
+    await ffmpeg.exec([
+      "-i",
+      "input.mp3",
+      "-ss",
+      segment.start,
+      "-to",
+      segment.end,
+      "-c",
+      "copy",
+      "output.mp3",
+    ]);
+
+    const data = await ffmpeg.readFile("output.mp3");
+
+    const blob = new Blob([data], {
+      type: "audio/mpeg",
+    });
+
+    const url = URL.createObjectURL(blob);
 
     const a = document.createElement("a");
     a.href = url;
@@ -92,11 +164,11 @@ const handleDownloadAudio = async (segment: any) => {
     a.click();
 
     URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error(err);
-    toast.error("Download failed.");
+  } finally {
+    setDownloading(false);
   }
 };
+
 
 const toSeconds = (time?: string) => {
   if (!time || time === "null") return null;
@@ -199,7 +271,7 @@ const toSeconds = (time?: string) => {
     };
 
     fetchLogs();
-    logIntervalRef.current = setInterval(fetchLogs, 1000);
+    logIntervalRef.current = setInterval(fetchLogs, 10000);
 
     return () => {
       cancelled = true;
@@ -237,7 +309,7 @@ const toSeconds = (time?: string) => {
           statusIntervalRef.current = null;
         }
       }
-    }, 1000);
+    }, 10000);
   };
 
   const handleEdit = (row: any) => {
@@ -452,6 +524,36 @@ const handlePlaySegment = async (row: any) => {
       }
     }
 };
+
+const updateTimePart = (
+  id: number,
+  field: "start" | "end",
+  part: "minute" | "second",
+  value: string
+) => {
+  const num = Math.max(0, Math.min(59, Number(value) || 0));
+
+  setResults(prev =>
+    prev.map(r => {
+      if (r.id !== id) return r;
+
+      const [, mm = "00", ss = "00"] = (r[field] || "00:00:00").split(":");
+
+      const minute = part === "minute"
+        ? String(num).padStart(2, "0")
+        : mm;
+
+      const second = part === "second"
+        ? String(num).padStart(2, "0")
+        : ss;
+
+      return {
+        ...r,
+        [field]: `00:${minute}:${second}`,
+      };
+    })
+  );
+};
   /* ---------------- DOWNLOAD ---------------- */
   const handleDownloadExcel  = async () => {
     const exportData = results.map((r) => ({ Text: r.text, Start: r.start || "-", End: r.end || "-" }));
@@ -574,7 +676,30 @@ useEffect(() => {
       <div className={styles.grid}>
         {/* LEFT */}
         <div className={styles.card}>
-          <h3 className={styles.sectionTitle}>Upload Audio</h3>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 12,
+            }}
+          >
+            <h3 className={styles.sectionTitle}>Upload Audio</h3>
+
+            <span
+              style={{
+                fontSize: "13px",
+                color: "#6b7280",
+                maxWidth: "300px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={file?.name}
+            >
+              {file ? `${file.name}` : "No file selected"}
+            </span>
+          </div>
 
           <div className={styles.controlRow}>
             <input
@@ -806,9 +931,9 @@ useEffect(() => {
           <table className={styles.table}>
            <thead>
             <tr>
-              <th style={{ width: "60%" }}>Transcript</th>
-              <th style={{ width: "12%" }}>Start</th>
-              <th style={{ width: "12%" }}>End</th>
+              <th style={{ width: "70%" }}>Transcript</th>
+              <th style={{ width: "10%" }}>Start</th>
+              <th style={{ width: "10%" }}>End</th>
               <th style={{ width: "16%", textAlign: "center" }}>Actions</th>
             </tr>
           </thead>
@@ -837,11 +962,68 @@ useEffect(() => {
                         </div>
                       )}
                     </td>
+              <td className={styles.timeCell}>
+                <div className={styles.timeEditor}>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={displayTime(r.start).split(":")[0]}
+                    onClick={(e) =>
+                    {
+                      e.stopPropagation();
+                      updateTimePart(r.id, "start", "minute", e.target.value)
+                    }
+                    }
+                    className={styles.timeInput}
+                  />
+                  :
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={displayTime(r.start).split(":")[1]}
+                    onClick={(e) =>{
+                    e.stopPropagation();
+                      updateTimePart(r.id, "start", "second", e.target.value)
+                    }
+                  }
+                    className={styles.timeInput}
+                  />
+                </div>
+              </td>
 
-                    <td className={styles.timeCell}>{r.start}</td>
-
-                    <td className={styles.timeCell}>{r.end}</td>
-
+                <td className={styles.timeCell}>
+                  <div className={styles.timeEditor}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="59"                      
+                      value={displayTime(r.end).split(":")[0]}
+                      onClick={(e) =>
+                      {
+                        e.stopPropagation();
+                        updateTimePart(r.id, "end", "minute", e.target.value)
+                      }
+                    }
+                      className={styles.timeInput}
+                    />
+                    :
+                    <input
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={displayTime(r.end).split(":")[1]}
+                      onClick={(e) =>
+                      {
+                        e.stopPropagation();
+                        updateTimePart(r.id, "end", "second", e.target.value)
+                      }
+                    }                   
+                      className={styles.timeInput}
+                    />
+                  </div>
+                </td>
                     <td>
                       <div className={styles.actionButtons}>
                         {editingId === r.id ? (
@@ -863,6 +1045,7 @@ useEffect(() => {
                         ) : (
                           <>
                             <button
+                            disabled={downloading}
                               className={styles.iconBtn}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -870,7 +1053,7 @@ useEffect(() => {
                               }}
                               title="Download"
                             >
-                              📥
+                              {downloading ? "..." : "📥"}
                             </button>
 
                             <button
