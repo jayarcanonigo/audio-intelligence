@@ -969,12 +969,10 @@ useEffect(() => {
                     min="0"
                     max="59"
                     value={displayTime(r.start).split(":")[0]}
-                    onClick={(e) =>
-                    {
+                   onChange={(e) => {
                       e.stopPropagation();
-                      updateTimePart(r.id, "start", "minute", e.target.value)
-                    }
-                    }
+                      updateTimePart(r.id, "start", "minute", e.currentTarget.value);
+                    }}
                     className={styles.timeInput}
                   />
                   :
@@ -983,11 +981,10 @@ useEffect(() => {
                     min="0"
                     max="59"
                     value={displayTime(r.start).split(":")[1]}
-                    onClick={(e) =>{
-                    e.stopPropagation();
-                      updateTimePart(r.id, "start", "second", e.target.value)
-                    }
-                  }
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      updateTimePart(r.id, "start", "second", e.currentTarget.value);
+                    }}
                     className={styles.timeInput}
                   />
                 </div>
@@ -1000,12 +997,10 @@ useEffect(() => {
                       min="0"
                       max="59"                      
                       value={displayTime(r.end).split(":")[0]}
-                      onClick={(e) =>
-                      {
+                      onChange={(e) => {
                         e.stopPropagation();
-                        updateTimePart(r.id, "end", "minute", e.target.value)
-                      }
-                    }
+                        updateTimePart(r.id, "end", "minute", e.currentTarget.value);
+                      }}
                       className={styles.timeInput}
                     />
                     :
@@ -1014,12 +1009,10 @@ useEffect(() => {
                       min="0"
                       max="59"
                       value={displayTime(r.end).split(":")[1]}
-                      onClick={(e) =>
-                      {
+                      onChange={(e) => {
                         e.stopPropagation();
-                        updateTimePart(r.id, "end", "second", e.target.value)
-                      }
-                    }                   
+                        updateTimePart(r.id, "end", "second", e.currentTarget.value);
+                      }}
                       className={styles.timeInput}
                     />
                   </div>
