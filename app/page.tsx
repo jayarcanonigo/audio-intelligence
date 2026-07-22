@@ -313,21 +313,21 @@ export default function ProjectsPage() {
             >
 
 
-              <Link
-                href={`/projects/${project.id}`}
-                className="
-                  flex-1
-                  text-center
-                  bg-blue-600
-                  hover:bg-blue-700
-                  text-white
-                  py-2.5
-                  rounded-lg
-                  font-semibold
-                "
-              >
-                Open
-              </Link>
+             <Link
+            href={`/projects/${project.id}?name=${encodeURIComponent(project.name)}`}
+            className="
+              flex-1
+              text-center
+              bg-blue-600
+              hover:bg-blue-700
+              text-white
+              py-2.5
+              rounded-lg
+              font-semibold
+            "
+          >
+            Open
+          </Link>
 
 
 

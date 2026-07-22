@@ -1,257 +1,288 @@
 "use client";
 
-import { useState } from "react";
-
+import { useEffect, useState } from "react";
+import { getBrands } from "@/services/api";
 
 interface Segment {
-
-  id:number;
-
-  start?:string;
-
-  end?:string;
-
-  text:string;
-
-  segment_type?:string;
-
+  id: number;
+  start?: string;
+  end?: string;
+  text: string;
+  segment_type?: string;
+  brand_name?: string;
 }
 
-
+interface Brand {
+  id: number;
+  name: string;
+}
 
 interface Props {
-
   segments: Segment[];
-
   selectedResultId: number | null;
-
-  setSelectedResultId: (
-    id:number | null
-  ) => void;
-
-
-  updateTimePart?: (
-    id:number,
-    field:"start" | "end",
-    part:"minute" | "second",
-    value:string
-  ) => void;
-
-
-  displayTime?: (
-    time?:string
-  ) => string;
-
-
-  onPlay:(row:Segment)=>void;
-
-
-  onUpdate?:(
-    id:number,
-    data:{
-      text:string;
-      start:string;
-      end:string;
+  setSelectedResultId: (id: number | null) => void;
+  onPlay: (row: Segment) => void;
+  onUpdate?: (
+    id: number,
+    data: {
+      text: string;
+      start: string;
+      end: string;
+      brand_name: string;
     }
-  )=>void;
-
-
-  onRemove?:(
-    id:number
-  )=>void;
-
-
-  onSave?:()=>Promise<void> | void;
-
-
-  onDownload?:(
-    row:Segment
-  )=>void;
-
+  ) => void;
+  onRemove?: (id: number) => void;
+  onSave?: (segments: Segment[]) => void;
 }
-
 
 export default function SelectedSegments({
-
   segments,
-
   selectedResultId,
-
   setSelectedResultId,
-
   onPlay,
-
-  onDownload,
-
   onUpdate,
-
   onRemove,
+  onSave,
+}: Props) {
 
-}:Props){
+  const [segmentList, setSegmentList] = useState<Segment[]>(segments);
+  const [brands, setBrands] = useState<Brand[]>([]);
 
+  const [editingId, setEditingId] = useState<number | null>(null);
 
-
-const [editingId,setEditingId]
-=
-useState<number|null>(null);
-
-
-
-const [editText,setEditText]
-=
-useState("");
+  const [editText, setEditText] = useState("");
+  const [editStart, setEditStart] = useState("");
+  const [editEnd, setEditEnd] = useState("");
+  const [editBrand, setEditBrand] = useState("");
 
 
+  // LOAD BRANDS
+  useEffect(() => {
 
-const [editStart,setEditStart]
-=
-useState("");
+    async function loadBrands() {
 
+      try {
 
+        const data = await getBrands();
 
-const [editEnd,setEditEnd]
-=
-useState("");
+        setBrands(data);
 
+      } catch(error){
 
+        console.error(error);
 
+      }
 
-
-function displayTime(time?:string){
-
-  return time || "00:00";
-
-}
-
-
-
-
-
-function handleEdit(row:Segment){
-
-  setEditingId(row.id);
-
-  setEditText(row.text);
-
-  setEditStart(
-    row.start || "00:00:00"
-  );
-
-  setEditEnd(
-    row.end || "00:00:00"
-  );
-
-}
-
-
-
-
-
-function handleSave(row:Segment){
-
-
-  onUpdate?.(
-    row.id,
-    {
-      text:editText,
-      start:editStart,
-      end:editEnd
     }
-  );
 
 
-  setEditingId(null);
+    loadBrands();
 
-}
-
-
+  }, []);
 
 
 
-function handleCancel(){
+  // AUTO MATCH BRAND
+  function detectBrand(
+    text:string,
+    currentBrand?:string
+  ){
 
-  setEditingId(null);
-
-  setEditText("");
-
-  setEditStart("");
-
-  setEditEnd("");
-
-}
+    if(currentBrand){
+      return currentBrand;
+    }
 
 
+    const cleanText =
+      text.toLowerCase();
 
 
 
-function handleRemove(id:number){
+    const matched =
+      brands.find((brand)=>{
 
 
-  onRemove?.(id);
+        const words =
+          brand.name
+          .toLowerCase()
+          .split(" ")
+          .filter(
+            word=>word.length >= 4
+          );
 
 
-  if(selectedResultId === id){
+        return words.some(word =>
+          cleanText.includes(word)
+        );
 
-    setSelectedResultId(null);
+
+      });
+
+
+
+    return matched
+      ? matched.name
+      : "";
 
   }
 
-}
+
+
+  // UPDATE SEGMENTS + AUTO BRAND
+  useEffect(()=>{
+
+
+    const updated =
+      segments.map((segment)=>{
+
+
+        const brand =
+          detectBrand(
+            segment.text,
+            segment.brand_name
+          );
+
+
+        return {
+          ...segment,
+          brand_name: brand
+        };
+
+
+      });
+
+
+
+    setSegmentList(updated);
+
+
+
+  },[segments,brands]);
 
 
 
 
 
-function TimeInput({
+  function edit(row:Segment){
 
-  value,
+    setEditingId(row.id);
 
-  onChange,
+    setEditText(row.text);
 
-}:{
+    setEditStart(
+      row.start || "00:00:00"
+    );
 
-  value:string;
-
-  onChange:(value:string)=>void;
-
-}){
+    setEditEnd(
+      row.end || "00:00:00"
+    );
 
 
-return (
+    setEditBrand(
+      row.brand_name || ""
+    );
 
-<input
+  }
 
-type="text"
 
-value={value}
 
-placeholder="00:00:00"
 
-maxLength={8}
 
-onChange={(e)=>
-onChange(e.target.value)
-}
+  function saveEdit(row:Segment){
 
-className="
-w-24
-border
-rounded-lg
-px-2
-py-1
-text-center
-bg-white
-focus:outline-none
-focus:ring-2
-focus:ring-blue-300
-"
 
-/>
+    const updated = {
 
-);
+      text:editText,
 
-}
+      start:editStart,
 
+      end:editEnd,
+
+      brand_name:editBrand
+
+    };
+
+
+    onUpdate?.(
+      row.id,
+      updated
+    );
+
+
+    setSegmentList(prev=>
+
+      prev.map(item=>
+
+        item.id===row.id
+
+        ? {
+            ...item,
+            ...updated
+          }
+
+        : item
+
+      )
+
+    );
+
+
+    setEditingId(null);
+
+  }
+
+
+
+
+
+  function updateBrand(
+    value:string
+  ){
+
+    setEditBrand(value);
+
+  }
+
+
+
+
+
+  function TimeInput({
+    value,
+    onChange
+  }:{
+    value:string;
+    onChange:(v:string)=>void;
+  }){
+
+
+    return (
+
+      <input
+
+        value={value}
+
+        maxLength={8}
+
+        onChange={
+          e=>onChange(e.target.value)
+        }
+
+        className="
+        w-24
+        border
+        rounded-lg
+        px-2
+        py-1
+        text-center
+        "
+
+      />
+
+    );
+
+  }
 
 
 
@@ -261,25 +292,70 @@ return (
 <div className="space-y-4">
 
 
+<div className="
+flex justify-between 
+items-center 
+bg-white 
+border 
+rounded-xl 
+p-4
+">
+
+
+<h2 className="text-lg font-bold">
+📢 Selected Advertisements
+</h2>
+
+
+<button
+
+onClick={()=>
+ onSave?.(segmentList)
+}
+
+className="
+bg-blue-600 
+text-white 
+px-5 
+py-2 
+rounded-lg
+font-semibold
+"
+
+>
+Save All
+</button>
+
+
+</div>
+
+
+
+
+
 {
-
-[...segments]
-
-.sort((a,b)=>
-
-(a.start || "")
-.localeCompare(
-(a.start || "")
-)
-
-)
-
-.map((row,index)=>(
+segmentList.map((row,index)=>(
 
 
 <div
 
 key={row.id}
+
+className={`
+border
+rounded-2xl
+p-5
+bg-white
+shadow-sm
+
+${
+selectedResultId===row.id
+?
+"ring-2 ring-blue-300 bg-blue-50"
+:""
+}
+
+`}
 
 
 onClick={(e)=>{
@@ -289,11 +365,12 @@ const target =
 e.target as HTMLElement;
 
 
-if(target.closest("button")){
-
+if(
+target.closest("button") ||
+target.closest("select") ||
+target.closest("input")
+)
 return;
-
-}
 
 
 setSelectedResultId(row.id);
@@ -301,62 +378,25 @@ setSelectedResultId(row.id);
 
 }}
 
-
-
-className={`
-
-border
-
-rounded-xl
-
-p-5
-
-cursor-pointer
-
-transition-all
-
-
-${
-selectedResultId === row.id
-
-?
-
-"bg-blue-50 border-blue-500 ring-2 ring-blue-200 shadow-md"
-
-:
-
-"bg-white border-gray-200 hover:border-blue-300 hover:shadow"
-
-}
-
-`}
-
 >
 
 
-
-<div className="flex justify-between items-start">
-
+<div className="flex justify-between">
 
 
-<div className="flex items-center gap-3">
+<div className="flex gap-3">
 
 
-
-<div
-
-className="
-w-8
-h-8
+<div className="
+w-10
+h-10
 rounded-full
 bg-gray-100
 flex
 items-center
 justify-center
 font-bold
-"
-
->
+">
 
 {index+1}
 
@@ -364,35 +404,121 @@ font-bold
 
 
 
+<div>
+
+<h3 className="font-bold">
+Advertisement
+</h3>
+
+
+<p className="text-xs text-gray-500">
+Detected Segment
+</p>
+
+
+
+{
+editingId===row.id
+
+?
+
+<select
+
+value={editBrand}
+
+onChange={
+e=>updateBrand(e.target.value)
+}
+
+className="
+mt-2
+w-80
+rounded-full
+px-4
+py-2
+bg-yellow-50
+border
+border-yellow-300
+font-semibold
+"
+
+>
+
+
+<option value="">
+🏷 Select Brand
+</option>
+
+
+{
+brands.map(brand=>(
+
+<option
+key={brand.id}
+value={brand.name}
+>
+
+{brand.name}
+
+</option>
+
+))
+
+}
+
+
+</select>
+
+
+:
+
+
+<div className="
+mt-2
+w-80
+truncate
+rounded-full
+px-4
+py-2
+bg-yellow-50
+border
+border-yellow-300
+font-semibold
+">
+
+🏷 {row.brand_name || "No brand"}
+
+</div>
+
+
+}
+
+
+
+</div>
+
+
+</div>
+
+
+
+
+
+<div className="flex gap-2">
+
 
 <button
 
-type="button"
-
-
-onClick={(e)=>{
-
-
-e.stopPropagation();
-
-
-setSelectedResultId(row.id);
-
-
-onPlay(row);
-
-
-}}
-
+onClick={()=>
+onPlay(row)
+}
 
 className="
 bg-green-500
-hover:bg-green-600
 text-white
-rounded-full
 w-10
 h-10
-shadow
+rounded-lg
 "
 
 >
@@ -403,211 +529,22 @@ shadow
 
 
 
-
-<div>
-
-<div className="font-semibold text-gray-800">
-
-Advertisement
-
-</div>
-
-
-<div className="text-xs text-gray-500">
-
-Detected Segment
-
-</div>
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-<div className="flex gap-2">
-
-
-
-<button
-
-type="button"
-
-
-onClick={(e)=>{
-
-
-e.stopPropagation();
-
-
-onDownload?.(row);
-
-
-}}
-
-
-className="
-px-3
-py-2
-rounded-lg
-bg-purple-600
-hover:bg-purple-700
-text-white
-text-sm
-"
-
->
-
-⬇️
-
-</button>
-
-
-
-
-
-<button
-
-type="button"
-
-
-onClick={(e)=>{
-
-
-e.stopPropagation();
-
-
-handleEdit(row);
-
-
-}}
-
-
-className="
-px-3
-py-2
-rounded-lg
-hover:bg-gray-100
-"
-
->
-
-✏️
-
-</button>
-
-
-
-
-
-<button
-
-type="button"
-
-
-onClick={(e)=>{
-
-
-e.stopPropagation();
-
-
-handleRemove(row.id);
-
-
-}}
-
-
-className="
-px-3
-py-2
-rounded-lg
-hover:bg-red-50
-"
-
->
-
-🗑️
-
-</button>
-
-
-
-</div>
-
-
-
-</div>
-
-
-
-
-
-
-
-<div
-
-className="
-mt-4
-bg-gray-50
-rounded-lg
-p-3
-text-gray-700
-"
-
->
-
-
 {
 
-editingId === row.id
+editingId===row.id
 
 ?
-
-
-<>
-
-
-<textarea
-
-value={editText}
-
-onChange={(e)=>
-setEditText(e.target.value)
-}
-
-rows={4}
-
-className="
-w-full
-border
-rounded-lg
-p-3
-bg-white
-"
-
-/>
-
-
-
-<div className="flex gap-2 mt-3">
-
 
 <button
 
 onClick={()=>
-handleSave(row)
+saveEdit(row)
 }
 
 className="
-bg-blue-500
+bg-blue-600
 text-white
 px-4
-py-2
 rounded-lg
 "
 
@@ -618,21 +555,49 @@ Save
 </button>
 
 
+:
+
 
 <button
 
-onClick={handleCancel}
+onClick={()=>
+edit(row)
+}
 
 className="
-bg-gray-200
-px-4
-py-2
+bg-gray-100
+w-10
+h-10
 rounded-lg
 "
 
 >
 
-Cancel
+✏️
+
+</button>
+
+}
+
+
+
+
+<button
+
+onClick={()=>
+onRemove?.(row.id)
+}
+
+className="
+bg-red-50
+w-10
+h-10
+rounded-lg
+"
+
+>
+
+🗑
 
 </button>
 
@@ -640,11 +605,45 @@ Cancel
 </div>
 
 
-</>
+</div>
 
+
+
+
+
+<div className="
+mt-4
+bg-gray-50
+rounded-xl
+p-4
+">
+
+
+{
+editingId===row.id
+
+?
+
+<textarea
+
+value={editText}
+
+onChange={
+e=>setEditText(e.target.value)
+}
+
+rows={4}
+
+className="
+w-full
+border
+rounded-lg
+p-3
+"
+
+/>
 
 :
-
 
 row.text
 
@@ -652,85 +651,53 @@ row.text
 }
 
 
-
 </div>
 
 
 
 
 
-
-
-<div className="mt-4 flex items-center">
-
-
-<div className="flex items-center gap-2 text-sm text-gray-500">
-
+<div className="
+mt-4
+flex
+gap-2
+items-center
+">
 
 ⏱
 
 
 {
-
-editingId === row.id
-
+editingId===row.id
 
 ?
 
-
 <>
 
-
 <TimeInput
-
 value={editStart}
-
 onChange={setEditStart}
-
 />
 
-
-<span>
 →
-</span>
-
 
 <TimeInput
-
 value={editEnd}
-
 onChange={setEditEnd}
-
 />
-
 
 </>
 
 
 :
 
-
 <>
 
+<b>{row.start}</b>
 
-<span className="font-semibold text-gray-700">
-
-{displayTime(row.start)}
-
-</span>
-
-
-<span>
 →
-</span>
 
-
-<span className="font-semibold text-gray-700">
-
-{displayTime(row.end)}
-
-</span>
-
+<b>{row.end}</b>
 
 </>
 
@@ -738,27 +705,19 @@ onChange={setEditEnd}
 }
 
 
-
 </div>
 
 
 </div>
-
-
-
-</div>
-
 
 
 ))
-
 
 }
 
 
 
 </div>
-
 
 );
 

@@ -1,336 +1,186 @@
 "use client";
 
-import {
-  useState,
-  useEffect
-} from "react";
-
-import {
-  uploadAudio,
-  getUploadStatus
-} from "@/services/api";
-
+import { useState, useEffect } from "react";
+import { uploadAudio, getUploadStatus } from "@/services/api";
 
 interface Props {
-
-  projectId:number;
-
-  onComplete?:()=>void;
-
+  projectId: number;
+  onComplete?: () => void;
 }
 
-
 export default function UploadPanel({
-
   projectId,
+  onComplete,
+}: Props) {
+  const [file, setFile] = useState<File | null>(null);
+  const [keywords, setKeywords] = useState("");
+  const [uploadTime, setUploadTime] = useState("01");
+  const [sessionId, setSessionId] = useState("");
+  const [status, setStatus] = useState<any>(null);
 
-  onComplete
+  async function handleUpload() {
+    if (!file) return;
 
-}:Props){
-
-
-  const [file,setFile] =
-    useState<File | null>(null);
-
-
-  const [keywords,setKeywords] =
-    useState("");
-
-
-  const [uploadTime,setUploadTime] =
-    useState("01");
-
-
-  const [sessionId,setSessionId] =
-    useState("");
-
-
-  const [status,setStatus] =
-    useState<any>(null);
-
-
-
-  async function handleUpload(){
-
-
-    if(!file){
-
-      return;
-
-    }
-
-
-    const keywordList =
-      keywords
+    const keywordList = keywords
       .split("\n")
-      .map(x=>x.trim())
+      .map((x) => x.trim())
       .filter(Boolean);
 
-
-
-    const result =
-      await uploadAudio(
-
-        projectId,
-
-        file,
-
-        keywordList,
-
-        uploadTime   // <-- add time
-
-      );
-
-
-    setSessionId(
-      result.session_id
+    const result = await uploadAudio(
+      projectId,
+      file,
+      keywordList,
+      uploadTime
     );
 
+    setSessionId(result.session_id);
   }
 
+  useEffect(() => {
+    if (!sessionId) return;
 
-
-
-
-  useEffect(()=>{
-
-
-    if(!sessionId){
-
-      return;
-
-    }
-
-
-    const timer = setInterval(async()=>{
-
-
-      const data =
-        await getUploadStatus(
-          sessionId
-        );
-
+    const timer = setInterval(async () => {
+      const data = await getUploadStatus(sessionId);
 
       setStatus(data);
 
-
-
-      if(data.status === "completed"){
-
+      if (data.status === "completed") {
         onComplete?.();
-
         clearInterval(timer);
-
       }
 
-
-
-      if(data.status === "error"){
-
+      if (data.status === "error") {
         clearInterval(timer);
-
       }
+    }, 2000);
 
-
-    },2000);
-
-
-
-    return()=>{
-
-      clearInterval(timer);
-
-    };
-
-
-  },[sessionId]);
-
-
-
-
-
+    return () => clearInterval(timer);
+  }, [sessionId, onComplete]);
 
   return (
+    <div className="space-y-6">
 
-    <div className="space-y-4">
+      {/* Choose File */}
+      <div>
+        <input
+          id="audio-file"
+          type="file"
+          accept="audio/*"
+          className="hidden"
+          onChange={(e) =>
+            setFile(e.target.files?.[0] || null)
+          }
+        />
 
-
-      <input
-
-        type="file"
-
-        accept="audio/*"
-
-        onChange={e=>
-
-          setFile(
-            e.target.files?.[0] || null
-          )
-
-        }
-
-      />
-
-
-
-      {/* TIME DROPDOWN */}
-      <div className="flex items-center gap-3">
-
-        <label className="font-medium">
-          Time:
+        <label
+          htmlFor="audio-file"
+          className="inline-flex cursor-pointer items-center gap-3 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-md transition hover:bg-blue-700 hover:shadow-lg"
+        >
+          📁 Choose Audio File
         </label>
 
-
-        <select
-
-          value={uploadTime}
-
-          onChange={e=>
-            setUploadTime(
-              e.target.value
-            )
-          }
-
-          className="
-            border
-            rounded
-            px-3
-            py-2
-          "
-
-        >
-
-          {
-            Array.from(
-              {length:24},
-              (_,index)=>{
-
-                const hour =
-                  String(index + 1)
-                  .padStart(2,"0");
-
-
-                return (
-
-                  <option
-                    key={hour}
-                    value={hour}
-                  >
-
-                    {hour}:00
-
-                  </option>
-
-                );
-
-              }
-            )
-          }
-
-
-        </select>
-
-
+        {file ? (
+          <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+            <p className="text-sm text-green-700">
+              <span className="font-semibold">Selected File:</span>{" "}
+              {file.name}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-gray-500">
+            No audio file selected.
+          </p>
+        )}
       </div>
 
+      {/* Time */}
+      <div>
+        <label className="mb-2 block font-semibold text-gray-700">
+          Broadcast Time
+        </label>
 
+        <select
+          value={uploadTime}
+          onChange={(e) => setUploadTime(e.target.value)}
+          className="w-48 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none"
+        >
+          {Array.from({ length: 24 }, (_, index) => {
+            const hour = String(index + 1).padStart(2, "0");
 
+            return (
+              <option
+                key={hour}
+                value={hour}
+              >
+                {hour}:00
+              </option>
+            );
+          })}
+        </select>
+      </div>
 
-      <textarea
+      {/* Keywords */}
+      <div>
+        <label className="mb-2 block font-semibold text-gray-700">
+          Keywords
+        </label>
 
-        placeholder="Keywords per line"
+        <textarea
+          placeholder="Enter one keyword per line..."
+          value={keywords}
+          onChange={(e) => setKeywords(e.target.value)}
+          className="h-40 w-full rounded-lg border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
+        />
+      </div>
 
-        value={keywords}
-
-        onChange={e=>
-
-          setKeywords(
-            e.target.value
-          )
-
-        }
-
-        className="border p-2 w-full"
-
-      />
-
-
-
-
+      {/* Upload */}
       <button
-
         onClick={handleUpload}
-
-        className="
-          bg-blue-600
-          text-white
-          px-4
-          py-2
-          rounded
-        "
-
+        disabled={!file}
+        className="rounded-xl bg-green-600 px-6 py-3 font-semibold text-white shadow transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400"
       >
-
-        Upload
-
+        🚀 Upload Audio
       </button>
 
+      {/* Progress */}
+      {status && (
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <span className="font-semibold text-gray-700">
+              Status
+            </span>
 
-
-
-
-      {
-        status &&
-
-        <div className="border p-3">
-
-
-          <p>
-            Status: {status.status}
-          </p>
-
-
-          <p>
-            Chunk:
-            {" "}
-            {status.current_chunk}
-            /
-            {status.total_chunks}
-          </p>
-
-
-
-          <div className="w-full bg-gray-200 h-3">
-
-
-            <div
-
-              className="bg-blue-500 h-3"
-
-              style={{
-                width:
-                `${status.progress_percent || 0}%`
-              }}
-
-            />
-
-
+            <span
+              className={`rounded-full px-3 py-1 text-sm font-medium ${
+                status.status === "completed"
+                  ? "bg-green-100 text-green-700"
+                  : status.status === "processing"
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-yellow-100 text-yellow-700"
+              }`}
+            >
+              {status.status}
+            </span>
           </div>
 
+          <div className="mb-2 flex justify-between text-sm text-gray-600">
+            <span>
+              Chunk {status.current_chunk} / {status.total_chunks}
+            </span>
 
+            <span>{status.progress_percent || 0}%</span>
+          </div>
 
-          <p>
-            {status.progress_percent || 0}%
-          </p>
-
-
+          <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+            <div
+              className="h-3 rounded-full bg-blue-600 transition-all duration-500"
+              style={{
+                width: `${status.progress_percent || 0}%`,
+              }}
+            />
+          </div>
         </div>
-
-      }
-
-
+      )}
     </div>
-
   );
-
 }

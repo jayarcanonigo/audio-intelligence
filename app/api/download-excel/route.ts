@@ -3,56 +3,69 @@ import * as XLSX from "xlsx";
 
 export async function POST(req: Request) {
   try {
-    const { results } = await req.json();
+    const body = await req.json();
 
-    console.log("Received results for Excel export:", results);
+    const results = body.results || [];
 
-    // ✅ SAFE mapping (matches your frontend)
-    const formatted = (results || []).map((r: any) => ({
-      Text: r.Text || "",
-      Start: r.Start || "",
-      End: r.End || "",
-    }));
-
-    // ❗ fallback safety check
-    if (!formatted.length) {
+    if (!results.length) {
       return NextResponse.json(
-        { error: "No data to export" },
+        { error: "No data received" },
         { status: 400 }
       );
     }
 
-    const worksheet = XLSX.utils.json_to_sheet(formatted);
 
-    // optional: column width (nice formatting)
+    const worksheet =
+      XLSX.utils.json_to_sheet(results);
+
+
     worksheet["!cols"] = [
-      { wch: 60 }, // Text
-      { wch: 15 }, // Start
-      { wch: 15 }, // End
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 35 },
+      { wch: 80 },
     ];
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Segments");
 
-    const buffer = XLSX.write(workbook, {
-      type: "buffer",
-      bookType: "xlsx",
-    });
+    const workbook =
+      XLSX.utils.book_new();
+
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "Advertisements"
+    );
+
+
+    const buffer =
+      XLSX.write(workbook, {
+        type: "buffer",
+        bookType: "xlsx",
+      });
+
 
     return new NextResponse(buffer, {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
         "Content-Disposition":
-          "attachment; filename=radio_segments.xlsx",
+          "attachment; filename=advertisement_report.xlsx",
       },
     });
-  } catch (err: any) {
-    console.error("Excel export error:", err);
+
+
+  } catch (error: any) {
 
     return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
+      {
+        error: error.message,
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
