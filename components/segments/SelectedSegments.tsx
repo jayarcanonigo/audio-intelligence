@@ -21,11 +21,22 @@ interface Segment {
 
 interface Props {
 
-  segments:Segment[];
+  segments: Segment[];
+
+  selectedResultId: number | null;
+
+  setSelectedResultId: (
+    id:number | null
+  ) => void;
+
 
   onPlay:(row:Segment)=>void;
 
-  onDownload?:(row:Segment)=>void;
+
+  onDownload?:(
+    row:Segment
+  )=>void;
+
 
   onUpdate?:(
     id:number,
@@ -35,6 +46,7 @@ interface Props {
       end:string;
     }
   )=>void;
+
 
   onRemove?:(
     id:number
@@ -48,20 +60,20 @@ export default function SelectedSegments({
 
   segments,
 
+  selectedResultId,
+
+  setSelectedResultId,
+
   onPlay,
 
   onDownload,
 
   onUpdate,
 
-  onRemove
+  onRemove,
 
 }:Props){
 
-
-const [selectedResultId,setSelectedResultId]
-=
-useState<number|null>(null);
 
 
 const [editingId,setEditingId]
@@ -69,14 +81,17 @@ const [editingId,setEditingId]
 useState<number|null>(null);
 
 
+
 const [editText,setEditText]
 =
 useState("");
 
 
+
 const [editStart,setEditStart]
 =
 useState("");
+
 
 
 const [editEnd,setEditEnd]
@@ -89,7 +104,7 @@ useState("");
 
 function displayTime(time?:string){
 
- return time || "00:00";
+  return time || "00:00";
 
 }
 
@@ -99,13 +114,17 @@ function displayTime(time?:string){
 
 function handleEdit(row:Segment){
 
- setEditingId(row.id);
+  setEditingId(row.id);
 
- setEditText(row.text);
+  setEditText(row.text);
 
- setEditStart(row.start || "00:00:00");
+  setEditStart(
+    row.start || "00:00:00"
+  );
 
- setEditEnd(row.end || "00:00:00");
+  setEditEnd(
+    row.end || "00:00:00"
+  );
 
 }
 
@@ -113,25 +132,21 @@ function handleEdit(row:Segment){
 
 
 
-function handleSave(row: Segment) {
+function handleSave(row:Segment){
 
-  console.log("SAVE", {
-    id: row.id,
-    text: editText,
-    start: editStart,
-    end: editEnd,
-  });
 
   onUpdate?.(
     row.id,
     {
-      text: editText,
-      start: editStart,
-      end: editEnd,
+      text:editText,
+      start:editStart,
+      end:editEnd
     }
   );
 
+
   setEditingId(null);
+
 }
 
 
@@ -140,13 +155,13 @@ function handleSave(row: Segment) {
 
 function handleCancel(){
 
- setEditingId(null);
+  setEditingId(null);
 
- setEditText("");
+  setEditText("");
 
- setEditStart("");
+  setEditStart("");
 
- setEditEnd("");
+  setEditEnd("");
 
 }
 
@@ -156,13 +171,15 @@ function handleCancel(){
 
 function handleRemove(id:number){
 
- onRemove?.(id);
 
- if(selectedResultId===id){
+  onRemove?.(id);
 
-  setSelectedResultId(null);
 
- }
+  if(selectedResultId === id){
+
+    setSelectedResultId(null);
+
+  }
 
 }
 
@@ -171,34 +188,56 @@ function handleRemove(id:number){
 
 
 function TimeInput({
+
   value,
+
   onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <input
-      type="text"
-      value={value}
-      placeholder="00:00:00"
-      maxLength={8}
-      onChange={(e) => onChange(e.target.value)}
-      className="
-        w-24
-        border
-        rounded-lg
-        px-2
-        py-1
-        text-center
-        bg-white
-        focus:outline-none
-        focus:ring-2
-        focus:ring-blue-300
-      "
-    />
-  );
+
+}:{
+
+  value:string;
+
+  onChange:(value:string)=>void;
+
+}){
+
+
+return (
+
+<input
+
+type="text"
+
+value={value}
+
+placeholder="00:00:00"
+
+maxLength={8}
+
+onChange={(e)=>
+onChange(e.target.value)
 }
+
+className="
+w-24
+border
+rounded-lg
+px-2
+py-1
+text-center
+bg-white
+focus:outline-none
+focus:ring-2
+focus:ring-blue-300
+"
+
+/>
+
+);
+
+}
+
+
 
 
 
@@ -212,7 +251,12 @@ return (
 [...segments]
 
 .sort((a,b)=>
-(a.start || "").localeCompare(b.start || "")
+
+(a.start || "")
+.localeCompare(
+(a.start || "")
+)
+
 )
 
 .map((row,index)=>(
@@ -222,19 +266,27 @@ return (
 
 key={row.id}
 
+
 onClick={(e)=>{
 
-const target=e.target as HTMLElement;
+
+const target =
+e.target as HTMLElement;
 
 
 if(target.closest("button")){
- return;
+
+return;
+
 }
 
 
 setSelectedResultId(row.id);
 
+
 }}
+
+
 
 className={`
 
@@ -248,8 +300,9 @@ cursor-pointer
 
 transition-all
 
+
 ${
-selectedResultId===row.id
+selectedResultId === row.id
 
 ?
 
@@ -266,13 +319,18 @@ selectedResultId===row.id
 >
 
 
+
 <div className="flex justify-between items-start">
+
 
 
 <div className="flex items-center gap-3">
 
 
-<div className="
+
+<div
+
+className="
 w-8
 h-8
 rounded-full
@@ -281,7 +339,9 @@ flex
 items-center
 justify-center
 font-bold
-">
+"
+
+>
 
 {index+1}
 
@@ -290,20 +350,25 @@ font-bold
 
 
 
-
 <button
 
 type="button"
 
+
 onClick={(e)=>{
+
 
 e.stopPropagation();
 
+
 setSelectedResultId(row.id);
+
 
 onPlay(row);
 
+
 }}
+
 
 className="
 bg-green-500
@@ -324,7 +389,6 @@ shadow
 
 
 
-
 <div>
 
 <div className="font-semibold text-gray-800">
@@ -340,10 +404,12 @@ Detected Segment
 
 </div>
 
+
 </div>
 
 
 </div>
+
 
 
 
@@ -353,19 +419,22 @@ Detected Segment
 
 
 
-{/* DOWNLOAD BUTTON */}
-
 <button
 
 type="button"
 
+
 onClick={(e)=>{
+
 
 e.stopPropagation();
 
+
 onDownload?.(row);
 
+
 }}
+
 
 className="
 px-3
@@ -391,13 +460,18 @@ text-sm
 
 type="button"
 
+
 onClick={(e)=>{
+
 
 e.stopPropagation();
 
+
 handleEdit(row);
 
+
 }}
+
 
 className="
 px-3
@@ -420,13 +494,18 @@ hover:bg-gray-100
 
 type="button"
 
+
 onClick={(e)=>{
+
 
 e.stopPropagation();
 
+
 handleRemove(row.id);
 
+
 }}
+
 
 className="
 px-3
@@ -442,28 +521,35 @@ hover:bg-red-50
 </button>
 
 
-</div>
-
-
 
 </div>
 
 
 
+</div>
 
 
-<div className="
+
+
+
+
+
+<div
+
+className="
 mt-4
 bg-gray-50
 rounded-lg
 p-3
 text-gray-700
-">
+"
+
+>
 
 
 {
 
-editingId===row.id
+editingId === row.id
 
 ?
 
@@ -475,7 +561,9 @@ editingId===row.id
 
 value={editText}
 
-onChange={(e)=>setEditText(e.target.value)}
+onChange={(e)=>
+setEditText(e.target.value)
+}
 
 rows={4}
 
@@ -496,7 +584,9 @@ bg-white
 
 <button
 
-onClick={()=>handleSave(row)}
+onClick={()=>
+handleSave(row)
+}
 
 className="
 bg-blue-500
@@ -540,69 +630,122 @@ Cancel
 
 :
 
+
 row.text
 
 
 }
 
 
-</div>
-
-
-
-
-
-<div className="mt-4 flex justify-between items-center">
-
-  <div className="flex items-center gap-2 text-sm text-gray-500">
-
-    ⏱
-
-    {editingId === row.id ? (
-
-      <>
-        <TimeInput
-          value={editStart}
-          onChange={setEditStart}
-        />
-
-        <span>→</span>
-
-        <TimeInput
-          value={editEnd}
-          onChange={setEditEnd}
-        />
-      </>
-
-    ) : (
-
-      <>
-        <span className="font-semibold text-gray-700">
-          {displayTime(row.start)}
-        </span>
-
-        <span>→</span>
-
-        <span className="font-semibold text-gray-700">
-          {displayTime(row.end)}
-        </span>
-      </>
-
-    )}
-
-  </div>
-  </div>
 
 </div>
 
 
-))
+
+
+
+
+
+<div className="mt-4 flex items-center">
+
+
+<div className="flex items-center gap-2 text-sm text-gray-500">
+
+
+⏱
+
+
+{
+
+editingId === row.id
+
+
+?
+
+
+<>
+
+
+<TimeInput
+
+value={editStart}
+
+onChange={setEditStart}
+
+/>
+
+
+<span>
+→
+</span>
+
+
+<TimeInput
+
+value={editEnd}
+
+onChange={setEditEnd}
+
+/>
+
+
+</>
+
+
+:
+
+
+<>
+
+
+<span className="font-semibold text-gray-700">
+
+{displayTime(row.start)}
+
+</span>
+
+
+<span>
+→
+</span>
+
+
+<span className="font-semibold text-gray-700">
+
+{displayTime(row.end)}
+
+</span>
+
+
+</>
+
 
 }
 
 
+
 </div>
 
+
+</div>
+
+
+
+</div>
+
+
+
+))
+
+
+}
+
+
+
+</div>
+
+
 );
+
 
 }

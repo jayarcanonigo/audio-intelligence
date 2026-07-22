@@ -472,7 +472,7 @@ const handleAddRange = async () => {
     const rowIds = row.segmentIds ?? [row.id];
 
     return !rowIds.some(
-      (id) => ids.includes(id)
+       (id: string) => ids.includes(id)
     );
 
   });
@@ -567,7 +567,7 @@ async function handleSaveAllSegments() {
   }
 
 }
-  /* REMOVE */
+
 /* REMOVE UI ONLY */
 const handleRemove = (id: number) => {
 
@@ -795,7 +795,6 @@ const handleAddSingle = (row: any) => {
 
       <SelectedSegments
       segments={results}
-      setSegments={setResults}
       selectedResultId={selectedResultId}
       setSelectedResultId={setSelectedResultId}
       onRemove={handleRemove}
