@@ -341,6 +341,29 @@ export async function getLogs(
 
 }
 
+export async function deleteProject(id:number){
+
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/projects/${id}`,
+    {
+      method:"DELETE",
+    }
+  );
+
+
+  if(!res.ok){
+
+    throw new Error(
+      "Delete project failed"
+    );
+
+  }
+
+
+  return res.json();
+
+}
+
 
 
 // ======================================

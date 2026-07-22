@@ -1,19 +1,16 @@
 "use client";
 
-
 import {
   useEffect,
   useState
 } from "react";
 
-
 import Link from "next/link";
 
-
 import {
-  getProjects
+  getProjects,
+  deleteProject
 } from "@/services/api";
-
 
 
 export default function ProjectsPage(){
@@ -23,9 +20,59 @@ export default function ProjectsPage(){
     useState<any[]>([]);
 
 
-
   const [loading,setLoading] =
     useState(true);
+
+
+
+  async function handleDelete(id:number){
+
+
+    const confirmDelete =
+      window.confirm(
+        "Are you sure you want to delete this project?\n\nSegments and advertisements will also be deleted."
+      );
+
+
+    if(!confirmDelete){
+
+      return;
+
+    }
+
+
+
+    try{
+
+
+      await deleteProject(id);
+
+
+
+      setProjects(prev =>
+        prev.filter(
+          project => project.id !== id
+        )
+      );
+
+
+
+    }
+    catch(error){
+
+
+      console.error(error);
+
+
+      alert(
+        "Failed to delete project"
+      );
+
+
+    }
+
+  }
+
 
 
 
@@ -62,12 +109,9 @@ export default function ProjectsPage(){
 
   useEffect(()=>{
 
-
     loadProjects();
 
-
   },[]);
-
 
 
 
@@ -104,25 +148,38 @@ export default function ProjectsPage(){
 
 
 
-
       {
+        projects.map(project=>(
 
-        projects.map(
 
-          project => (
+          <div
+
+            key={project.id}
+
+            className="
+              border
+              rounded-xl
+              p-4
+              hover:shadow
+              flex
+              justify-between
+              items-center
+            "
+
+          >
+
+
 
             <Link
 
-              key={project.id}
-
               href={`/projects/${project.id}`}
 
-              className="block border rounded p-4 hover:bg-gray-100"
+              className="flex-1"
 
             >
 
 
-              <h2 className="font-semibold">
+              <h2 className="font-semibold text-lg">
 
                 {project.name}
 
@@ -132,11 +189,7 @@ export default function ProjectsPage(){
 
               <p>
 
-                File:
-
-                {" "}
-
-                {project.filename || "No file"}
+                File: {project.filename || "No file"}
 
               </p>
 
@@ -144,11 +197,7 @@ export default function ProjectsPage(){
 
               <p>
 
-                Status:
-
-                {" "}
-
-                {project.status}
+                Status: {project.status}
 
               </p>
 
@@ -156,22 +205,47 @@ export default function ProjectsPage(){
 
               <p>
 
-                Chunks:
-
-                {" "}
-
-                {project.total_chunks}
+                Chunks: {project.total_chunks || 0}
 
               </p>
 
 
             </Link>
 
-          )
 
-        )
 
+
+
+            <button
+
+              onClick={()=>
+                handleDelete(project.id)
+              }
+
+              className="
+                ml-4
+                bg-red-500
+                hover:bg-red-600
+                text-white
+                px-4
+                py-2
+                rounded-lg
+              "
+
+            >
+
+              🗑 Delete
+
+            </button>
+
+
+
+          </div>
+
+
+        ))
       }
+
 
 
 
