@@ -352,7 +352,7 @@ export async function uploadAudio(
   projectId: number,
   file: File,
   keywords: string[],
-  startHour: number
+  startHour: String
 ) {
 
   const formData = new FormData();

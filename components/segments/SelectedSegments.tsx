@@ -30,12 +30,20 @@ interface Props {
   ) => void;
 
 
+  updateTimePart?: (
+    id:number,
+    field:"start" | "end",
+    part:"minute" | "second",
+    value:string
+  ) => void;
+
+
+  displayTime?: (
+    time?:string
+  ) => string;
+
+
   onPlay:(row:Segment)=>void;
-
-
-  onDownload?:(
-    row:Segment
-  )=>void;
 
 
   onUpdate?:(
@@ -52,8 +60,15 @@ interface Props {
     id:number
   )=>void;
 
-}
 
+  onSave?:()=>Promise<void> | void;
+
+
+  onDownload?:(
+    row:Segment
+  )=>void;
+
+}
 
 
 export default function SelectedSegments({
