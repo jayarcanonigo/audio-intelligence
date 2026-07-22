@@ -694,18 +694,18 @@ const handleDownloadExcel = async () => {
               <span className="text-sm text-gray-500">{results.length} Selected</span>
             </div>
 
-            <SelectedSegments
-              segments={results}
-              selectedResultId={selectedResultId}
-              setSelectedResultId={setSelectedResultId}
-              onRemove={handleRemove}
-              updateTimePart={updateTimePart}
-              displayTime={displayTime}
-              onPlay={handlePlaySegment}
-              onUpdate={handleUpdateSegment}
-              onDownload={handleDownloadAudio}
-              onSave={handleSaveAllSegments}
-            />
+          <SelectedSegments
+            segments={results}
+            selectedResultId={selectedResultId}
+            setSelectedResultId={setSelectedResultId}
+            onRemove={handleRemove}
+            updateTimePart={updateTimePart}
+            displayTime={displayTime}
+            onPlay={handlePlaySegment}
+            onUpdate={handleUpdateSegment}
+            onDownload={handleDownloadAudio}
+            onSave={handleSaveAllSegments}
+          />
           </div>
         </div>
       </div>

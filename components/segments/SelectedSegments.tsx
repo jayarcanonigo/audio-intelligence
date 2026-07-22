@@ -22,6 +22,7 @@ interface Props {
   selectedResultId: number | null;
   setSelectedResultId: (id: number | null) => void;
   onPlay: (row: Segment) => void;
+
   onUpdate?: (
     id: number,
     data: {
@@ -31,18 +32,34 @@ interface Props {
       brand_name: string;
     }
   ) => void;
-  onRemove?: (id: number) => void;
-  onSave?: (segments: Segment[]) => void;
-}
 
+  onRemove?: (id: number) => void;
+
+  onSave?: (segments: Segment[]) => void;
+
+  // ADD THESE
+  updateTimePart?: (
+    id: number,
+    field: "start" | "end",
+    part: "minute" | "second",
+    value: string
+  ) => void;
+
+  displayTime?: (time: string) => string;
+
+  onDownload?: (segment: Segment) => void;
+}
 export default function SelectedSegments({
-  segments,
+   segments,
   selectedResultId,
   setSelectedResultId,
   onPlay,
   onUpdate,
   onRemove,
   onSave,
+  updateTimePart,
+  displayTime,
+  onDownload,
 }: Props) {
 
   const [segmentList, setSegmentList] = useState<Segment[]>(segments);
