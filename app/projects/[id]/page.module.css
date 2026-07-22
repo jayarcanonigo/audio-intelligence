@@ -1,0 +1,65 @@
+.page {
+  min-height: 100vh;
+  background: #f8fafc;
+  padding: 20px;
+}
+
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: #111827;
+}
+
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 20px;
+}
+
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 15px;
+}
+
+
+.logContainer {
+  height: 550px;
+  overflow-y: auto;
+}
+
+
+.tableWrapper {
+  overflow-x: auto;
+}
+
+
+.audioWrapper {
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+
+@media(max-width:1024px){
+
+  .dashboardGrid {
+    grid-template-columns: 1fr;
+  }
+
+}

@@ -1,120 +1,428 @@
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8000";
 
-export async function uploadAudio(
-  file: File,
-  keywords: string[] = []
-) {
-  const formData = new FormData();
 
-  formData.append("file", file);
-  formData.append("keywords", JSON.stringify(keywords));
+// ======================================
+// PROJECTS
+// ======================================
 
-  const res = await fetch(`${API_URL}/upload`, {
-    method: "POST",
-    body: formData,
-  });
+export async function getProjects() {
 
-  if (!res.ok) throw new Error("Upload failed");
-
-  return res.json();
-}
-
-export async function getStatus(sessionId: string) {
   const res = await fetch(
-    `${API_URL}/status/${sessionId}`
+    `${API_URL}/projects`
   );
 
-  if (!res.ok) throw new Error("Status failed");
 
-  return res.json();
-}
-
-export async function getLogs(sessionId: string) {
-  const res = await fetch(
-    `${API_URL}/logs/${sessionId}?t=${Date.now()}`,
-    { cache: "no-store" }
-  );
-
-  if (!res.ok) throw new Error("Logs failed");
-
-  return res.json();
-}
-
-export async function getTranscript(
-  sessionId: string
-) {
-  const res = await fetch(
-    `${API_URL}/transcript/${sessionId}`
-  );
-
-  if (!res.ok) throw new Error("Transcript failed");
-
-  return res.json();
-}
-
-export async function stopProcess(
-  sessionId: string
-) {
-  const res = await fetch(
-    `${API_URL}/stop/${sessionId}`,
-    { method: "POST" }
-  );
-
-  if (!res.ok) throw new Error("Stop failed");
-
-  return res.json();
-}
-
-export async function resetSession(
-  sessionId: string
-) {
-  const res = await fetch(
-    `${API_URL}/reset/${sessionId}`,
-    { method: "POST" }
-  );
-
-  if (!res.ok) throw new Error("Reset failed");
-
-  return res.json();
-}
-
-// -------------------------
-// RESTART SERVER
-// -------------------------
-
-export async function restartServer() {
-  const res = await fetch(
-    `${API_URL}/restart`,
-    { method: "POST" }
-  );
-
-  if (!res.ok)
-    throw new Error("Restart failed");
-
-  return res.json();
-}
-
-export async function downloadAudio(
-  sessionId: string,
-  start: number,
-  end: number
-) {
-  const response = await fetch(`${API_URL}/download-audio`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      session_id: sessionId,
-      start,
-      end,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to download audio.");
+  if (!res.ok) {
+    throw new Error(
+      "Failed to load projects"
+    );
   }
 
-  return response.blob();
+
+  return res.json();
+
+}
+
+
+
+export async function getProject(
+  projectId: number
+) {
+
+  const res = await fetch(
+    `${API_URL}/projects/${projectId}`
+  );
+
+
+  if (!res.ok) {
+    throw new Error(
+      "Failed to load project"
+    );
+  }
+
+
+  return res.json();
+
+}
+
+
+
+export async function createProject(
+  name: string
+) {
+
+  const res = await fetch(
+    `${API_URL}/projects`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        name,
+      }),
+    }
+  );
+
+
+  if (!res.ok) {
+
+    throw new Error(
+      "Failed to create project"
+    );
+
+  }
+
+
+  return res.json();
+
+}
+
+
+// ======================================
+// ADVERTISEMENTS
+// ======================================
+
+
+export async function getAdvertisements(
+  projectId: number
+) {
+
+  const res = await fetch(
+    `${API_URL}/advertisements/${projectId}`
+  );
+
+
+  if (!res.ok) {
+
+    throw new Error(
+      "Failed to load advertisements"
+    );
+
+  }
+
+
+  return res.json();
+
+}
+
+
+
+
+export async function createAdvertisement(
+  advertisement: any
+) {
+
+  const res = await fetch(
+    `${API_URL}/advertisements`,
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+
+      body: JSON.stringify({
+
+        project_id:
+          advertisement.project_id,
+
+        text:
+          advertisement.text,
+
+        start_time:
+          advertisement.start,
+
+        end_time:
+          advertisement.end,
+
+      }),
+    }
+  );
+
+
+  if (!res.ok) {
+
+    throw new Error(
+      "Failed to create advertisement"
+    );
+
+  }
+
+
+  return res.json();
+
+}
+
+
+
+
+export async function updateAdvertisement(
+  id: number,
+  data: any
+) {
+
+  const res = await fetch(
+    `${API_URL}/advertisements/${id}`,
+    {
+      method: "PUT",
+
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+
+      body: JSON.stringify({
+
+        text:
+          data.text,
+
+        start_time:
+          data.start,
+
+        end_time:
+          data.end,
+
+      }),
+    }
+  );
+
+
+  if (!res.ok) {
+
+    throw new Error(
+      "Failed to update advertisement"
+    );
+
+  }
+
+
+  return res.json();
+
+}
+
+
+
+
+
+export async function deleteAdvertisement(
+  id: number
+) {
+
+  const res = await fetch(
+    `${API_URL}/advertisements/${id}`,
+    {
+      method:"DELETE",
+    }
+  );
+
+
+  if (!res.ok) {
+
+    throw new Error(
+      "Failed to delete advertisement"
+    );
+
+  }
+
+
+  return res.json();
+
+}
+
+
+
+
+// ======================================
+// DELETE ALL ADS BY PROJECT
+// ======================================
+
+
+export async function deleteAdvertisementsByProject(
+  projectId:number
+) {
+
+  const res = await fetch(
+    `${API_URL}/advertisements/project/${projectId}`,
+    {
+      method:"DELETE",
+    }
+  );
+
+
+  if(!res.ok){
+
+    throw new Error(
+      "Failed to delete advertisements"
+    );
+
+  }
+
+
+  return res.json();
+
+}
+
+
+
+// ======================================
+// SAVE PROJECT
+// ======================================
+
+
+export async function saveProject(
+  projectId:number,
+  payload:any
+){
+
+  const res = await fetch(
+    `${API_URL}/projects/${projectId}/save`,
+    {
+
+      method:"POST",
+
+      headers:{
+        "Content-Type":"application/json",
+      },
+
+
+      body:JSON.stringify(payload),
+
+    }
+  );
+
+
+  if(!res.ok){
+
+    const error =
+      await res.text();
+
+
+    throw new Error(error);
+
+  }
+
+
+  return res.json();
+
+}
+
+
+
+// ======================================
+// TRANSCRIPT LOGS
+// ======================================
+
+
+export async function getLogs(
+  projectId:number
+){
+
+  const res = await fetch(
+    `${API_URL}/upload/logs/${projectId}`
+  );
+
+
+  if(!res.ok){
+
+    throw new Error(
+      "Failed to load logs"
+    );
+
+  }
+
+
+  return res.json();
+
+}
+
+
+
+// ======================================
+// AUDIO UPLOAD
+// ======================================
+
+
+export async function uploadAudio(
+  projectId: number,
+  file: File,
+  keywords: string[],
+  startHour: number
+) {
+
+  const formData = new FormData();
+
+  formData.append(
+    "project_id",
+    projectId.toString()
+  );
+
+  formData.append(
+    "file",
+    file
+  );
+
+  formData.append(
+    "keywords",
+    JSON.stringify(keywords)
+  );
+
+  formData.append(
+    "start_hour",
+    startHour.toString()
+  );
+
+
+  const response = await fetch(
+    `${API_URL}/upload/`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+
+  if (!response.ok) {
+    throw new Error(
+      "Upload failed"
+    );
+  }
+
+
+  return response.json();
+
+}
+
+
+
+// ======================================
+// UPLOAD STATUS
+// ======================================
+
+
+export async function getUploadStatus(
+  sessionId:string
+){
+
+  const res = await fetch(
+    `${API_URL}/upload/status/${sessionId}`
+  );
+
+
+  if(!res.ok){
+
+    throw new Error(
+      "Failed to load upload status"
+    );
+
+  }
+
+
+  return res.json();
+
 }

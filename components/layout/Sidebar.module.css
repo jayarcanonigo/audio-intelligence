@@ -1,0 +1,64 @@
+.sidebar {
+  width: 240px;
+  height: 100vh;
+
+  background: #1e293b;
+  color: white;
+
+  display: flex;
+  flex-direction: column;
+
+  transition: width .25s ease;
+}
+
+.collapsed {
+  width: 70px;
+}
+
+.logo {
+  padding: 20px;
+  font-size: 20px;
+  font-weight: bold;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+
+.nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 10px;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  color: white;
+  text-decoration: none;
+
+  padding: 14px 20px;
+
+  transition: background .2s;
+}
+
+.link:hover {
+  background: #334155;
+}
+
+.toggle {
+  margin: 16px;
+  height: 40px;
+
+  border: none;
+  border-radius: 8px;
+
+  cursor: pointer;
+
+  background: #2563eb;
+  color: white;
+}
+
+.toggle:hover {
+  background: #1d4ed8;
+}

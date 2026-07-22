@@ -515,12 +515,9 @@
 }
 
 .timeInput {
-  width: 60px;
+  width: 6ch;
   text-align: center;
-  padding: 4px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 12px;
+  box-sizing: border-box;
 }
 
 .timeInput:focus {

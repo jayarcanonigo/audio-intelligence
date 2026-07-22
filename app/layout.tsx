@@ -1,3 +1,5 @@
+import "./globals.css";
+import AppLayout from "@/components/layout/AppLayout";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -7,17 +9,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html>
+    <html lang="en">
       <body>
-        {children}
+        <AppLayout>
+          {children}
+        </AppLayout>
 
         <ToastContainer
           position="top-right"
           autoClose={2000}
-          newestOnTop
-          closeOnClick
-          pauseOnHover
-          draggable
           theme="colored"
         />
       </body>
