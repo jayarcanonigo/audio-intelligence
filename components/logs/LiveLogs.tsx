@@ -80,15 +80,7 @@ export default function LiveLogs({
   };
 
   return (
-    <div
-      className="
-        space-y-3
-        max-h-[650px]
-        overflow-y-auto
-        pr-1
-      "
-    >
-
+    <div className="space-y-3 pr-1">
       {logs.map((log) => {
 
         const text =

@@ -698,9 +698,7 @@ const handleDownloadExcel = async () => {
             segments={results}
             selectedResultId={selectedResultId}
             setSelectedResultId={setSelectedResultId}
-            onRemove={handleRemove}
-            updateTimePart={updateTimePart}
-            displayTime={displayTime}
+            onRemove={handleRemove} 
             onPlay={handlePlaySegment}
             onUpdate={handleUpdateSegment}
             onDownload={handleDownloadAudio}
