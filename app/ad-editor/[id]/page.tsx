@@ -708,107 +708,137 @@ const handleDownloadExcel = async () => {
         </div>
       </div>
 
-      {/* FOOTER TOOLBAR */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-lg px-4 py-3">
-        <div className="flex items-center gap-3">
-          {/* AUDIO PLAYER */}
-          <div className="flex-1 min-w-0">
-            <AudioPlayer
-              file={file}
-              setFile={setFile}
-              audioRef={audioRef}
-              audioUrl={audioUrl}
-              onChange={handleAudioChange}
-              onTimeUpdate={handleTimeUpdate}
-            />
-          </div>
+{/* ===================== FOOTER TOOLBAR ===================== */}
+<div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-xl">
 
-          {/* SEARCH */}
-          <div className="relative w-60">
-            <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search transcript..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-md border pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+  <div className="px-5 py-3">
 
-          {/* CLEAR */}
-          <button
-            onClick={() => {
-              setSearch("");
-              setPhrase1("");
-              setPhrase2("");
-              setSelectedP1Id(null);
-              setSelectedP2Id(null);
-            }}
-            className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-sm font-semibold"
-          >
-            <X size={16} />
-            Clear
-          </button>
+    {/* ===================== ROW 1 ===================== */}
+    <div className="flex items-center justify-between gap-4 mb-3">
 
-          {/* ADD RANGE */}
-          <button
-            onClick={handleAddRange}
-            disabled={selectedP1Id === null || selectedP2Id === null}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition ${
-              selectedP1Id !== null && selectedP2Id !== null
-                ? "bg-blue-600 hover:bg-blue-700 text-white"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
-          >
-            <Plus size={16} />
-            Add
-          </button>
+      {/* LEFT */}
+      <div className="flex items-center gap-3">
 
-          {/* SAVE */}
-          <button
-            onClick={handleSaveAllSegments}
-            disabled={results.length === 0}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition ${
-              results.length > 0 ? "bg-green-600 hover:bg-green-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
-          >
-            <Save size={16} />
-            Save
-          </button>
+        {/* CLEAR */}
+        <button
+          onClick={() => {
+            setSearch("");
+            setPhrase1("");
+            setPhrase2("");
+            setSelectedP1Id(null);
+            setSelectedP2Id(null);
+          }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 font-semibold text-sm transition"
+        >
+          <X size={16} />
+          Clear
+        </button>
 
-          {/* EXCEL DOWNLOAD */}
-          <button
-            onClick={handleDownloadExcel}
-            disabled={results.length === 0}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition ${
-              results.length > 0
-                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
-          >
-            <Download size={16} />
-            Excel
-          </button>
+        {/* ADD */}
+        <button
+          onClick={handleAddRange}
+          disabled={selectedP1Id === null || selectedP2Id === null}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition ${
+            selectedP1Id !== null && selectedP2Id !== null
+              ? "bg-blue-600 hover:bg-blue-700 text-white"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
+        >
+          <Plus size={16} />
+          Add Segment
+        </button>
 
-          {/* DELETE ALL */}
-          <button
-            onClick={handleDeleteAllAdvertisements}
-            disabled={results.length === 0}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold ${
-              results.length > 0 ? "bg-red-600 hover:bg-red-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
-          >
-            <Trash2 size={16} />
-            Delete All
-          </button>
-
-          {/* COUNTER */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-100 text-sm whitespace-nowrap">
-            <span className="text-gray-500">Selected</span>
-            <span className="font-bold text-blue-600">{results.length}</span>
-          </div>
-        </div>
       </div>
+
+      {/* CENTER */}
+      <div className="relative flex-1 max-w-xl">
+
+        <Search
+          size={18}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+        />
+
+        <input
+          type="text"
+          placeholder="Search transcript..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-lg border pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+        />
+
+      </div>
+
+      {/* RIGHT */}
+      <div className="flex items-center gap-3">
+
+        {/* SELECTED */}
+        <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 whitespace-nowrap">
+          🏷 {results.length} Selected
+        </div>
+
+        {/* SAVE */}
+        <button
+          onClick={handleSaveAllSegments}
+          disabled={results.length === 0}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-semibold text-sm transition ${
+            results.length > 0
+              ? "bg-green-600 hover:bg-green-700 text-white"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
+        >
+          <Save size={16} />
+          Save
+        </button>
+
+        {/* EXCEL */}
+        <button
+          onClick={handleDownloadExcel}
+          disabled={results.length === 0}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-semibold text-sm transition ${
+            results.length > 0
+              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
+        >
+          <Download size={16} />
+          Excel
+        </button>
+
+        {/* DELETE */}
+        <button
+          onClick={handleDeleteAllAdvertisements}
+          disabled={results.length === 0}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-semibold text-sm transition ${
+            results.length > 0
+              ? "bg-red-600 hover:bg-red-700 text-white"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
+        >
+          <Trash2 size={16} />
+          Delete All
+        </button>
+
+      </div>
+
+    </div>
+
+    {/* ===================== ROW 2 ===================== */}
+    <div className="border-t pt-3">
+
+      <AudioPlayer
+        file={file}
+        setFile={setFile}
+        audioRef={audioRef}
+        audioUrl={audioUrl}
+        onChange={handleAudioChange}
+        onTimeUpdate={handleTimeUpdate}
+      />
+
+    </div>
+
+  </div>
+
+</div>
     </div>
   );
 }
