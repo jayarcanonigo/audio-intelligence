@@ -18,6 +18,37 @@ export default function UploadPanel({
   const [sessionId, setSessionId] = useState("");
   const [status, setStatus] = useState<any>(null);
 
+  const STORAGE_KEY = `keywords-${projectId}`;
+
+  // Load saved keywords
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      setKeywords(saved);
+    }
+  }, [STORAGE_KEY]);
+
+  function handleSaveKeywords() {
+    localStorage.setItem(STORAGE_KEY, keywords);
+    alert("✅ Keywords saved successfully.");
+  }
+
+  function handleLoadKeywords() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+
+    if (saved) {
+      setKeywords(saved);
+      alert("✅ Saved keywords loaded.");
+    } else {
+      alert("No saved keywords found.");
+    }
+  }
+
+  function handleClearKeywords() {
+    setKeywords("");
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
   async function handleUpload() {
     if (!file) return;
 
@@ -67,14 +98,12 @@ export default function UploadPanel({
           type="file"
           accept="audio/*"
           className="hidden"
-          onChange={(e) =>
-            setFile(e.target.files?.[0] || null)
-          }
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
         />
 
         <label
           htmlFor="audio-file"
-          className="inline-flex cursor-pointer items-center gap-3 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-md transition hover:bg-blue-700 hover:shadow-lg"
+          className="inline-flex cursor-pointer items-center gap-3 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-md transition hover:bg-blue-700"
         >
           📁 Choose Audio File
         </label>
@@ -93,7 +122,7 @@ export default function UploadPanel({
         )}
       </div>
 
-      {/* Time */}
+      {/* Broadcast Time */}
       <div>
         <label className="mb-2 block font-semibold text-gray-700">
           Broadcast Time
@@ -108,10 +137,7 @@ export default function UploadPanel({
             const hour = String(index + 1).padStart(2, "0");
 
             return (
-              <option
-                key={hour}
-                value={hour}
-              >
+              <option key={hour} value={hour}>
                 {hour}:00
               </option>
             );
@@ -121,9 +147,37 @@ export default function UploadPanel({
 
       {/* Keywords */}
       <div>
-        <label className="mb-2 block font-semibold text-gray-700">
-          Keywords
-        </label>
+        <div className="mb-2 flex items-center justify-between">
+          <label className="font-semibold text-gray-700">
+            Keywords
+          </label>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleSaveKeywords}
+              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              💾 Save
+            </button>
+
+            <button
+              type="button"
+              onClick={handleLoadKeywords}
+              className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              📂 Load
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClearKeywords}
+              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              🗑 Clear
+            </button>
+          </div>
+        </div>
 
         <textarea
           placeholder="Enter one keyword per line..."
