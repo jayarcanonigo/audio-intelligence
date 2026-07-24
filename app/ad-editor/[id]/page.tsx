@@ -42,8 +42,7 @@ export default function AdEditorPage() {
   const [selectedSegments, setSelectedSegments] = useState<any[]>([]);
   const audioRef = useRef<HTMLAudioElement>(null);
   const logRefs = useRef<Record<number, HTMLDivElement | null>>({});
-
-  /* LOAD LOGS */
+   
   useEffect(() => {
     async function loadLogs() {
       try {
@@ -62,6 +61,7 @@ export default function AdEditorPage() {
             start: ad.start_time,
             end: ad.end_time,
             brand_name: ad.brand_name,
+            status: "pending",
             advertisement: true,
             segment_type: "advertisement",
             segmentIds: [],
@@ -324,19 +324,39 @@ const handleDownloadExcel = async () => {
     }
   };
 
-  function handleUpdateSegment(
-    id: number,
-    data: { text: string; start: string; end: string; brand_name: string }
-  ) {
-    setResults((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, text: data.text, start: data.start, end: data.end, brand_name: data.brand_name }
-          : item
-      )
-    );
-  }
+  const [lastSavedId, setLastSavedId] = useState<number | null>(null);
 
+function handleUpdateSegment(
+  id: number,
+  data: {
+    text: string;
+    start: string;
+    end: string;
+    brand_name: string;
+    status: "pending" | "completed";
+  }
+) {
+  console.log("UPDATE SEGMENT ID:", id);
+  console.log("UPDATE DATA:", data);
+
+  // save the last edited segment id
+  setLastSavedId(id);
+
+  setResults((prev) =>
+    prev.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            text: data.text,
+            start: data.start,
+            end: data.end,
+            brand_name: data.brand_name,
+            status: data.status,
+          }
+        : item
+    )
+  );
+}
   /* SAVE PROJECT */
   const handleSave = async () => {
     try {
@@ -488,6 +508,7 @@ const handleDownloadExcel = async () => {
       end: range[range.length - 1].end_time,
       segmentIds: ids,
       advertisement: true,
+      status: "completed",
       segment_type: "new",
     };
 
@@ -573,6 +594,27 @@ const handleDownloadExcel = async () => {
     return parts.length === 3 ? `${parts[1]}:${parts[2]}` : time;
   };
 
+const handleCenterLastCompleted = () => {
+  if (!lastSavedId) {
+    toast.info("No recently saved segment");
+    return;
+  }
+
+  console.log("CENTER LAST SAVED:", lastSavedId);
+
+  setSelectedResultId(lastSavedId);
+
+  setTimeout(() => {
+    const element = document.getElementById(
+      `segment-${lastSavedId}`
+    );
+
+    element?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, 200);
+};
   /* AUDIO */
   const audioUrl = useMemo(() => {
     if (!file) return "";
@@ -607,6 +649,7 @@ const handleDownloadExcel = async () => {
       end: row.end_time,
       segmentIds: [row.id],
       advertisement: true,
+       status: "completed",
       segment_type: "advertisement",
     };
 
@@ -718,7 +761,12 @@ const handleDownloadExcel = async () => {
 
       {/* LEFT */}
       <div className="flex items-center gap-3">
-
+      <button
+        onClick={handleCenterLastCompleted}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm"
+      >
+        🎯 View Last Completed
+      </button>
         {/* CLEAR */}
         <button
           onClick={() => {

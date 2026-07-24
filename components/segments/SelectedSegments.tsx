@@ -50,6 +50,7 @@ export default function SelectedSegments({
   const [editStart, setEditStart] = useState("");
   const [editEnd, setEditEnd] = useState("");
   const [editBrand, setEditBrand] = useState("");
+  
 
   useEffect(() => {
     setSegmentList((prev) =>
@@ -57,7 +58,7 @@ export default function SelectedSegments({
         const local = prev.find((p) => p.id === incoming.id);
         return {
           ...incoming,
-          status: incoming.status ?? local?.status ?? "pending",
+          status: incoming.status ?? local?.status ?? "completed",
         };
       })
     );
@@ -73,22 +74,32 @@ export default function SelectedSegments({
     setEditBrand(row.brand_name || "");
   }
 
-  function saveEdit(row: Segment) {
-    const data = {
-      text: editText,
-      start: editStart,
-      end: editEnd,
-      brand_name: editBrand,
-      // pending -> completed
-      status: "completed" as const,
-    };
-    setSegmentList((prev) =>
-      prev.map((item) => (item.id === row.id ? { ...item, ...data } : item))
-    );
-    setEditingId(null);
-    setBrandOpenId(null);
-    onUpdate?.(row.id, data);
-  }
+ function saveEdit(row: Segment) {
+  const data = {
+    text: editText,
+    start: editStart,
+    end: editEnd,
+    brand_name: editBrand,
+    status: "completed" as const,
+  };
+
+  setSegmentList((prev) =>
+    prev
+      .map((item) =>
+        item.id === row.id
+          ? { ...item, ...data }
+          : item
+      )
+      .sort((a, b) =>
+        toSeconds(a.start) - toSeconds(b.start)
+      )
+  );
+
+  setEditingId(null);
+  setBrandOpenId(null);
+  console.log("Saving edit for row:", row.id, "with data:", data);
+  onUpdate?.(row.id, data);
+}
 
   function updateBrand(row: Segment, value: string) {
     setEditBrand(value);
@@ -105,6 +116,34 @@ export default function SelectedSegments({
     setEditEnd("");
     setEditBrand("");
   }
+
+    const toSeconds = (time?: string) => {
+    if (!time) return 0;
+
+    const parts = time.split(":").map(Number);
+
+    if (parts.length === 3) {
+      const [hour, minute, second] = parts;
+      return hour * 3600 + minute * 60 + second;
+    }
+
+    if (parts.length === 2) {
+      const [minute, second] = parts;
+      return minute * 60 + second;
+    }
+
+    return 0;
+  };
+
+
+ const sortedSegments = [...segmentList]
+  .map((item) => ({
+    ...item,
+    status: item.status ?? "pending",
+  }))
+  .sort((a, b) => {
+    return toSeconds(a.start) - toSeconds(b.start);
+  });
 
   function TimeInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
     return (
@@ -128,16 +167,25 @@ export default function SelectedSegments({
           <p className="text-sm text-gray-500">Review detected advertisements before saving.</p>
         </div>
         <button
-          onClick={() => onSave?.(segmentList)}
+          onClick={() => {
+            const completed: Segment[] = segmentList.map((item) => ({
+              ...item,
+              status: "completed",
+            }));
+
+            setSegmentList(completed);
+            onSave?.(completed);
+          }}
           className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700"
         >
           Save All
         </button>
       </div>
 
-      {segmentList.map((row, index) => (
+      {sortedSegments.map((row, index) => (
         <div
           key={row.id}
+          id={`segment-${row.id}`}
           onClick={(e) => {
             const target = e.target as HTMLElement;
             if (
