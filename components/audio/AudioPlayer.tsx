@@ -1,11 +1,17 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Play, Pause, SkipBack, SkipForward } from "lucide-react";
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Upload,
+} from "lucide-react";
 
 interface Props {
   file: File | null;
-  setFile: (file: File | null) => void;
+  setFile: (file: File |null) => void;
   audioRef: React.RefObject<HTMLAudioElement | null>;
   audioUrl: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -53,11 +59,13 @@ export default function AudioPlayer({
   }, [audioRef, onTimeUpdate]);
 
   return (
-    <div className="flex items-center gap-3 bg-white border rounded-xl shadow-sm px-4 py-3">
+    <div className="flex items-center gap-3 rounded-lg border bg-white px-3 py-2 shadow-sm">
 
-      {/* CHOOSE AUDIO */}
-      <label className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg cursor-pointer font-medium whitespace-nowrap flex-shrink-0">
-        📁 Choose Audio
+      {/* Upload Button */}
+      <label className="flex cursor-pointer items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 whitespace-nowrap">
+        <Upload size={16} />
+        <span className="hidden md:inline">Choose Audio</span>
+
         <input
           type="file"
           accept="audio/*"
@@ -66,10 +74,10 @@ export default function AudioPlayer({
         />
       </label>
 
-      {/* FILENAME */}
-      <span className="text-gray-600 truncate max-w-[160px] flex-shrink-0">
-        {file ? file.name : "No file selected"}
-      </span>
+      {/* File Name */}
+      <div className="min-w-[120px] max-w-[180px] truncate text-xs text-gray-600">
+        {file ? file.name : "No audio selected"}
+      </div>
 
       {audioUrl ? (
         <>
@@ -79,58 +87,68 @@ export default function AudioPlayer({
             preload="metadata"
           />
 
-          <div className="w-px h-8 bg-gray-200 flex-shrink-0" />
+          <div className="h-6 border-l" />
 
+          {/* Play */}
           <button
             onClick={() => audioRef.current?.play()}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold flex-shrink-0"
+            className="flex h-8 w-8 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
+            title="Play"
           >
-            <Play size={18} />
-            Play
+            <Play size={15} />
           </button>
 
+          {/* Pause */}
           <button
             onClick={() => audioRef.current?.pause()}
-            className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg font-semibold flex-shrink-0"
+            className="flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200"
+            title="Pause"
           >
-            <Pause size={18} />
-            Pause
+            <Pause size={15} />
           </button>
 
+          {/* Back 5 sec */}
           <button
             onClick={() => {
-              if (audioRef.current)
+              if (audioRef.current) {
                 audioRef.current.currentTime = Math.max(
                   0,
                   audioRef.current.currentTime - 5
                 );
+              }
             }}
-            className="bg-gray-100 hover:bg-gray-200 p-2 rounded-lg flex-shrink-0"
+            className="flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200"
+            title="Back 5 seconds"
           >
-            <SkipBack size={18} />
+            <SkipBack size={15} />
           </button>
 
+          {/* Forward 5 sec */}
           <button
             onClick={() => {
-              if (audioRef.current)
+              if (audioRef.current) {
                 audioRef.current.currentTime = Math.min(
                   duration,
                   audioRef.current.currentTime + 5
                 );
+              }
             }}
-            className="bg-gray-100 hover:bg-gray-200 p-2 rounded-lg flex-shrink-0"
+            className="flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200"
+            title="Forward 5 seconds"
           >
-            <SkipForward size={18} />
+            <SkipForward size={15} />
           </button>
 
-          <span className="w-14 text-center font-semibold flex-shrink-0">
+          {/* Current Time */}
+          <span className="w-12 text-center text-xs font-semibold">
             {formatTime(currentTime)}
           </span>
 
+          {/* Progress Slider */}
           <input
             type="range"
             min={0}
-            max={duration}
+            max={duration || 0}
             value={currentTime}
             onChange={(e) => {
               const value = Number(e.target.value);
@@ -141,17 +159,18 @@ export default function AudioPlayer({
 
               setCurrentTime(value);
             }}
-            className="flex-1 min-w-0 accent-blue-600"
+            className="h-1 flex-1 cursor-pointer accent-blue-600"
           />
 
-          <span className="w-14 text-center font-semibold flex-shrink-0">
+          {/* Duration */}
+          <span className="w-12 text-center text-xs font-semibold">
             {formatTime(duration)}
           </span>
         </>
       ) : (
-        <span className="text-gray-400 text-sm flex-shrink-0">
-          No audio selected
-        </span>
+        <div className="text-xs text-gray-400">
+          Select an audio file to start playback
+        </div>
       )}
     </div>
   );

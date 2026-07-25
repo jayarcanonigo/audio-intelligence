@@ -357,45 +357,7 @@ function handleUpdateSegment(
     )
   );
 }
-  /* SAVE PROJECT */
-  const handleSave = async () => {
-    try {
-      const payload = {
-        project_id: projectId,
-        segments: results.map((segment) => ({
-          id: segment.id,
-          text: segment.text,
-          start_time: segment.start,
-          end_time: segment.end,
-          advertisement: segment.advertisement ?? true,
-          segment_type: segment.segment_type ?? "advertisement",
-        })),
-      };
 
-      console.log("Saving...");
-      console.log(payload);
-
-      const response = await fetch(`http://localhost:8000/projects/${projectId}/save`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error(error);
-        toast.error(error.detail ?? "Unable to save project.");
-        return;
-      }
-
-      const data = await response.json();
-      console.log(data);
-      toast.success("✔ Project Saved");
-    } catch (err) {
-      console.error(err);
-      toast.error("Server Error");
-    }
-  };
 
   /* TIME HELPERS */
   const toSeconds = (time?: string) => {
@@ -508,7 +470,7 @@ function handleUpdateSegment(
       end: range[range.length - 1].end_time,
       segmentIds: ids,
       advertisement: true,
-      status: "completed",
+      status: "pending",
       segment_type: "new",
     };
 
@@ -528,6 +490,7 @@ function handleUpdateSegment(
     // RESET P1 / P2
     setSelectedP1Id(null);
     setSelectedP2Id(null);
+    setLastSavedId(newSegment.id);
 
     toast.success("✅ Advertisement segment added");
   };
@@ -752,22 +715,22 @@ const handleCenterLastCompleted = () => {
       </div>
 
 {/* ===================== FOOTER TOOLBAR ===================== */}
-<div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-xl">
+<div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white shadow-lg">
+  <div className="px-3 py-1.5">
 
-  <div className="px-5 py-3">
+    {/* ================= TOP TOOLBAR ================= */}
+    <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
 
-    {/* ===================== ROW 1 ===================== */}
-    <div className="flex items-center justify-between gap-4 mb-3">
+      {/* Left */}
+      <div className="flex items-center gap-1.5 flex-wrap">
 
-      {/* LEFT */}
-      <div className="flex items-center gap-3">
-      <button
-        onClick={handleCenterLastCompleted}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm"
-      >
-        🎯 View Last Completed
-      </button>
-        {/* CLEAR */}
+        <button
+          onClick={handleCenterLastCompleted}
+          className="flex h-8 items-center gap-1 rounded-md bg-purple-600 px-3 text-[11px] font-semibold text-white hover:bg-purple-700"
+        >
+          🎯 Last
+        </button>
+
         <button
           onClick={() => {
             setSearch("");
@@ -776,34 +739,36 @@ const handleCenterLastCompleted = () => {
             setSelectedP1Id(null);
             setSelectedP2Id(null);
           }}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 font-semibold text-sm transition"
+          className="flex h-8 items-center gap-1 rounded-md bg-gray-100 px-3 text-[11px] font-medium hover:bg-gray-200"
         >
-          <X size={16} />
+          <X size={13} />
           Clear
         </button>
 
-        {/* ADD */}
         <button
           onClick={handleAddRange}
           disabled={selectedP1Id === null || selectedP2Id === null}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition ${
+          className={`flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-semibold transition ${
             selectedP1Id !== null && selectedP2Id !== null
-              ? "bg-blue-600 hover:bg-blue-700 text-white"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              ? "bg-blue-600 text-white hover:bg-blue-700"
+              : "cursor-not-allowed bg-gray-300 text-gray-500"
           }`}
         >
-          <Plus size={16} />
-          Add Segment
+          <Plus size={13} />
+          Add
         </button>
 
       </div>
 
-      {/* CENTER */}
-      <div className="relative flex-1 max-w-xl">
+      {/* Divider */}
+      <div className="hidden h-6 w-px bg-gray-300 lg:block" />
+
+      {/* Search */}
+      <div className="relative flex-1 min-w-[220px]">
 
         <Search
-          size={18}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          size={14}
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
         />
 
         <input
@@ -811,67 +776,87 @@ const handleCenterLastCompleted = () => {
           placeholder="Search transcript..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-md border py-1.5 pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-blue-500"
         />
 
       </div>
 
-      {/* RIGHT */}
-      <div className="flex items-center gap-3">
+      {/* Divider */}
+      <div className="hidden h-6 w-px bg-gray-300 lg:block" />
 
-        {/* SELECTED */}
-        <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 whitespace-nowrap">
-          🏷 {results.length} Selected
+      {/* Right */}
+      <div className="flex items-center gap-2 flex-wrap">
+
+        {/* Selected */}
+        <div className="flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1">
+          <span className="text-sm">🏷</span>
+
+          <div className="leading-none">
+            <div className="text-[9px] uppercase text-gray-500">
+              Selected
+            </div>
+            <div className="text-[11px] font-bold text-blue-700">
+              {results.length}
+            </div>
+          </div>
         </div>
 
-        {/* SAVE */}
+        {/* Divider */}
+        <div className="h-6 w-px bg-gray-300" />
+
+        {/* Apply Label */}
+        <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">
+          Apply to All
+        </span>
+
+        {/* Save */}
         <button
           onClick={handleSaveAllSegments}
           disabled={results.length === 0}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-semibold text-sm transition ${
+          className={`flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-semibold transition ${
             results.length > 0
-              ? "bg-green-600 hover:bg-green-700 text-white"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              ? "bg-green-600 text-white hover:bg-green-700"
+              : "cursor-not-allowed bg-gray-300 text-gray-500"
           }`}
         >
-          <Save size={16} />
+          <Save size={13} />
           Save
         </button>
 
-        {/* EXCEL */}
+        {/* Download */}
         <button
           onClick={handleDownloadExcel}
           disabled={results.length === 0}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-semibold text-sm transition ${
+          className={`flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-semibold transition ${
             results.length > 0
-              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              ? "bg-emerald-600 text-white hover:bg-emerald-700"
+              : "cursor-not-allowed bg-gray-300 text-gray-500"
           }`}
         >
-          <Download size={16} />
-          Excel
+          <Download size={13} />
+          Download
         </button>
 
-        {/* DELETE */}
+        {/* Delete */}
         <button
           onClick={handleDeleteAllAdvertisements}
           disabled={results.length === 0}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-semibold text-sm transition ${
+          className={`flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-semibold transition ${
             results.length > 0
-              ? "bg-red-600 hover:bg-red-700 text-white"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              ? "bg-red-600 text-white hover:bg-red-700"
+              : "cursor-not-allowed bg-gray-300 text-gray-500"
           }`}
         >
-          <Trash2 size={16} />
-          Delete All
+          <Trash2 size={13} />
+          Delete
         </button>
 
       </div>
 
     </div>
 
-    {/* ===================== ROW 2 ===================== */}
-    <div className="border-t pt-3">
+    {/* ================= AUDIO PLAYER ================= */}
+    <div className="mt-1 border-t pt-1.5">
 
       <AudioPlayer
         file={file}
@@ -885,7 +870,6 @@ const handleCenterLastCompleted = () => {
     </div>
 
   </div>
-
 </div>
     </div>
   );
