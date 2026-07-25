@@ -100,9 +100,26 @@ export async function saveProject(projectId: number, payload: any) {
 // TRANSCRIPT LOGS
 // ======================================
 
-export async function getLogs(projectId: number) {
-  const res = await fetch(`${API_URL}/upload/logs/${projectId}`);
-  if (!res.ok) throw new Error("Failed to load logs");
+// ======================================
+// TRANSCRIPT LOGS
+// ======================================
+
+export async function getLogs(
+  projectId: number,
+  hour?: number
+) {
+  let url = `${API_URL}/upload/logs/${projectId}`;
+
+  if (hour !== undefined) {
+    url += `?hour=${hour}`;
+  }
+
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    throw new Error("Failed to load logs");
+  }
+
   return res.json();
 }
 
@@ -212,5 +229,34 @@ export async function updateBrand(id: number, name: string) {
 export async function deleteBrand(id: number) {
   const res = await fetch(`${API_URL}/brands/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete brand");
+  return res.json();
+}
+
+export async function deleteAdvertisementsByProjectHour(
+  projectId: number,
+  hour: number
+) {
+  const response = await fetch(
+    `${API_URL}/advertisements/project/${projectId}/hour/${hour}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  return response.json();
+}
+
+export async function getAdvertisementsByProjectHour(
+  projectId: number,
+  hour: number
+) {
+  const res = await fetch(
+    `${API_URL}/advertisements/project/${projectId}/hour/${hour}`
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed loading advertisements");
+  }
+
   return res.json();
 }

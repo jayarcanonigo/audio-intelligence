@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import LiveLogs from "@/components/logs/LiveLogs";
 import { fetchFile } from "@ffmpeg/util";
 import SelectedSegments from "@/components/segments/SelectedSegments";
@@ -10,10 +10,12 @@ import {
   getLogs,
   deleteAdvertisementsByProject,
   saveProject,
+  deleteAdvertisementsByProjectHour,
+  getAdvertisementsByProjectHour,
   createAdvertisement,
   getAdvertisements,
 } from "@/services/api";
-import { Download, Save, Trash2, Plus, Search, X } from "lucide-react";
+import { Download, Save, Trash2, Plus, Search, X, RefreshCw } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 
 export default function AdEditorPage() {
@@ -42,15 +44,28 @@ export default function AdEditorPage() {
   const [selectedSegments, setSelectedSegments] = useState<any[]>([]);
   const audioRef = useRef<HTMLAudioElement>(null);
   const logRefs = useRef<Record<number, HTMLDivElement | null>>({});
-   
-  useEffect(() => {
-    async function loadLogs() {
+
+  // NEW: broadcast hour filter + refresh state
+  const [broadcastHour, setBroadcastHour] = useState<string>("all");
+  const [refreshing, setRefreshing] = useState(false);
+
+  /* ---------------- LOAD LOGS (extracted so header Refresh can reuse it) ---------------- */
+  const loadLogs = useCallback(
+    async (opts: { silent?: boolean } = {}) => {
+      if (!projectId) return;
       try {
-        const data = await getLogs(projectId);
+        if (!opts.silent) setRefreshing(true);
+
+              const hour =
+        broadcastHour === "all"
+          ? undefined
+          : Number(broadcastHour);
+
+      const data = await getLogs(projectId, hour);
         const list = Array.isArray(data) ? data : data.logs || [];
         setLogs(list);
 
-        const ads = await getAdvertisements(projectId);
+        const ads = await getAdvertisementsByProjectHour(projectId, Number(broadcastHour));
 
         // IF SAVED ADVERTISEMENTS EXIST, LOAD FROM DATABASE
         if (ads && ads.length > 0) {
@@ -86,13 +101,59 @@ export default function AdEditorPage() {
           setResults(detectedAds);
           setDisabledLogs(detectedAds.flatMap((item: any) => item.segmentIds ?? [item.id]));
         }
+
+        if (!opts.silent) toast.success("🔄 Logs refreshed");
       } catch (err) {
         console.error("Load logs failed", err);
+        if (!opts.silent) toast.error("Failed to refresh logs");
+      } finally {
+        if (!opts.silent) setRefreshing(false);
       }
-    }
+    },
+    [projectId, broadcastHour]
+  );
 
-    if (projectId) loadLogs();
-  }, [projectId]);
+  useEffect(() => {
+    loadLogs({ silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, broadcastHour]);
+
+  const handleRefresh = () => {
+    loadLogs();
+  };
+
+  /* ---------------- BROADCAST HOUR HELPERS ---------------- */
+  // Pulls a display-friendly source filename off a log entry.
+  // Adjust this fallback chain if your logs use a different field name.
+  const getFileName = (log: any) =>
+    log.file_name || log.audio_file || log.filename || log.source_file || "Unknown file";
+
+  const getHour = (log: any) => {
+    const time = log.start_time || log.start;
+    if (!time) return null;
+    const [hh] = String(time).split(":");
+    return hh ? `${hh.padStart(2, "0")}:00` : null;
+  };
+
+  // Derives the distinct (hour, file) combinations present in the logs, e.g.
+  // { key: "08:00|morning_news.mp3", hour: "08:00", fileName: "morning_news.mp3" }
+  const broadcastOptions = useMemo(() => {
+    const seen = new Map<string, { key: string; hour: string; fileName: string }>();
+
+    logs.forEach((log) => {
+      const hour = getHour(log);
+      if (!hour) return;
+
+      const fileName = getFileName(log);
+      const key = `${hour}|${fileName}`;
+
+      if (!seen.has(key)) seen.set(key, { key, hour, fileName });
+    });
+
+    return Array.from(seen.values()).sort((a, b) =>
+      a.hour === b.hour ? a.fileName.localeCompare(b.fileName) : a.hour.localeCompare(b.hour)
+    );
+  }, [logs]);
 
   /* ---------------- DOWNLOAD ---------------- */
 const handleDownloadExcel = async () => {
@@ -390,8 +451,20 @@ function handleUpdateSegment(
   /* FILTER */
   const filteredLogs = useMemo(() => {
     const q = search.toLowerCase();
-    return logs.filter((log) => (log.text || log.message || "").toLowerCase().includes(q));
-  }, [logs, search]);
+
+    return logs.filter((log) => {
+      const matchesSearch = (log.text || log.message || "").toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+
+      if (broadcastHour === "all") return true;
+
+      const hour = getHour(log);
+      if (!hour) return false;
+
+      const key = `${hour}|${getFileName(log)}`;
+      return key === broadcastHour;
+    });
+  }, [logs, search, broadcastHour]);
 
   /* PLAY SEGMENT */
   const handlePlaySegment = async (row: any) => {
@@ -430,7 +503,7 @@ function handleUpdateSegment(
 
   const handleDeleteAllAdvertisements = async () => {
     try {
-      await deleteAdvertisementsByProject(projectId);
+      await deleteAdvertisementsByProjectHour(projectId, Number(broadcastHour));
       setResults([]);
       setDisabledLogs([]);
       toast.success("🗑 All advertisements deleted");
@@ -504,7 +577,7 @@ function handleUpdateSegment(
       }
 
       // DELETE OLD ADS
-      await deleteAdvertisementsByProject(projectId);
+      await deleteAdvertisementsByProjectHour(projectId, Number(broadcastHour));
 
       // CREATE NEW ADS
       for (const segment of results) {
@@ -587,7 +660,7 @@ const handleCenterLastCompleted = () => {
   useEffect(() => {
     async function loadAdvertisements() {
       try {
-        const response = await getAdvertisements(projectId);
+        const response = await getAdvertisementsByProjectHour(projectId, Number(broadcastHour));
         // put ads into SelectedSegments table
         setResults(response);
       } catch (error) {
@@ -661,11 +734,70 @@ const handleCenterLastCompleted = () => {
     <div className="p-6 space-y-6">
       <ToastContainer position="top-right" autoClose={2000} />
 
-      {/* HEADER */}
-      <div className="bg-white rounded-xl shadow p-5">
-        <h1 className="text-2xl font-bold">🎧 Ad Editor</h1>
-        <p className="text-gray-500">{projectName || `Project #${projectId}`}</p>
+{/* HEADER */}
+<div className="bg-white rounded-xl shadow p-5">
+  <div className="flex flex-wrap items-center justify-between gap-4">
+
+    {/* Project Info */}
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800">
+        🎧 Ad Editor
+      </h1>
+
+      <p className="mt-1 text-sm text-gray-500">
+        Project:{" "}
+        <span className="font-medium text-gray-700">
+          {projectName || `Project #${projectId}`}
+        </span>
+      </p>
+    </div>
+
+
+    {/* Broadcast Filter */}
+    <div className="flex items-center gap-3">
+
+      <div className="flex items-center gap-2 rounded-xl border bg-gray-50 px-4 py-2">
+        
+        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Broadcast Hour
+        </span>
+
+        <select
+          value={broadcastHour}
+          onChange={(e) => {
+            setBroadcastHour(e.target.value);
+          }}
+          className="
+            rounded-lg
+            border
+            bg-white
+            px-3
+            py-2
+            text-sm
+            font-semibold
+            text-gray-700
+            outline-none
+            focus:ring-2
+            focus:ring-blue-500
+          "
+        >
+          {Array.from({ length: 24 }, (_, i) => {
+            const hour = i + 1;
+
+            return (
+              <option key={hour} value={hour}>
+                {String(hour).padStart(2, "0")}:00
+              </option>
+            );
+          })}
+        </select>
+
       </div>
+
+    </div>
+
+  </div>
+</div>
 
       {/* CONTENT */}
       <div className="grid grid-cols-12 gap-6 pb-40">
@@ -674,7 +806,7 @@ const handleCenterLastCompleted = () => {
           <div className="bg-white rounded-xl shadow p-5">
             <h2 className="font-semibold mb-4">Live Logs</h2>
             <LiveLogs
-              logs={filteredLogs}
+              logs={logs}
               disabledLogs={disabledLogs}
               selectedP1Id={selectedP1Id}
               selectedP2Id={selectedP2Id}

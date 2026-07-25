@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { uploadAudio, getUploadStatus } from "@/services/api";
 
 interface Props {
@@ -12,6 +12,8 @@ export default function UploadPanel({
   projectId,
   onComplete,
 }: Props) {
+  const fileInputId = useId();
+
   const [file, setFile] = useState<File | null>(null);
   const [keywords, setKeywords] = useState("");
   const [uploadTime, setUploadTime] = useState("01");
@@ -75,13 +77,12 @@ export default function UploadPanel({
 
       setStatus(data);
 
-      if (data.status === "completed") {
+      if (
+        data.status === "completed" ||
+        data.status === "error"
+      ) {
+        clearInterval(timer);
         onComplete?.();
-        clearInterval(timer);
-      }
-
-      if (data.status === "error") {
-        clearInterval(timer);
       }
     }, 2000);
 
@@ -94,7 +95,7 @@ export default function UploadPanel({
       {/* Choose File */}
       <div>
         <input
-          id="audio-file"
+          id={fileInputId}
           type="file"
           accept="audio/*"
           className="hidden"
@@ -102,7 +103,7 @@ export default function UploadPanel({
         />
 
         <label
-          htmlFor="audio-file"
+          htmlFor={fileInputId}
           className="inline-flex cursor-pointer items-center gap-3 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-md transition hover:bg-blue-700"
         >
           📁 Choose Audio File
@@ -111,7 +112,9 @@ export default function UploadPanel({
         {file ? (
           <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
             <p className="text-sm text-green-700">
-              <span className="font-semibold">Selected File:</span>{" "}
+              <span className="font-semibold">
+                Selected File:
+              </span>{" "}
               {file.name}
             </p>
           </div>
