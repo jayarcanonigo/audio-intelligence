@@ -16,13 +16,23 @@ export async function getProject(projectId: number) {
   return res.json();
 }
 
-export async function createProject(name: string) {
+export async function createProject(data: {
+  name: string;
+  broadcast_date: string;
+}) {
+  console.log("Creating project with data:", data);
   const res = await fetch(`${API_URL}/projects`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("Failed to create project");
+
+  if (!res.ok) {
+    throw new Error("Failed to create project");
+  }
+
   return res.json();
 }
 

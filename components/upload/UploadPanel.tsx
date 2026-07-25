@@ -8,10 +8,7 @@ interface Props {
   onComplete?: () => void;
 }
 
-export default function UploadPanel({
-  projectId,
-  onComplete,
-}: Props) {
+export default function UploadPanel({ projectId, onComplete }: Props) {
   const fileInputId = useId();
 
   const [file, setFile] = useState<File | null>(null);
@@ -20,14 +17,15 @@ export default function UploadPanel({
   const [sessionId, setSessionId] = useState("");
   const [status, setStatus] = useState<any>(null);
 
+  // NEW: disable upload after submit
+  const [uploading, setUploading] = useState(false);
+
   const STORAGE_KEY = `keywords-${projectId}`;
 
   // Load saved keywords
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setKeywords(saved);
-    }
+    if (saved) setKeywords(saved);
   }, [STORAGE_KEY]);
 
   function handleSaveKeywords() {
@@ -37,7 +35,6 @@ export default function UploadPanel({
 
   function handleLoadKeywords() {
     const saved = localStorage.getItem(STORAGE_KEY);
-
     if (saved) {
       setKeywords(saved);
       alert("✅ Saved keywords loaded.");
@@ -52,37 +49,42 @@ export default function UploadPanel({
   }
 
   async function handleUpload() {
-    if (!file) return;
+    if (!file || uploading) return;
 
-    const keywordList = keywords
-      .split("\n")
-      .map((x) => x.trim())
-      .filter(Boolean);
+    try {
+      setUploading(true);
 
-    const result = await uploadAudio(
-      projectId,
-      file,
-      keywordList,
-      uploadTime
-    );
+      const keywordList = keywords
+        .split("\n")
+        .map((x) => x.trim())
+        .filter(Boolean);
 
-    setSessionId(result.session_id);
+      const result = await uploadAudio(projectId, file, keywordList, uploadTime);
+      setSessionId(result.session_id);
+    } catch (error) {
+      console.error("Upload failed:", error);
+      setUploading(false);
+    }
   }
 
+  // Monitor upload status
   useEffect(() => {
     if (!sessionId) return;
 
     const timer = setInterval(async () => {
-      const data = await getUploadStatus(sessionId);
+      try {
+        const data = await getUploadStatus(sessionId);
+        setStatus(data);
 
-      setStatus(data);
-
-      if (
-        data.status === "completed" ||
-        data.status === "error"
-      ) {
+        if (data.status === "completed" || data.status === "error") {
+          clearInterval(timer);
+          setUploading(false);
+          onComplete?.();
+        }
+      } catch (error) {
+        console.error("Status check failed", error);
         clearInterval(timer);
-        onComplete?.();
+        setUploading(false);
       }
     }, 2000);
 
@@ -91,7 +93,6 @@ export default function UploadPanel({
 
   return (
     <div className="space-y-6">
-
       {/* Choose File */}
       <div>
         <input
@@ -112,24 +113,17 @@ export default function UploadPanel({
         {file ? (
           <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
             <p className="text-sm text-green-700">
-              <span className="font-semibold">
-                Selected File:
-              </span>{" "}
-              {file.name}
+              <span className="font-semibold">Selected File:</span> {file.name}
             </p>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-gray-500">
-            No audio file selected.
-          </p>
+          <p className="mt-3 text-sm text-gray-500">No audio file selected.</p>
         )}
       </div>
 
       {/* Broadcast Time */}
       <div>
-        <label className="mb-2 block font-semibold text-gray-700">
-          Broadcast Time
-        </label>
+        <label className="mb-2 block font-semibold text-gray-700">Broadcast Time</label>
 
         <select
           value={uploadTime}
@@ -138,7 +132,6 @@ export default function UploadPanel({
         >
           {Array.from({ length: 24 }, (_, index) => {
             const hour = String(index + 1).padStart(2, "0");
-
             return (
               <option key={hour} value={hour}>
                 {hour}:00
@@ -151,9 +144,7 @@ export default function UploadPanel({
       {/* Keywords */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <label className="font-semibold text-gray-700">
-            Keywords
-          </label>
+          <label className="font-semibold text-gray-700">Keywords</label>
 
           <div className="flex gap-2">
             <button
@@ -190,22 +181,22 @@ export default function UploadPanel({
         />
       </div>
 
-      {/* Upload */}
+      {/* Upload Button */}
       <button
         onClick={handleUpload}
-        disabled={!file}
-        className="rounded-xl bg-green-600 px-6 py-3 font-semibold text-white shadow transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+        disabled={!file || uploading}
+        className={`rounded-xl px-6 py-3 font-semibold text-white shadow transition ${
+          !file || uploading ? "cursor-not-allowed bg-gray-400" : "bg-green-600 hover:bg-green-700"
+        }`}
       >
-        🚀 Upload Audio
+        {uploading ? "⏳ Uploading..." : "🚀 Upload Audio"}
       </button>
 
       {/* Progress */}
       {status && (
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <span className="font-semibold text-gray-700">
-              Status
-            </span>
+            <span className="font-semibold text-gray-700">Status</span>
 
             <span
               className={`rounded-full px-3 py-1 text-sm font-medium ${
@@ -224,16 +215,13 @@ export default function UploadPanel({
             <span>
               Chunk {status.current_chunk} / {status.total_chunks}
             </span>
-
             <span>{status.progress_percent || 0}%</span>
           </div>
 
           <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
             <div
               className="h-3 rounded-full bg-blue-600 transition-all duration-500"
-              style={{
-                width: `${status.progress_percent || 0}%`,
-              }}
+              style={{ width: `${status.progress_percent || 0}%` }}
             />
           </div>
         </div>
