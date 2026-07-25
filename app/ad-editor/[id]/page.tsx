@@ -46,7 +46,7 @@ export default function AdEditorPage() {
   const logRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   // NEW: broadcast hour filter + refresh state
-  const [broadcastHour, setBroadcastHour] = useState<string>("all");
+  const [broadcastHour, setBroadcastHour] = useState<string>("1");
   const [refreshing, setRefreshing] = useState(false);
 
   /* ---------------- LOAD LOGS (extracted so header Refresh can reuse it) ---------------- */
@@ -65,42 +65,105 @@ export default function AdEditorPage() {
         const list = Array.isArray(data) ? data : data.logs || [];
         setLogs(list);
 
-        const ads = await getAdvertisementsByProjectHour(projectId, Number(broadcastHour));
+        const ads = await getAdvertisementsByProjectHour(
+  projectId,
+  Number(broadcastHour)
+);
 
-        // IF SAVED ADVERTISEMENTS EXIST, LOAD FROM DATABASE
-        if (ads && ads.length > 0) {
-          const loaded = ads.map((ad: any) => ({
-            id: ad.id,
-            project_id: ad.project_id,
-            text: ad.text,
-            start: ad.start_time,
-            end: ad.end_time,
-            brand_name: ad.brand_name,
-            status: "pending",
-            advertisement: true,
-            segment_type: "advertisement",
-            segmentIds: [],
-          }));
 
-          setResults(loaded);
-          setDisabledLogs(loaded.flatMap((item: any) => item.segmentIds ?? [item.id]));
-        } else {
-          // NO SAVED ADS, LOAD DETECTED ADVERTISEMENT SEGMENTS FROM LOGS
-          const detectedAds = list
-            .filter((log: any) => log.segment_type === "advertisement")
-            .map((log: any) => ({
-              id: log.id,
-              text: log.text || log.message || "",
-              start: log.start_time,
-              end: log.end_time,
-              advertisement: true,
-              segment_type: "advertisement",
-              segmentIds: [log.id],
-            }));
+          // ================================
+          // LOAD SAVED ADS FROM DATABASE
+          // ================================
+          if (ads && ads.length > 0) {
 
-          setResults(detectedAds);
-          setDisabledLogs(detectedAds.flatMap((item: any) => item.segmentIds ?? [item.id]));
-        }
+            const loaded = ads.map((ad: any) => {
+
+              const matchedLogs = list.filter(
+                (log: any) =>
+                  log.start_time === ad.start_time &&
+                  log.end_time === ad.end_time
+              );
+
+              return {
+                id: ad.id,
+                project_id: ad.project_id,
+                text: ad.text,
+                start: ad.start_time,
+                end: ad.end_time,
+                brand_name: ad.brand_name || "",
+                status: "completed",
+                advertisement: true,
+                segment_type: "advertisement",
+
+                segmentIds: matchedLogs.map(
+                  (log: any) => log.id
+                ),
+              };
+            });
+
+
+            setResults(loaded);
+
+            setDisabledLogs(
+              loaded.flatMap((item:any)=>
+                item.segmentIds.length
+                  ? item.segmentIds
+                  : [item.id]
+              )
+            );
+
+          }
+
+
+          // ================================
+          // NO SAVED ADS -> USE LOGS
+          // ================================
+          else {
+
+            const detectedAds = list
+              .filter(
+                (log:any)=>
+                  log.segment_type === "advertisement"
+              )
+              .map((log:any)=>({
+
+                id: log.id,
+
+                text:
+                  log.text ||
+                  log.message ||
+                  "",
+
+                start:
+                  log.start_time,
+
+                end:
+                  log.end_time,
+
+                brand_name:"",
+
+                status:"pending",
+
+                advertisement:true,
+
+                segment_type:"advertisement",
+
+                segmentIds:[
+                  log.id
+                ],
+
+              }));
+
+
+            setResults(detectedAds);
+
+
+            setDisabledLogs(
+              detectedAds.flatMap(
+                (item:any)=>item.segmentIds
+              )
+            );
+          }
 
         if (!opts.silent) toast.success("🔄 Logs refreshed");
       } catch (err) {
