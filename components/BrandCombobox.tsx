@@ -20,155 +20,100 @@ import {
 
 import { getBrands, createBrand } from "@/services/api";
 
-
 interface Brand {
-  id:number;
-  name:string;
+  id: number;
+  name: string;
 }
-
 
 interface Props {
-  value:string;
-  onChange:(value:string)=>void;
+  value: string;
+  // Now also returns the brand id (undefined only while nothing is resolved yet)
+  onChange: (value: string, id?: number) => void;
 
   // added control
-  open?:boolean;
-  onOpenChange?:(open:boolean)=>void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
-
 
 export default function BrandCombobox({
   value,
   onChange,
   open,
   onOpenChange,
-}:Props){
+}: Props) {
+  const [internalOpen, setInternalOpen] = React.useState(false);
 
-  const [internalOpen,setInternalOpen] = React.useState(false);
-
-  const [brands,setBrands] = React.useState<Brand[]>([]);
-  const [loading,setLoading] = React.useState(true);
-  const [creating,setCreating] = React.useState(false);
-  const [search,setSearch] = React.useState("");
-
+  const [brands, setBrands] = React.useState<Brand[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [creating, setCreating] = React.useState(false);
+  const [search, setSearch] = React.useState("");
 
   const isControlled = open !== undefined;
 
-  const popoverOpen = isControlled
-    ? open
-    : internalOpen;
+  const popoverOpen = isControlled ? open : internalOpen;
 
-
-  function setPopoverOpen(state:boolean){
-
-    if(!isControlled){
+  function setPopoverOpen(state: boolean) {
+    if (!isControlled) {
       setInternalOpen(state);
     }
 
     onOpenChange?.(state);
   }
 
-
-
-  async function loadBrands(){
-
-    try{
-
+  async function loadBrands() {
+    try {
       setLoading(true);
 
       const data = await getBrands();
 
       setBrands(data || []);
-
-    }catch(err){
-
+    } catch (err) {
       console.error(err);
-
-    }finally{
-
+    } finally {
       setLoading(false);
-
     }
   }
 
-
-
-  React.useEffect(()=>{
-
+  React.useEffect(() => {
     loadBrands();
+  }, []);
 
-  },[]);
+  const filteredBrands = brands.filter((brand) =>
+    brand.name.toLowerCase().includes(search.toLowerCase())
+  );
 
+  const exactMatch = brands.find(
+    (b) => b.name.toLowerCase() === search.trim().toLowerCase()
+  );
 
-
-  const filteredBrands =
-    brands.filter((brand)=>
-      brand.name
-      .toLowerCase()
-      .includes(search.toLowerCase())
-    );
-
-
-
-  const exactMatch =
-    brands.find(
-      b =>
-      b.name.toLowerCase()
-      === search.trim().toLowerCase()
-    );
-
-
-
-  async function handleAddBrand(){
-
+  async function handleAddBrand() {
     const name = search.trim();
 
-    if(!name) return;
+    if (!name) return;
 
-
-    try{
-
+    try {
       setCreating(true);
 
+      const brand = await createBrand(name);
 
-      const brand =
-        await createBrand(name);
+      // Make sure the new brand is in our local list too
+      setBrands((prev) => [...prev, brand]);
 
-
-      await loadBrands();
-
-
-      onChange(brand.name);
-
+      // Pass BOTH the name and the id back to the parent
+      onChange(brand.name, brand.id);
 
       setSearch("");
 
       setPopoverOpen(false);
-
-
-    }catch(err:any){
-
+    } catch (err: any) {
       alert(err.message);
-
-    }
-    finally{
-
+    } finally {
       setCreating(false);
-
     }
-
   }
 
-
-
   return (
-
-    <Popover
-      open={popoverOpen}
-      onOpenChange={setPopoverOpen}
-    >
-
-
+    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
       <PopoverTrigger
         className="
           flex
@@ -183,51 +128,30 @@ export default function BrandCombobox({
           px-3
         "
       >
+        <span>{value || "Select Brand"}</span>
 
-        <span>
-          {value || "Select Brand"}
-        </span>
-
-
-        <ChevronsUpDown
-          className="h-4 w-4"
-        />
-
+        <ChevronsUpDown className="h-4 w-4" />
       </PopoverTrigger>
 
-
-
       <PopoverContent
-            side="bottom"
-            align="start"
-            sideOffset={5}
-            className="
+        side="bottom"
+        align="start"
+        sideOffset={5}
+        className="
                 w-[420px]
                 p-0
                 z-[9999]
             "
-            >
-
-
-        <Command
-          shouldFilter={false}
-        >
-
-
+      >
+        <Command shouldFilter={false}>
           <CommandInput
             placeholder="Search brand..."
             value={search}
             onValueChange={setSearch}
           />
 
-
-
           <CommandList>
-
-
-            {
-            loading ? (
-
+            {loading ? (
               <div
                 className="
                 flex
@@ -236,7 +160,6 @@ export default function BrandCombobox({
                 py-8
                 "
               >
-
                 <Loader2
                   className="
                   h-5
@@ -244,183 +167,86 @@ export default function BrandCombobox({
                   animate-spin
                   "
                 />
-
               </div>
-
-
-            ):(
-
-
+            ) : (
               <>
+                <CommandEmpty>No brands found.</CommandEmpty>
 
+                <CommandGroup heading="Brands">
+                  {filteredBrands.map((brand) => (
+                    <CommandItem
+                      key={brand.id}
+                      value={brand.name}
+                      onSelect={() => {
+                        // Pass BOTH the name and the id back to the parent
+                        onChange(brand.name, brand.id);
 
-              <CommandEmpty>
-                No brands found.
-              </CommandEmpty>
-
-
-
-              <CommandGroup heading="Brands">
-
-
-              {
-              filteredBrands.map((brand)=>(
-
-
-                <CommandItem
-
-                  key={brand.id}
-
-                  value={brand.name}
-
-
-                  onSelect={()=>{
-
-
-                    onChange(
-                      brand.name
-                    );
-
-
-                    setSearch("");
-
-                    setPopoverOpen(false);
-
-
-                  }}
-
-
-                  className="
+                        setSearch("");
+                        setPopoverOpen(false);
+                      }}
+                      className="
                   cursor-pointer
                   "
-                >
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          value === brand.name ? "opacity-100" : "opacity-0"
+                        )}
+                      />
 
-
-                  <Check
-
-                    className={cn(
-                      "mr-2 h-4 w-4",
-
-                      value === brand.name
-                      ? "opacity-100"
-                      : "opacity-0"
-                    )}
-
-                  />
-
-
-                  <span
-                    className="
+                      <span
+                        className="
                     flex-1
                     truncate
                     "
-                  >
-                    🏷 {brand.name}
-                  </span>
+                      >
+                        🏷 {brand.name}
+                      </span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
 
+                {!exactMatch && search.trim() !== "" && (
+                  <>
+                    <div className="border-t" />
 
-                </CommandItem>
-
-
-              ))
-              }
-
-
-              </CommandGroup>
-
-
-
-
-
-              {
-              !exactMatch &&
-              search.trim() !== "" &&
-
-              (
-
-              <>
-
-
-              <div
-                className="border-t"
-              />
-
-
-              <CommandGroup>
-
-
-                <CommandItem
-
-                  disabled={creating}
-
-                  onSelect={handleAddBrand}
-
-                  className="
+                    <CommandGroup>
+                      <CommandItem
+                        disabled={creating}
+                        onSelect={handleAddBrand}
+                        className="
                   cursor-pointer
                   "
-                >
-
-
-                {
-                creating ? (
-
-                  <Loader2
-                    className="
+                      >
+                        {creating ? (
+                          <Loader2
+                            className="
                     mr-2
                     h-4
                     w-4
                     animate-spin
                     "
-                  />
-
-
-                ):(
-
-                  <Plus
-                    className="
+                          />
+                        ) : (
+                          <Plus
+                            className="
                     mr-2
                     h-4
                     w-4
                     "
-                  />
-
-                )
-                }
-
-
-                Add "{search}"
-
-
-                </CommandItem>
-
-
-              </CommandGroup>
-
-
+                          />
+                        )}
+                        Add "{search}"
+                      </CommandItem>
+                    </CommandGroup>
+                  </>
+                )}
               </>
-
-              )
-              }
-
-
-
-              </>
-
-            )
-            }
-
-
+            )}
           </CommandList>
-
-
         </Command>
-
-
       </PopoverContent>
-
-
     </Popover>
-
   );
-
 }
