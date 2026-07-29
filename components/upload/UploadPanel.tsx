@@ -12,41 +12,12 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
   const fileInputId = useId();
 
   const [file, setFile] = useState<File | null>(null);
-  const [keywords, setKeywords] = useState("");
   const [uploadTime, setUploadTime] = useState("01");
   const [sessionId, setSessionId] = useState("");
   const [status, setStatus] = useState<any>(null);
 
-  // NEW: disable upload after submit
+  // Disable upload after submit
   const [uploading, setUploading] = useState(false);
-
-  const STORAGE_KEY = `keywords-${projectId}`;
-
-  // Load saved keywords
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setKeywords(saved);
-  }, [STORAGE_KEY]);
-
-  function handleSaveKeywords() {
-    localStorage.setItem(STORAGE_KEY, keywords);
-    alert("✅ Keywords saved successfully.");
-  }
-
-  function handleLoadKeywords() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setKeywords(saved);
-      alert("✅ Saved keywords loaded.");
-    } else {
-      alert("No saved keywords found.");
-    }
-  }
-
-  function handleClearKeywords() {
-    setKeywords("");
-    localStorage.removeItem(STORAGE_KEY);
-  }
 
   async function handleUpload() {
     if (!file || uploading) return;
@@ -54,12 +25,12 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
     try {
       setUploading(true);
 
-      const keywordList = keywords
-        .split("\n")
-        .map((x) => x.trim())
-        .filter(Boolean);
+      const result = await uploadAudio(
+        projectId,
+        file,
+        uploadTime
+      );
 
-      const result = await uploadAudio(projectId, file, keywordList, uploadTime);
       setSessionId(result.session_id);
     } catch (error) {
       console.error("Upload failed:", error);
@@ -76,7 +47,10 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
         const data = await getUploadStatus(sessionId);
         setStatus(data);
 
-        if (data.status === "completed" || data.status === "error") {
+        if (
+          data.status === "completed" ||
+          data.status === "error"
+        ) {
           clearInterval(timer);
           setUploading(false);
           onComplete?.();
@@ -100,7 +74,9 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
           type="file"
           accept="audio/*"
           className="hidden"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          onChange={(e) =>
+            setFile(e.target.files?.[0] || null)
+          }
         />
 
         <label
@@ -113,17 +89,24 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
         {file ? (
           <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
             <p className="text-sm text-green-700">
-              <span className="font-semibold">Selected File:</span> {file.name}
+              <span className="font-semibold">
+                Selected File:
+              </span>{" "}
+              {file.name}
             </p>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-gray-500">No audio file selected.</p>
+          <p className="mt-3 text-sm text-gray-500">
+            No audio file selected.
+          </p>
         )}
       </div>
 
       {/* Broadcast Time */}
       <div>
-        <label className="mb-2 block font-semibold text-gray-700">Broadcast Time</label>
+        <label className="mb-2 block font-semibold text-gray-700">
+          Broadcast Time
+        </label>
 
         <select
           value={uploadTime}
@@ -132,6 +115,7 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
         >
           {Array.from({ length: 24 }, (_, index) => {
             const hour = String(index + 1).padStart(2, "0");
+
             return (
               <option key={hour} value={hour}>
                 {hour}:00
@@ -141,62 +125,28 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
         </select>
       </div>
 
-      {/* Keywords */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <label className="font-semibold text-gray-700">Keywords</label>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleSaveKeywords}
-              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              💾 Save
-            </button>
-
-            <button
-              type="button"
-              onClick={handleLoadKeywords}
-              className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-            >
-              📂 Load
-            </button>
-
-            <button
-              type="button"
-              onClick={handleClearKeywords}
-              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
-            >
-              🗑 Clear
-            </button>
-          </div>
-        </div>
-
-        <textarea
-          placeholder="Enter one keyword per line..."
-          value={keywords}
-          onChange={(e) => setKeywords(e.target.value)}
-          className="h-40 w-full rounded-lg border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
-        />
-      </div>
-
       {/* Upload Button */}
       <button
         onClick={handleUpload}
         disabled={!file || uploading}
         className={`rounded-xl px-6 py-3 font-semibold text-white shadow transition ${
-          !file || uploading ? "cursor-not-allowed bg-gray-400" : "bg-green-600 hover:bg-green-700"
+          !file || uploading
+            ? "cursor-not-allowed bg-gray-400"
+            : "bg-green-600 hover:bg-green-700"
         }`}
       >
-        {uploading ? "⏳ Uploading..." : "🚀 Upload Audio"}
+        {uploading
+          ? "⏳ Uploading..."
+          : "🚀 Upload Audio"}
       </button>
 
       {/* Progress */}
       {status && (
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <span className="font-semibold text-gray-700">Status</span>
+            <span className="font-semibold text-gray-700">
+              Status
+            </span>
 
             <span
               className={`rounded-full px-3 py-1 text-sm font-medium ${
@@ -213,15 +163,21 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
 
           <div className="mb-2 flex justify-between text-sm text-gray-600">
             <span>
-              Chunk {status.current_chunk} / {status.total_chunks}
+              Chunk {status.current_chunk} /{" "}
+              {status.total_chunks}
             </span>
-            <span>{status.progress_percent || 0}%</span>
+
+            <span>
+              {status.progress_percent || 0}%
+            </span>
           </div>
 
           <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
             <div
               className="h-3 rounded-full bg-blue-600 transition-all duration-500"
-              style={{ width: `${status.progress_percent || 0}%` }}
+              style={{
+                width: `${status.progress_percent || 0}%`,
+              }}
             />
           </div>
         </div>

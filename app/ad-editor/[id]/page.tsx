@@ -14,6 +14,7 @@ import {
   getAdvertisementsByProjectHour,
   createAdvertisement,
   getAdvertisements,
+  getSegmentHours,
 } from "@/services/api";
 import { Download, Save, Trash2, Plus, Search, X, RefreshCw } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
@@ -47,6 +48,7 @@ export default function AdEditorPage() {
 
   // NEW: broadcast hour filter + refresh state
   const [broadcastHour, setBroadcastHour] = useState<string>("1");
+  const [hours, setHours] = useState<number[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   /* ---------------- LOAD LOGS (extracted so header Refresh can reuse it) ---------------- */
@@ -140,7 +142,7 @@ export default function AdEditorPage() {
                 end:
                   log.end_time,
 
-                brand_name:"",
+                brand_name: log.brand_name || "",
 
                 status:"pending",
 
@@ -180,6 +182,31 @@ export default function AdEditorPage() {
     loadLogs({ silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, broadcastHour]);
+
+  useEffect(() => {
+  async function loadHours() {
+    try {
+      const data = await getSegmentHours(projectId);
+
+      setHours(data);
+
+      if (data.length > 0) {
+        setBroadcastHour(String(data[0]));
+      }
+
+    } catch (error) {
+      console.error(
+        "Failed loading segment hours",
+        error
+      );
+    }
+  }
+
+  if (projectId) {
+    loadHours();
+  }
+
+}, [projectId]);
 
   const handleRefresh = () => {
     loadLogs();
@@ -606,6 +633,7 @@ function handleUpdateSegment(
       end: range[range.length - 1].end_time,
       segmentIds: ids,
       advertisement: true,
+      brand_name: "",
       status: "pending",
       segment_type: "new",
     };
@@ -748,7 +776,8 @@ const handleCenterLastCompleted = () => {
       end: row.end_time,
       segmentIds: [row.id],
       advertisement: true,
-       status: "completed",
+      brand_name: row.brand_name || "",
+      status: "completed",
       segment_type: "advertisement",
     };
 
@@ -782,7 +811,7 @@ const handleCenterLastCompleted = () => {
 
   /* AUTO SCROLL CURRENT LOG */
   useEffect(() => {
-    const current = filteredLogs.find((log) => {
+    const current = logs.find((log) => {
       const start = toSeconds(log.start_time);
       const end = toSeconds(log.end_time);
       return start !== null && end !== null && currentAudioTime >= start && currentAudioTime <= end;
@@ -791,7 +820,7 @@ const handleCenterLastCompleted = () => {
     if (current) {
       logRefs.current[current.id]?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [currentAudioTime, filteredLogs]);
+  }, [currentAudioTime, logs]);
 
   return (
     <div className="p-6 space-y-6">
@@ -825,36 +854,34 @@ const handleCenterLastCompleted = () => {
           Broadcast Hour
         </span>
 
-        <select
-          value={broadcastHour}
-          onChange={(e) => {
-            setBroadcastHour(e.target.value);
-          }}
-          className="
-            rounded-lg
-            border
-            bg-white
-            px-3
-            py-2
-            text-sm
-            font-semibold
-            text-gray-700
-            outline-none
-            focus:ring-2
-            focus:ring-blue-500
-          "
-        >
-          {Array.from({ length: 24 }, (_, i) => {
-            const hour = i + 1;
+  <div className="flex items-center gap-2 flex-wrap">
 
-            return (
-              <option key={hour} value={hour}>
-                {String(hour).padStart(2, "0")}:00
-              </option>
-            );
-          })}
-        </select>
+  {hours.map((hour)=>(
+    <button
+      key={hour}
+      onClick={()=>{
+        setBroadcastHour(String(hour));
+      }}
+      className={`
+        px-3
+        py-1
+        rounded-lg
+        text-sm
+        font-semibold
+        transition
 
+        ${
+          broadcastHour === String(hour)
+          ? "bg-blue-600 text-white"
+          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+        }
+      `}
+    >
+      {hour}
+    </button>
+  ))}
+
+</div>
       </div>
 
     </div>

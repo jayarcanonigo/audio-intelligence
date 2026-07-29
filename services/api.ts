@@ -150,21 +150,22 @@ export async function deleteProject(id: number) {
 export async function uploadAudio(
   projectId: number,
   file: File,
-  keywords: string[],
   startHour: string
 ) {
   const formData = new FormData();
+
   formData.append("project_id", projectId.toString());
   formData.append("file", file);
-  formData.append("keywords", JSON.stringify(keywords));
   formData.append("start_hour", startHour);
 
-  const response = await fetch(`${API_URL}/upload/`, {
+  const res = await fetch(`${API_URL}/upload/`, {
     method: "POST",
     body: formData,
   });
-  if (!response.ok) throw new Error("Upload failed");
-  return response.json();
+
+  if (!res.ok) throw new Error("Upload failed");
+
+  return res.json();
 }
 
 // ======================================
@@ -266,6 +267,74 @@ export async function getAdvertisementsByProjectHour(
 
   if (!res.ok) {
     throw new Error("Failed loading advertisements");
+  }
+
+  return res.json();
+}
+
+// ======================================
+// KEYWORDS
+// ======================================
+
+export async function getKeywords() {
+  const res = await fetch(`${API_URL}/keywords/`);
+  if (!res.ok) throw new Error("Failed to load keywords");
+  return res.json();
+}
+
+export async function getKeywordsByBrand(brandId: number) {
+  const res = await fetch(`${API_URL}/keywords/brand/${brandId}`);
+  if (!res.ok) throw new Error("Failed to load brand keywords");
+  return res.json();
+}
+
+export async function createKeyword(data: {
+  brand_id: number;
+  keyword: string;
+}) {
+  const res = await fetch(`${API_URL}/keywords/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) throw new Error("Failed to create keyword");
+  return res.json();
+}
+
+export async function updateKeyword(
+  id: number,
+  data: {
+    brand_id?: number;
+    keyword?: string;
+  }
+) {
+  const res = await fetch(`${API_URL}/keywords/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) throw new Error("Failed to update keyword");
+  return res.json();
+}
+
+export async function deleteKeyword(id: number) {
+  const res = await fetch(`${API_URL}/keywords/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) throw new Error("Failed to delete keyword");
+  return res.json();
+}
+
+export async function getSegmentHours(projectId: number) {
+  const res = await fetch(
+    `${API_URL}/segments/hours/${projectId}`
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed to load segment hours");
   }
 
   return res.json();
