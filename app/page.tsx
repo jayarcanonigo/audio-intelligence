@@ -264,10 +264,18 @@ export default function ProjectsPage() {
 
               </p>
 
-
-
-
-
+        {/* UPLOAD TIMES */}
+        <p>
+          <strong>Upload Time:</strong>
+          <br />
+          {project.upload_times?.length ? (
+            <span className="text-purple-600 font-semibold">
+              {project.upload_times.join(", ")}
+            </span>
+          ) : (
+            <span className="text-gray-400">None</span>
+          )}
+        </p>
 
               {/* CREATED DATE */}
               <p

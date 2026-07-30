@@ -604,61 +604,67 @@ function handleUpdateSegment(
   };
 
   /* ADD P1 - P2 RANGE */
-  const handleAddRange = async () => {
-    if (selectedP1Id === null || selectedP2Id === null) {
-      toast.warning("Select P1 and P2 first");
-      return;
-    }
+const handleAddRange = async () => {
+  if (selectedP1Id === null || selectedP2Id === null) {
+    toast.warning("Select P1 and P2 first");
+    return;
+  }
 
-    const startIndex = logs.findIndex((l) => l.id === selectedP1Id);
-    const endIndex = logs.findIndex((l) => l.id === selectedP2Id);
+  const startIndex = logs.findIndex((l) => l.id === selectedP1Id);
+  const endIndex = logs.findIndex((l) => l.id === selectedP2Id);
 
-    if (startIndex === -1 || endIndex === -1) {
-      toast.error("Invalid selection");
-      return;
-    }
+  if (startIndex === -1 || endIndex === -1) {
+    toast.error("Invalid selection");
+    return;
+  }
 
-    if (startIndex >= endIndex) {
-      toast.error("P2 must be after P1");
-      return;
-    }
+  if (startIndex >= endIndex) {
+    toast.error("P2 must be after P1");
+    return;
+  }
 
-    const range = logs.slice(startIndex, endIndex + 1);
-    const ids = range.map((x) => x.id);
+  const range = logs.slice(startIndex, endIndex + 1);
+  const ids = range.map((x) => x.id);
 
-    const newSegment = {
-      id: Date.now(),
-      text: range.map((x) => x.text || x.message || "").join(" "),
-      start: range[0].start_time,
-      end: range[range.length - 1].end_time,
-      segmentIds: ids,
-      advertisement: true,
-      brand_name: "",
-      status: "pending",
-      segment_type: "new",
-    };
+  // Generate a new ID and use it for both the segment and lastSavedId
+  const newId = Date.now();
 
-    // REMOVE DUPLICATED SELECTED LOGS
-    const clean = results.filter((row) => {
-      const rowIds = row.segmentIds ?? [row.id];
-      return !rowIds.some((id: string) => ids.includes(id));
-    });
-
-    const updated = [...clean, newSegment];
-
-    setResults(updated);
-
-    // DISABLE USED LOG ROWS
-    setDisabledLogs([...new Set(updated.flatMap((x) => x.segmentIds ?? [x.id]))]);
-
-    // RESET P1 / P2
-    setSelectedP1Id(null);
-    setSelectedP2Id(null);
-    setLastSavedId(newSegment.id);
-
-    toast.success("✅ Advertisement segment added");
+  const newSegment = {
+    id: newId,
+    text: range.map((x) => x.text || x.message || "").join(" "),
+    start: range[0].start_time,
+    end: range[range.length - 1].end_time,
+    segmentIds: ids,
+    advertisement: true,
+    brand_name: "",
+    status: "pending",
+    segment_type: "new",
   };
 
+  // REMOVE DUPLICATED SELECTED LOGS
+  const clean = results.filter((row) => {
+    const rowIds = row.segmentIds ?? [row.id];
+    return !rowIds.some((id: string) => ids.includes(id));
+  });
+
+  const updated = [...clean, newSegment];
+
+  setResults(updated);
+
+  // DISABLE USED LOG ROWS
+  setDisabledLogs([
+    ...new Set(updated.flatMap((x) => x.segmentIds ?? [x.id])),
+  ]);
+
+  // Make the new segment the last saved
+  setLastSavedId(newId);
+
+  // RESET P1 / P2
+  setSelectedP1Id(null);
+  setSelectedP2Id(null);
+
+  toast.success("✅ Advertisement segment added");
+};
   /* SAVE SEGMENT */
   async function handleSaveAllSegments() {
     try {
