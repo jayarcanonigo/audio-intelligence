@@ -291,17 +291,22 @@ export async function getKeywordsByBrand(brandId: number) {
 export async function createKeyword(data: {
   brand_id: number;
   keyword: string;
+  duration?: number | null;
 }) {
   const res = await fetch(`${API_URL}/keywords/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(data),
   });
 
-  if (!res.ok) throw new Error("Failed to create keyword");
+  if (!res.ok) {
+    throw new Error("Failed to create keyword");
+  }
+
   return res.json();
 }
-
 export async function updateKeyword(
   id: number,
   data: {

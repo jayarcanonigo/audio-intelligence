@@ -20,6 +20,7 @@ interface Keyword {
   brand_id: number;
   brand_name: string;
   keyword: string;
+  duration?: number | null;
   created_at: string;
 }
 
@@ -35,10 +36,12 @@ export default function KeywordsPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
 
   const [keyword, setKeyword] = useState("");
+  const [duration, setDuration] = useState<number | "">("");
   const [brandName, setBrandName] = useState("");
   const [brandId, setBrandId] = useState<number | "">("");
 
   const [loading, setLoading] = useState(false);
+
 
   async function loadKeywords() {
     try {
@@ -49,6 +52,7 @@ export default function KeywordsPage() {
     }
   }
 
+
   async function loadBrands() {
     try {
       const data = await getBrands();
@@ -58,58 +62,101 @@ export default function KeywordsPage() {
     }
   }
 
+
   function handleBrandChange(name: string, id?: number) {
     setBrandName(name);
     setBrandId(id ?? "");
   }
 
+
   async function addKeyword() {
+
     if (!keyword.trim()) {
       toast.warning("Enter keyword");
       return;
     }
+
     if (!brandId) {
       toast.warning("Select brand");
       return;
     }
 
+
     try {
+
       setLoading(true);
+
       await createKeyword({
+
         brand_id: Number(brandId),
+
         keyword: keyword.trim(),
+
+        duration:
+          duration === ""
+            ? null
+            : Number(duration),
+
       });
+
+
       setKeyword("");
+
+      setDuration("");
+
       await loadKeywords();
+
       toast.success("Keyword added");
+
+
     } catch {
+
       toast.error("Failed to add keyword");
+
     } finally {
+
       setLoading(false);
+
     }
   }
+
 
   async function removeKeyword(id: number) {
+
     try {
+
       await deleteKeyword(id);
+
       await loadKeywords();
+
       toast.success("Keyword deleted");
+
     } catch {
+
       toast.error("Failed to delete keyword");
+
     }
+
   }
 
+
   useEffect(() => {
+
     loadKeywords();
+
     loadBrands();
+
   }, []);
+
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
+
       <ToastContainer />
 
+
       <div className="max-w-5xl mx-auto">
-        {/* Back */}
+
         <button
           onClick={() => router.push("/settings")}
           className="flex items-center gap-2 mb-4 text-blue-600 hover:text-blue-800 font-medium"
@@ -118,100 +165,208 @@ export default function KeywordsPage() {
           Back to Settings
         </button>
 
+
         <div className="flex items-center gap-3 mb-5">
+
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100">
             <Search className="text-blue-600" />
           </div>
+
           <div>
-            <h1 className="text-2xl font-bold">Advertisement Keywords</h1>
+
+            <h1 className="text-2xl font-bold">
+              Advertisement Keywords
+            </h1>
+
             <p className="text-gray-500 text-sm">
               Manage keywords used for advertisement detection.
             </p>
+
           </div>
+
         </div>
 
-        {/* Add Keyword */}
+
+
         <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+
           <div className="flex items-center gap-2 mb-3">
+
             <Plus className="text-green-600 w-5 h-5" />
-            <h2 className="text-base font-bold">Add Advertisement Keyword</h2>
+
+            <h2 className="text-base font-bold">
+              Add Advertisement Keyword
+            </h2>
+
           </div>
 
+
+
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-            {/* Keyword */}
-            <div className="md:col-span-5">
+
+
+            <div className="md:col-span-4">
+
               <label className="block text-sm font-medium text-gray-600 mb-1">
                 Keyword
               </label>
+
               <input
+
                 value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder="Example: promo, sale, discount"
-                className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-blue-300"
+
+                onChange={(e)=>setKeyword(e.target.value)}
+
+                placeholder="Example: bet88"
+
+                className="w-full rounded-lg border px-3 py-2"
+
               />
+
             </div>
 
-            {/* Brand */}
-            <div className="md:col-span-5">
+
+
+            <div className="md:col-span-3">
+
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+                Duration (seconds)
+              </label>
+
+              <input
+
+                type="number"
+
+                value={duration}
+
+                onChange={(e)=>
+                  setDuration(
+                    e.target.value
+                    ? Number(e.target.value)
+                    : ""
+                  )
+                }
+
+                placeholder="Example: 30"
+
+                className="w-full rounded-lg border px-3 py-2"
+
+              />
+
+            </div>
+
+
+
+            <div className="md:col-span-3">
+
               <label className="block text-sm font-medium text-gray-600 mb-1">
                 Brand
               </label>
-              <BrandCombobox value={brandName} onChange={handleBrandChange} />
+
+              <BrandCombobox
+                value={brandName}
+                onChange={handleBrandChange}
+              />
+
             </div>
 
-            {/* Add Button */}
+
+
             <div className="md:col-span-2 flex items-end">
+
               <button
+
                 onClick={addKeyword}
+
                 disabled={loading}
-                className="w-full h-10 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
+
+                className="w-full h-10 rounded-lg bg-green-600 text-white font-semibold"
+
               >
-                <Plus className="w-5 h-5" />
+
+                <Plus className="w-5 h-5 inline" />
+
                 {loading ? "Saving..." : "Add"}
+
               </button>
+
             </div>
+
+
           </div>
+
         </div>
 
-        {/* Keyword List */}
+
+
         <div className="bg-white rounded-xl shadow-sm border p-4">
+
           <div className="flex items-center gap-2 mb-3">
+
             <Tag className="text-purple-600 w-5 h-5" />
-            <h2 className="text-base font-bold">Keyword List</h2>
+
+            <h2 className="text-base font-bold">
+              Keyword List
+            </h2>
+
           </div>
 
-          {keywords.length === 0 ? (
-            <div className="rounded-lg bg-gray-50 p-6 text-center">
-              <p className="text-gray-500">No keywords found.</p>
-            </div>
-          ) : (
-            <div className="grid gap-2">
-              {keywords.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between rounded-lg border bg-gray-50 px-3 py-2 hover:bg-white hover:shadow-sm transition"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-semibold text-blue-700">
-                      {item.keyword}
-                    </span>
-                    <span className="flex items-center gap-1 text-sm text-gray-500">
-                      🏷 {item.brand_name}
-                    </span>
-                  </div>
 
-                  <button
-                    onClick={() => removeKeyword(item.id)}
-                    className="rounded-lg p-1.5 text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+          <div className="grid gap-2">
+
+            {keywords.map((item)=>(
+
+              <div
+                key={item.id}
+                className="flex items-center justify-between rounded-lg border bg-gray-50 px-3 py-2"
+              >
+
+                <div className="flex items-center gap-3">
+
+                  <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-semibold text-blue-700">
+                    {item.keyword}
+                  </span>
+
+
+                  <span className="text-sm text-gray-500">
+                    🏷 {item.brand_name}
+                  </span>
+
+
+                  <span className="text-sm text-gray-500">
+                    ⏱ {item.duration ? `${item.duration}s` : "-"}
+                  </span>
+
                 </div>
-              ))}
-            </div>
-          )}
+
+
+
+                <button
+
+                  onClick={()=>removeKeyword(item.id)}
+
+                  className="rounded-lg p-1.5 text-red-600 hover:bg-red-50"
+
+                >
+
+                  <Trash2 className="w-4 h-4"/>
+
+                </button>
+
+
+              </div>
+
+            ))}
+
+          </div>
+
+
         </div>
+
+
       </div>
+
     </div>
   );
 }
