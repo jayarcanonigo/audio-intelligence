@@ -14,6 +14,7 @@ import {
   getAdvertisementsByProjectHour,
   createAdvertisement,
   getAdvertisements,
+  reprocessAdvertisements,
   getSegmentHours,
 } from "@/services/api";
 import { Download, Save, Trash2, Plus, Search, X, RefreshCw } from "lucide-react";
@@ -208,6 +209,46 @@ export default function AdEditorPage() {
 
 }, [projectId]);
 
+const handleReprocessAds = async () => {
+  try {
+
+    const hour =
+      broadcastHour === "all"
+        ? undefined
+        : Number(broadcastHour);
+
+
+    const result = await reprocessAdvertisements(
+      projectId,
+      hour
+    );
+
+
+    toast.success(
+      `🔄 ${result.updated} advertisements reprocessed`
+    );
+
+
+    // reload only selected hour
+    await loadLogs({
+      silent: true
+    });
+
+
+  } catch (error) {
+
+    console.error(
+      "REPROCESS ERROR",
+      error
+    );
+
+
+    toast.error(
+      "Failed to reprocess advertisements"
+    );
+
+  }
+};
   const handleRefresh = () => {
     loadLogs();
   };
@@ -1037,6 +1078,14 @@ const handleCenterLastCompleted = () => {
           Apply to All
         </span>
 
+      {/* Reprocess */}
+      <button
+        onClick={handleReprocessAds}
+        className="flex h-8 items-center gap-1 rounded-md bg-blue-600 px-3 text-[11px] font-semibold text-white hover:bg-blue-700"
+      >
+        <RefreshCw size={13} />
+        Reprocess
+      </button>
         {/* Save */}
         <button
           onClick={handleSaveAllSegments}

@@ -344,3 +344,32 @@ export async function getSegmentHours(projectId: number) {
 
   return res.json();
 }
+
+export async function reprocessAdvertisements(
+  projectId: number,
+  hour?: number
+) {
+
+  const url =
+    `${API_URL}/advertisements/project/${projectId}/reprocess` +
+    (hour !== undefined
+      ? `?hour=${hour}`
+      : "");
+
+
+  const res = await fetch(url, {
+    method: "POST",
+  });
+
+
+  if (!res.ok) {
+
+    throw new Error(
+      "Failed to reprocess advertisements"
+    );
+
+  }
+
+
+  return res.json();
+}
