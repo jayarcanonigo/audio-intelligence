@@ -20,13 +20,7 @@ interface Props {
   onPlay: (row: Segment) => void;
   onUpdate?: (
     id: number,
-    data: {
-      text: string;
-      start: string;
-      end: string;
-      brand_name: string;
-      status: "pending" | "completed";
-    }
+    data: { text: string; start: string; end: string; brand_name: string; status: "pending" | "completed" }
   ) => void;
   onRemove?: (id: number) => void;
   onSave?: (segments: Segment[]) => void;
@@ -44,29 +38,23 @@ export default function SelectedSegments({
 }: Props) {
   const [segmentList, setSegmentList] = useState<Segment[]>(segments);
   const [editingId, setEditingId] = useState<number | null>(null);
-  // controls dropdown visibility
   const [brandOpenId, setBrandOpenId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [editStart, setEditStart] = useState("");
   const [editEnd, setEditEnd] = useState("");
   const [editBrand, setEditBrand] = useState("");
-  
 
   useEffect(() => {
     setSegmentList((prev) =>
       segments.map((incoming) => {
         const local = prev.find((p) => p.id === incoming.id);
-        return {
-          ...incoming,
-          status: incoming.status ?? local?.status ?? "completed",
-        };
+        return { ...incoming, status: incoming.status ?? local?.status ?? "completed" };
       })
     );
   }, [segments]);
 
   function edit(row: Segment) {
     setEditingId(row.id);
-    // important: edit mode does NOT open dropdown
     setBrandOpenId(null);
     setEditText(row.text);
     setEditStart(row.start || "00:00:00");
@@ -74,38 +62,19 @@ export default function SelectedSegments({
     setEditBrand(row.brand_name || "");
   }
 
- function saveEdit(row: Segment) {
-  const data = {
-    text: editText,
-    start: editStart,
-    end: editEnd,
-    brand_name: editBrand,
-    status: "completed" as const,
-  };
-
-  setSegmentList((prev) =>
-    prev
-      .map((item) =>
-        item.id === row.id
-          ? { ...item, ...data }
-          : item
-      )
-      .sort((a, b) =>
-        toSeconds(a.start) - toSeconds(b.start)
-      )
-  );
-
-  setEditingId(null);
-  setBrandOpenId(null);
-  console.log("Saving edit for row:", row.id, "with data:", data);
-  onUpdate?.(row.id, data);
-}
+  function saveEdit(row: Segment) {
+    const data = { text: editText, start: editStart, end: editEnd, brand_name: editBrand, status: "completed" as const };
+    setSegmentList((prev) =>
+      prev.map((item) => (item.id === row.id ? { ...item, ...data } : item)).sort((a, b) => toSeconds(a.start) - toSeconds(b.start))
+    );
+    setEditingId(null);
+    setBrandOpenId(null);
+    onUpdate?.(row.id, data);
+  }
 
   function updateBrand(row: Segment, value: string) {
     setEditBrand(value);
-    setSegmentList((prev) =>
-      prev.map((item) => (item.id === row.id ? { ...item, brand_name: value } : item))
-    );
+    setSegmentList((prev) => prev.map((item) => (item.id === row.id ? { ...item, brand_name: value } : item)));
   }
 
   function cancelEdit() {
@@ -117,33 +86,30 @@ export default function SelectedSegments({
     setEditBrand("");
   }
 
-    const toSeconds = (time?: string) => {
+  const toSeconds = (time?: string) => {
     if (!time) return 0;
-
     const parts = time.split(":").map(Number);
-
     if (parts.length === 3) {
       const [hour, minute, second] = parts;
       return hour * 3600 + minute * 60 + second;
     }
-
     if (parts.length === 2) {
       const [minute, second] = parts;
       return minute * 60 + second;
     }
-
     return 0;
   };
 
+  const formatDuration = (start?: string, end?: string) => {
+    const diff = Math.max(0, toSeconds(end) - toSeconds(start));
+    const m = Math.floor(diff / 60);
+    const s = Math.floor(diff % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
 
- const sortedSegments = [...segmentList]
-  .map((item) => ({
-    ...item,
-    status: item.status ?? "pending",
-  }))
-  .sort((a, b) => {
-    return toSeconds(a.start) - toSeconds(b.start);
-  });
+  const sortedSegments = [...segmentList]
+    .map((item) => ({ ...item, status: item.status ?? "pending" }))
+    .sort((a, b) => toSeconds(a.start) - toSeconds(b.start));
 
   function TimeInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
     return (
@@ -168,11 +134,7 @@ export default function SelectedSegments({
         </div>
         <button
           onClick={() => {
-            const completed: Segment[] = segmentList.map((item) => ({
-              ...item,
-              status: "completed",
-            }));
-
+            const completed: Segment[] = segmentList.map((item) => ({ ...item, status: "completed" }));
             setSegmentList(completed);
             onSave?.(completed);
           }}
@@ -192,22 +154,14 @@ export default function SelectedSegments({
               target.closest("button") ||
               target.closest("input") ||
               target.closest("textarea") ||
-              target.closest(".brand-combobox")||
+              target.closest(".brand-combobox") ||
               target.closest("[data-radix-popper-content-wrapper]")
             ) {
               return;
             }
             setSelectedResultId(row.id);
           }}
-          className={`relative
-    rounded-2xl
-    border
-    bg-white
-    p-5
-    shadow-sm
-    overflow-visible ${
-            selectedResultId === row.id ? "ring-2 ring-blue-300 bg-blue-50" : ""
-          }`}
+          className={`relative rounded-2xl border bg-white p-5 shadow-sm overflow-visible ${selectedResultId === row.id ? "ring-2 ring-blue-300 bg-blue-50" : ""}`}
         >
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-1 gap-4">
@@ -222,31 +176,21 @@ export default function SelectedSegments({
                     <p className="text-xs text-gray-500">Detected Segment</p>
                   </div>
 
-                  <span
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-                      row.status === "completed"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-yellow-100 text-yellow-700"
-                    }`}
-                  >
+                  <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${row.status === "completed" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
                     {row.status === "completed" ? "🟢 Completed" : "● Pending"}
                   </span>
                 </div>
 
-                <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Brand
-                </label>
+                <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-gray-500">Brand</label>
 
                 {editingId === row.id ? (
-                  <div className="brand-combobox w-full"
-                   onClick={(e)=>e.stopPropagation()} >
+                  <div className="brand-combobox w-full" onClick={(e) => e.stopPropagation()}>
                     <BrandCombobox
                       value={editBrand}
                       open={brandOpenId === row.id}
                       onOpenChange={(open) => setBrandOpenId(open ? row.id : null)}
                       onChange={(value) => {
                         updateBrand(row, value);
-                        // close after select
                         setBrandOpenId(null);
                       }}
                     />
@@ -255,9 +199,7 @@ export default function SelectedSegments({
                   <div className="min-h-11 w-full rounded-xl border border-yellow-300 bg-yellow-50 px-4 py-2">
                     <div className="flex items-start gap-2">
                       <span className="text-lg">🏷</span>
-                      <span className="break-words text-sm font-semibold leading-6 text-gray-800">
-                        {row.brand_name || "No brand selected"}
-                      </span>
+                      <span className="break-words text-sm font-semibold leading-6 text-gray-800">{row.brand_name || "No brand selected"}</span>
                     </div>
                   </div>
                 )}
@@ -265,40 +207,18 @@ export default function SelectedSegments({
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              <button
-                onClick={() => onPlay(row)}
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600"
-              >
-                ▶
-              </button>
+              <button onClick={() => onPlay(row)} className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600">▶</button>
               {editingId === row.id ? (
-                <button
-                  onClick={() => saveEdit(row)}
-                  className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  💾 Save
-                </button>
+                <button onClick={() => saveEdit(row)} className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">💾 Save</button>
               ) : (
-                <button
-                  onClick={() => edit(row)}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200"
-                >
-                  ✏️
-                </button>
+                <button onClick={() => edit(row)} className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200">✏️</button>
               )}
-              <button
-                onClick={() => onRemove?.(row.id)}
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 hover:bg-red-100"
-              >
-                🗑
-              </button>
+              <button onClick={() => onRemove?.(row.id)} className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 hover:bg-red-100">🗑</button>
             </div>
           </div>
 
           <div className="mt-5">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Transcript
-            </label>
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">Transcript</label>
             <div className="rounded-xl bg-gray-50 p-4">
               {editingId === row.id ? (
                 <textarea
@@ -329,6 +249,9 @@ export default function SelectedSegments({
                 <span className="font-semibold">{row.end || "00:00:00"}</span>
               </>
             )}
+            <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+              {formatDuration(row.start, row.end)}
+            </span>
           </div>
         </div>
       ))}
