@@ -299,71 +299,99 @@ export default function KeywordsPage() {
 
 
 
-        <div className="bg-white rounded-xl shadow-sm border p-4">
+    {/* ===================== KEYWORD LIST ===================== */}
+<div className="bg-white rounded-xl shadow-sm border p-4">
 
-          <div className="flex items-center gap-2 mb-3">
+  <div className="flex items-center gap-2 mb-5">
+    <Tag className="text-purple-600 w-5 h-5" />
 
-            <Tag className="text-purple-600 w-5 h-5" />
+    <h2 className="text-base font-bold">
+      Keywords by Brand
+    </h2>
 
-            <h2 className="text-base font-bold">
-              Keyword List
-            </h2>
+    <span className="ml-auto rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+      {keywords.length} Keywords
+    </span>
+  </div>
+
+  {Object.entries(
+    keywords.reduce((acc: Record<string, Keyword[]>, item) => {
+      if (!acc[item.brand_name]) {
+        acc[item.brand_name] = [];
+      }
+
+      acc[item.brand_name].push(item);
+
+      return acc;
+    }, {})
+  )
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([brand, list]) => (
+      <div
+        key={brand}
+        className="mb-6 rounded-xl border overflow-hidden"
+      >
+
+        {/* Brand Header */}
+        <div className="flex items-center justify-between bg-blue-50 px-4 py-3 border-b">
+
+          <div className="flex items-center gap-2">
+
+            <span className="text-lg">🏷</span>
+
+            <h3 className="font-bold text-blue-700">
+              {brand}
+            </h3>
 
           </div>
 
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-700 border">
+            {list.length} keyword{list.length > 1 ? "s" : ""}
+          </span>
 
+        </div>
 
-          <div className="grid gap-2">
+        {/* Keywords */}
+        <div className="divide-y">
 
-            {keywords.map((item)=>(
+          {list
+            .sort((a, b) => a.keyword.localeCompare(b.keyword))
+            .map((item) => (
 
               <div
                 key={item.id}
-                className="flex items-center justify-between rounded-lg border bg-gray-50 px-3 py-2"
+                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
               >
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
 
-                  <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-semibold text-blue-700">
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-700">
                     {item.keyword}
                   </span>
 
-
-                  <span className="text-sm text-gray-500">
-                    🏷 {item.brand_name}
-                  </span>
-
-
-                  <span className="text-sm text-gray-500">
-                    ⏱ {item.duration ? `${item.duration}s` : "-"}
+                  <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
+                    ⏱ {item.duration ? `${item.duration}s` : "No Duration"}
                   </span>
 
                 </div>
 
-
-
                 <button
-
-                  onClick={()=>removeKeyword(item.id)}
-
-                  className="rounded-lg p-1.5 text-red-600 hover:bg-red-50"
-
+                  onClick={() => removeKeyword(item.id)}
+                  className="rounded-lg p-2 text-red-600 hover:bg-red-50"
                 >
-
-                  <Trash2 className="w-4 h-4"/>
-
+                  <Trash2 className="w-4 h-4" />
                 </button>
-
 
               </div>
 
             ))}
 
-          </div>
-
-
         </div>
 
+      </div>
+    ))}
+
+</div>
 
       </div>
 
