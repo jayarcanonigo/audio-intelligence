@@ -31,7 +31,8 @@ const menus = [
 ];
 
 export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  // Sidebar is collapsed by default
+  const [collapsed, setCollapsed] = useState(true);
 
   return (
     <aside
@@ -42,7 +43,6 @@ export default function Sidebar() {
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
-
         {!collapsed && (
           <h1 className="font-bold text-lg">
             📻 Radio Search
@@ -51,44 +51,38 @@ export default function Sidebar() {
 
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded hover:bg-gray-700"
+          className="p-2 rounded hover:bg-gray-700 transition"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? "➡️" : "⬅️"}
         </button>
-
       </div>
-
 
       {/* Menu */}
       <nav className="mt-4">
-
         {menus.map((menu) => (
           <a
             key={menu.name}
             href={menu.href}
-            className="
-              flex items-center gap-3
-              px-4 py-3
+            className={`
+              flex items-center
+              ${collapsed ? "justify-center px-2" : "gap-3 px-4"}
+              py-3
               hover:bg-gray-800
               transition
-            "
+            `}
+            title={menu.name}
           >
-
-            <span className="text-xl">
-              {menu.icon}
-            </span>
+            <span className="text-xl">{menu.icon}</span>
 
             {!collapsed && (
-              <span>
+              <span className="whitespace-nowrap">
                 {menu.name}
               </span>
             )}
-
           </a>
         ))}
-
       </nav>
-
     </aside>
   );
 }
