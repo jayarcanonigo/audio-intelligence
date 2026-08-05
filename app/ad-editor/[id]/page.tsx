@@ -909,80 +909,73 @@ const handleCenterLastCompleted = () => {
     {/* Broadcast Filter */}
 
     {/* Mobile */}
-    <div className="block md:hidden">
-      <label className="block mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-        Broadcast Hour
-      </label>
+    {/* ================= BROADCAST HOUR ================= */}
+<div className="w-full md:w-auto">
 
-      <select
-        value={broadcastHour}
-        onChange={(e) => setBroadcastHour(e.target.value)}
-        className="
-          w-full
-          rounded-lg
-          border
-          border-gray-300
-          bg-white
-          px-3
-          py-2
-          text-sm
-          font-semibold
-          outline-none
-          focus:border-blue-500
-          focus:ring-2
-          focus:ring-blue-500
-        "
-      >
-        {hours.map((hour) => (
-          <option
-            key={hour}
-            value={String(hour)}
-          >
-            Hour {hour}
-          </option>
-        ))}
-      </select>
+  {/* Mobile */}
+  <div className="block md:hidden">
+    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+      Broadcast Hour
+    </label>
+
+    <select
+      value={broadcastHour}
+      onChange={(e) => setBroadcastHour(e.target.value)}
+      className="
+        w-full
+        rounded-xl
+        border
+        border-gray-300
+        bg-white
+        px-4
+        py-3
+        text-sm
+        font-medium
+        shadow-sm
+        focus:border-blue-500
+        focus:ring-2
+        focus:ring-blue-500
+      "
+    >
+      {hours.map((hour) => (
+        <option
+          key={hour}
+          value={String(hour)}
+        >
+          {String(hour).padStart(2, "0")}:00
+        </option>
+      ))}
+    </select>
+  </div>
+
+  {/* Desktop */}
+  <div className="hidden md:block">
+
+    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+      Broadcast Hour
     </div>
 
-    {/* Desktop */}
-    <div className="hidden md:flex items-center gap-3">
+    <div className="flex max-w-[700px] gap-2 overflow-x-auto rounded-xl border bg-gray-50 p-2">
 
-      <div className="flex items-center gap-2 rounded-xl border bg-gray-50 px-4 py-2">
-
-        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-          Broadcast Hour
-        </span>
-
-        <div className="flex items-center gap-2 flex-wrap">
-
-          {hours.map((hour) => (
-            <button
-              key={hour}
-              onClick={() => setBroadcastHour(String(hour))}
-              className={`
-                px-3
-                py-1
-                rounded-lg
-                text-sm
-                font-semibold
-                transition
-
-                ${
-                  broadcastHour === String(hour)
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }
-              `}
-            >
-              {hour}
-            </button>
-          ))}
-
-        </div>
-
-      </div>
+      {hours.map((hour) => (
+        <button
+          key={hour}
+          onClick={() => setBroadcastHour(String(hour))}
+          className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-all ${
+            broadcastHour === String(hour)
+              ? "bg-blue-600 text-white shadow"
+              : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+          }`}
+        >
+          {String(hour).padStart(2, "0")}:00
+        </button>
+      ))}
 
     </div>
+
+  </div>
+
+</div>
 
   </div>
 </div>
@@ -991,80 +984,96 @@ const handleCenterLastCompleted = () => {
       {isMobile ? (
         /* ===================== MOBILE: SLIDING LOGS / SEGMENTS PANELS ===================== */
         <div className="pb-40">
-          {/* Tab switcher drives which panel is in view */}
-          <div className="flex gap-2 mb-4">
-            <button
-              onClick={() => setMobileTab("logs")}
-              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                mobileTab === "logs" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              Live Logs
-            </button>
+            <div className="sticky top-0 z-30 bg-gray-100 pb-3">
+            <div className="flex gap-2">
 
-            <button
-              onClick={() => setMobileTab("segments")}
-              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                mobileTab === "segments" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              Segments {results.length > 0 && `(${results.length})`}
-            </button>
+              <button
+                onClick={() => setMobileTab("logs")}
+                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
+                  mobileTab === "logs"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-600 border"
+                }`}
+              >
+                Live Logs
+              </button>
+
+              <button
+                onClick={() => setMobileTab("segments")}
+                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
+                  mobileTab === "segments"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-600 border"
+                }`}
+              >
+                Segments ({results.length})
+              </button>
+
+            </div>
           </div>
 
           {/* Sliding viewport: two full-width panels side by side, translated as one unit */}
-          <div className="overflow-hidden">
-            <div
-              className={`flex w-[200%] transition-transform duration-300 ease-in-out ${
-                mobileTab === "segments" ? "-translate-x-1/2" : "translate-x-0"
-              }`}
-            >
-              {/* LOGS PANEL */}
-              <div className="w-1/2 pr-2">
-                <div className="bg-white rounded-xl shadow p-4">
-                  <h2 className="font-semibold mb-4">Live Logs</h2>
+         {/* ===================== MOBILE CONTENT ===================== */}
 
-                  <LiveLogs
-                    logs={logs}
-                    disabledLogs={disabledLogs}
-                    selectedP1Id={selectedP1Id}
-                    selectedP2Id={selectedP2Id}
-                    currentAudioTime={currentAudioTime}
-                    logRefs={logRefs}
-                    selectedLogId={selectedLogId}
-                    setSelectedLogId={setSelectedLogId}
-                    setPhrase1={setPhrase1}
-                    setPhrase2={setPhrase2}
-                    setSelectedP1Id={setSelectedP1Id}
-                    setSelectedP2Id={setSelectedP2Id}
-                    onPlay={handlePlaySegment}
-                    onAddSingle={handleAddSingle}
-                  />
-                </div>
-              </div>
+{mobileTab === "logs" ? (
 
-              {/* SEGMENTS PANEL */}
-              <div className="w-1/2 pl-2">
-                <div className="bg-white rounded-xl shadow p-4">
-                  <div className="flex justify-between mb-4">
-                    <h2 className="font-semibold">Selected Segments</h2>
-                    <span className="text-sm text-gray-500">{results.length} Selected</span>
-                  </div>
+      /* ===================== LOGS TAB ===================== */
+      <div className="bg-white rounded-xl shadow p-4">
 
-                  <SelectedSegments
-                    segments={results}
-                    selectedResultId={selectedResultId}
-                    setSelectedResultId={setSelectedResultId}
-                    onRemove={handleRemove}
-                    onPlay={handlePlaySegment}
-                    onUpdate={handleUpdateSegment}
-                    onDownload={handleDownloadAudio}
-                    onSave={handleSaveAllSegments}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+        <h2 className="mb-4 font-semibold">
+          Live Logs
+        </h2>
+
+        <LiveLogs
+          logs={logs}
+          disabledLogs={disabledLogs}
+          selectedP1Id={selectedP1Id}
+          selectedP2Id={selectedP2Id}
+          currentAudioTime={currentAudioTime}
+          logRefs={logRefs}
+          selectedLogId={selectedLogId}
+          setSelectedLogId={setSelectedLogId}
+          setPhrase1={setPhrase1}
+          setPhrase2={setPhrase2}
+          setSelectedP1Id={setSelectedP1Id}
+          setSelectedP2Id={setSelectedP2Id}
+          onPlay={handlePlaySegment}
+          onAddSingle={handleAddSingle}
+        />
+
+      </div>
+
+    ) : (
+
+      /* ===================== SEGMENTS TAB ===================== */
+      <div className="bg-white rounded-xl shadow p-4">
+
+        <div className="mb-4 flex items-center justify-between">
+
+          <h2 className="font-semibold">
+            Selected Segments
+          </h2>
+
+          <span className="text-sm text-gray-500">
+            {results.length} Selected
+          </span>
+
+        </div>
+
+        <SelectedSegments
+          segments={results}
+          selectedResultId={selectedResultId}
+          setSelectedResultId={setSelectedResultId}
+          onRemove={handleRemove}
+          onPlay={handlePlaySegment}
+          onUpdate={handleUpdateSegment}
+          onDownload={handleDownloadAudio}
+          onSave={handleSaveAllSegments}
+        />
+
+      </div>
+
+    )}
         </div>
       ) : (
         /* ===================== DESKTOP: UNCHANGED GRID ===================== */
@@ -1114,15 +1123,40 @@ const handleCenterLastCompleted = () => {
           </div>
         </div>
       )}
-
-{/* ===================== FOOTER TOOLBAR ===================== */}
 {/* ===================== FOOTER TOOLBAR ===================== */}
 <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white shadow-lg">
   <div className="px-3 py-2">
 
     {isMobile ? (
       <>
-        {/* ================= MOBILE ================= */}
+        {/* ================= MOBILE TABS ================= */}
+        <div className="mb-3 flex rounded-xl bg-gray-100 p-1">
+
+          <button
+            onClick={() => setMobileTab("logs")}
+            className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
+              mobileTab === "logs"
+                ? "bg-blue-600 text-white shadow"
+                : "text-gray-600"
+            }`}
+          >
+            📝 Logs
+          </button>
+
+          <button
+            onClick={() => setMobileTab("segments")}
+            className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
+              mobileTab === "segments"
+                ? "bg-blue-600 text-white shadow"
+                : "text-gray-600"
+            }`}
+          >
+            🎧 Segments ({results.length})
+          </button>
+
+        </div>
+
+        {/* ================= MOBILE ACTIONS ================= */}
         <div className="flex items-center justify-between">
 
           {/* Reprocess */}
@@ -1142,7 +1176,7 @@ const handleCenterLastCompleted = () => {
             🎯 Last
           </button>
 
-          {/* More */}
+          {/* More Menu */}
           <div className="relative">
 
             <button
@@ -1155,7 +1189,6 @@ const handleCenterLastCompleted = () => {
             {showMenu && (
               <div className="absolute bottom-11 right-0 w-56 overflow-hidden rounded-xl border bg-white shadow-xl">
 
-                {/* Add Segment */}
                 <button
                   onClick={() => {
                     handleAddRange();
@@ -1171,7 +1204,6 @@ const handleCenterLastCompleted = () => {
                   Add Segment
                 </button>
 
-                {/* Save */}
                 <button
                   onClick={() => {
                     handleSaveAllSegments();
@@ -1184,7 +1216,6 @@ const handleCenterLastCompleted = () => {
                   Save
                 </button>
 
-                {/* Download */}
                 <button
                   onClick={() => {
                     handleDownloadExcel();
@@ -1197,7 +1228,6 @@ const handleCenterLastCompleted = () => {
                   Download Excel
                 </button>
 
-                {/* Delete */}
                 <button
                   onClick={() => {
                     handleDeleteAllAdvertisements();
@@ -1212,7 +1242,6 @@ const handleCenterLastCompleted = () => {
 
                 <div className="border-t" />
 
-                {/* Clear */}
                 <button
                   onClick={() => {
                     setSearch("");
@@ -1240,7 +1269,6 @@ const handleCenterLastCompleted = () => {
         {/* ================= DESKTOP ================= */}
         <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
 
-          {/* Left */}
           <div className="flex items-center gap-1.5 flex-wrap">
 
             <button
@@ -1285,7 +1313,6 @@ const handleCenterLastCompleted = () => {
 
           <div className="hidden h-6 w-px bg-gray-300 lg:block" />
 
-          {/* Search */}
           <div className="relative flex-1 min-w-[220px]">
 
             <Search
@@ -1305,28 +1332,11 @@ const handleCenterLastCompleted = () => {
 
           <div className="hidden h-6 w-px bg-gray-300 lg:block" />
 
-          {/* Right */}
           <div className="flex items-center gap-2 flex-wrap">
-
-            <div className="flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1">
-              <span className="text-sm">🏷</span>
-
-              <div className="leading-none">
-                <div className="text-[9px] uppercase text-gray-500">
-                  Selected
-                </div>
-
-                <div className="text-[11px] font-bold text-blue-700">
-                  {results.length}
-                </div>
-              </div>
-            </div>
-
-            <div className="h-6 w-px bg-gray-300" />
 
             <button
               onClick={handleReprocessAds}
-              className="flex h-8 items-center gap-1 rounded-md bg-blue-600 px-3 text-[11px] font-semibold text-white hover:bg-blue-700"
+              className="flex h-8 items-center gap-1 rounded-md bg-blue-600 px-3 text-[11px] font-semibold text-white"
             >
               <RefreshCw size={13} />
               Reprocess
@@ -1335,11 +1345,7 @@ const handleCenterLastCompleted = () => {
             <button
               onClick={handleSaveAllSegments}
               disabled={results.length === 0}
-              className={`flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-semibold ${
-                results.length > 0
-                  ? "bg-green-600 text-white hover:bg-green-700"
-                  : "cursor-not-allowed bg-gray-300 text-gray-500"
-              }`}
+              className="flex h-8 items-center gap-1 rounded-md bg-green-600 px-3 text-[11px] font-semibold text-white disabled:bg-gray-300"
             >
               <Save size={13} />
               Save
@@ -1348,11 +1354,7 @@ const handleCenterLastCompleted = () => {
             <button
               onClick={handleDownloadExcel}
               disabled={results.length === 0}
-              className={`flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-semibold ${
-                results.length > 0
-                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                  : "cursor-not-allowed bg-gray-300 text-gray-500"
-              }`}
+              className="flex h-8 items-center gap-1 rounded-md bg-emerald-600 px-3 text-[11px] font-semibold text-white disabled:bg-gray-300"
             >
               <Download size={13} />
               Download
@@ -1361,11 +1363,7 @@ const handleCenterLastCompleted = () => {
             <button
               onClick={handleDeleteAllAdvertisements}
               disabled={results.length === 0}
-              className={`flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-semibold ${
-                results.length > 0
-                  ? "bg-red-600 text-white hover:bg-red-700"
-                  : "cursor-not-allowed bg-gray-300 text-gray-500"
-              }`}
+              className="flex h-8 items-center gap-1 rounded-md bg-red-600 px-3 text-[11px] font-semibold text-white disabled:bg-gray-300"
             >
               <Trash2 size={13} />
               Delete
