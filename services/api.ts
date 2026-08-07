@@ -312,15 +312,24 @@ export async function updateKeyword(
   data: {
     brand_id?: number;
     keyword?: string;
+    duration?: number | null;
   }
 ) {
-  const res = await fetch(`${API_URL}/keywords/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  const res = await fetch(
+    `${API_URL}/keywords/${id}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    }
+  );
 
-  if (!res.ok) throw new Error("Failed to update keyword");
+  if (!res.ok) {
+    throw new Error("Failed to update keyword");
+  }
+
   return res.json();
 }
 
