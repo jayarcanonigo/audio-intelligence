@@ -239,8 +239,8 @@ const handleReprocessAds = async () => {
     );
 
 
-    toast.success(
-      `🔄 ${result.updated} advertisements reprocessed`
+      toast.success(
+      `🔄 ${result.updated.advertisements} advertisements reprocessed`
     );
 
 
