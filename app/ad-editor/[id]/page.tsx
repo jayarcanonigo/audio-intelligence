@@ -614,6 +614,12 @@ function handleUpdateSegment(
 
   /* PLAY SEGMENT */
   const handlePlaySegment = async (row: any) => {
+
+    // set this segment as the latest selected/saved segment
+    setLastSavedId(row.id);
+
+    // highlight selected row
+    setSelectedResultId(row.id);
     const audio = audioRef.current;
     if (!audio) return;
 
