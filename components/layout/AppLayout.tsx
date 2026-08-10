@@ -1,7 +1,6 @@
 "use client";
 
-import Sidebar from "./Sidebar";
-import Header from "./Header";
+import Navbar from "./Navbar";
 import styles from "./AppLayout.module.css";
 
 type AppLayoutProps = {
@@ -13,15 +12,11 @@ export default function AppLayout({
 }: AppLayoutProps) {
   return (
     <div className={styles.layout}>
-      <Sidebar />
+      <Navbar />
 
-      <div className={styles.content}>
-        <Header />
-
-        <main className={styles.main}>
-          {children}
-        </main>
-      </div>
+      <main className={styles.main}>
+        {children}
+      </main>
     </div>
   );
 }

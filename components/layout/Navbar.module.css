@@ -1,0 +1,185 @@
+.navbar {
+  width: 100%;
+  background: #111827;
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbarInner {
+  width: 100%;
+  min-height: 64px;
+
+  display: flex;
+  align-items: center;
+
+  padding: 0 20px;
+}
+
+/* =========================
+   MENU BUTTON
+========================= */
+
+.menuButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 42px;
+  height: 42px;
+
+  margin-right: 14px;
+
+  border: none;
+  border-radius: 8px;
+
+  background: transparent;
+  color: white;
+
+  font-size: 26px;
+
+  cursor: pointer;
+}
+
+.menuButton:hover {
+  background: #1f2937;
+}
+
+/* =========================
+   LOGO
+========================= */
+
+.navbarLogo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  color: white;
+  text-decoration: none;
+
+  font-size: 18px;
+  font-weight: 700;
+
+  white-space: nowrap;
+}
+
+.navbarLogo span:first-child {
+  font-size: 24px;
+}
+
+/* =========================
+   DESKTOP MENU
+========================= */
+
+.desktopMenu {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  margin-left: 24px;
+}
+
+.menuLink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 10px 12px;
+
+  border-radius: 8px;
+
+  color: #e5e7eb;
+  text-decoration: none;
+
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.menuLink:hover {
+  background: #1f2937;
+  color: white;
+}
+
+/* =========================
+   ADMIN
+========================= */
+
+.desktopAdmin {
+  margin-left: auto;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 14px;
+}
+
+/* =========================
+   DROPDOWN PANEL
+========================= */
+
+.menuPanel {
+  position: absolute;
+
+  top: 64px;
+  left: 20px;
+
+  width: 240px;
+
+  padding: 8px;
+
+  background: #111827;
+
+  border: 1px solid #374151;
+  border-radius: 10px;
+
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.menuPanelLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 12px 14px;
+
+  border-radius: 8px;
+
+  color: #e5e7eb;
+  text-decoration: none;
+
+  font-size: 15px;
+}
+
+.menuPanelLink:hover {
+  background: #1f2937;
+  color: white;
+}
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 767px) {
+
+  .navbarInner {
+    padding: 0 12px;
+  }
+
+  .navbarLogo {
+    font-size: 17px;
+  }
+
+  .desktopMenu,
+  .desktopAdmin {
+    display: none;
+  }
+
+  .menuPanel {
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}
