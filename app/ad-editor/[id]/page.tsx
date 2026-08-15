@@ -224,6 +224,17 @@ export default function AdEditorPage() {
 
 }, [projectId]);
 
+const transcriptSegments = useMemo(() => {
+  return logs.map((log: any) => ({
+    id: log.id,
+    start: log.start_time || log.start || "00:00:00",
+    end: log.end_time || log.end || "00:00:00",
+    text: log.text || log.message || "",
+    segment_type: log.segment_type,
+    brand_name: log.brand_name || "",
+  }));
+}, [logs]);
+
 const handleReprocessAds = async () => {
   try {
 
@@ -1066,16 +1077,17 @@ const handleCenterLastCompleted = () => {
 
         </div>
 
-        <SelectedSegments
-          segments={results}
-          selectedResultId={selectedResultId}
-          setSelectedResultId={setSelectedResultId}
-          onRemove={handleRemove}
-          onPlay={handlePlaySegment}
-          onUpdate={handleUpdateSegment}
-          onDownload={handleDownloadAudio}
-          onSave={handleSaveAllSegments}
-        />
+      <SelectedSegments
+      segments={results}
+      transcriptSegments={transcriptSegments}
+      selectedResultId={selectedResultId}
+      setSelectedResultId={setSelectedResultId}
+      onRemove={handleRemove}
+      onPlay={handlePlaySegment}
+      onUpdate={handleUpdateSegment}
+      onDownload={handleDownloadAudio}
+      onSave={handleSaveAllSegments}
+    />
 
       </div>
 
@@ -1115,16 +1127,17 @@ const handleCenterLastCompleted = () => {
                 <span className="text-sm text-gray-500">{results.length} Selected</span>
               </div>
 
-              <SelectedSegments
-                segments={results}
-                selectedResultId={selectedResultId}
-                setSelectedResultId={setSelectedResultId}
-                onRemove={handleRemove}
-                onPlay={handlePlaySegment}
-                onUpdate={handleUpdateSegment}
-                onDownload={handleDownloadAudio}
-                onSave={handleSaveAllSegments}
-              />
+           <SelectedSegments
+            segments={results}
+            transcriptSegments={transcriptSegments}
+            selectedResultId={selectedResultId}
+            setSelectedResultId={setSelectedResultId}
+            onRemove={handleRemove}
+            onPlay={handlePlaySegment}
+            onUpdate={handleUpdateSegment}
+            onDownload={handleDownloadAudio}
+            onSave={handleSaveAllSegments}
+/>
             </div>
           </div>
         </div>
