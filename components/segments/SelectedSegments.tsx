@@ -96,7 +96,9 @@ export default function SelectedSegments({
 
     if (
       parts.length === 3 &&
-      parts.every((value) => !Number.isNaN(value))
+      parts.every(
+        (value) => !Number.isNaN(value)
+      )
     ) {
       const [hour, minute, second] = parts;
 
@@ -109,7 +111,9 @@ export default function SelectedSegments({
 
     if (
       parts.length === 2 &&
-      parts.every((value) => !Number.isNaN(value))
+      parts.every(
+        (value) => !Number.isNaN(value)
+      )
     ) {
       const [minute, second] = parts;
 
@@ -126,7 +130,9 @@ export default function SelectedSegments({
     return 0;
   }
 
-  function secondsToTime(totalSeconds: number): string {
+  function secondsToTime(
+    totalSeconds: number
+  ): string {
     totalSeconds = Math.max(
       0,
       Math.floor(totalSeconds)
@@ -164,8 +170,73 @@ export default function SelectedSegments({
       0,
       Math.round(
         toSeconds(end) -
-        toSeconds(start)
+          toSeconds(start)
       )
+    );
+  }
+
+  /*
+   * =====================================================
+   * OVERLAP DETECTION
+   * =====================================================
+   *
+   * Two ranges overlap when:
+   *
+   * A.start < B.end
+   * AND
+   * A.end > B.start
+   *
+   * Example:
+   *
+   * A = 10:00 -> 10:30
+   * B = 10:20 -> 10:50
+   *
+   * TRUE
+   *
+   * A = 10:00 -> 10:20
+   * B = 10:20 -> 10:50
+   *
+   * FALSE
+   */
+
+  function isRangeOverlapping(
+    startA?: string,
+    endA?: string,
+    startB?: string,
+    endB?: string
+  ): boolean {
+    if (
+      !startA ||
+      !endA ||
+      !startB ||
+      !endB
+    ) {
+      return false;
+    }
+
+    const aStart =
+      toSeconds(startA);
+
+    const aEnd =
+      toSeconds(endA);
+
+    const bStart =
+      toSeconds(startB);
+
+    const bEnd =
+      toSeconds(endB);
+
+    if (aEnd <= aStart) {
+      return false;
+    }
+
+    if (bEnd <= bStart) {
+      return false;
+    }
+
+    return (
+      aStart < bEnd &&
+      aEnd > bStart
     );
   }
 
@@ -258,17 +329,6 @@ export default function SelectedSegments({
   /*
    * =====================================================
    * GET TRANSCRIPT FOR TIME RANGE
-   *
-   * Example:
-   *
-   * Start = 00:10:00
-   * Duration = 30
-   *
-   * End = 00:10:30
-   *
-   * Get all transcript segments that overlap
-   * 00:10:00 -> 00:10:30
-   * and combine their text.
    * =====================================================
    */
 
@@ -326,9 +386,6 @@ export default function SelectedSegments({
               segment.end
             );
 
-          /*
-           * Segment overlaps selected range.
-           */
           return (
             segmentStart <
               endSeconds &&
@@ -353,9 +410,7 @@ export default function SelectedSegments({
           (segment) =>
             segment.text?.trim()
         )
-        .filter(
-          Boolean
-        )
+        .filter(Boolean)
         .join(" ");
 
     return (
@@ -384,15 +439,9 @@ export default function SelectedSegments({
     const newEnd =
       secondsToTime(
         startSeconds +
-        duration
+          duration
       );
 
-    /*
-     * THIS IS THE IMPORTANT PART:
-     *
-     * Rebuild transcript using
-     * Start + selected Duration.
-     */
     const newText =
       getTranscriptForRange(
         start,
@@ -412,8 +461,25 @@ export default function SelectedSegments({
     );
 
     /*
-     * Update UI immediately.
+     * Update custom duration.
      */
+
+    setCustomDurations(
+      (prev) => ({
+        ...prev,
+        [row.id]:
+          duration,
+      })
+    );
+
+    /*
+     * Update UI immediately.
+     *
+     * The overlap detection below
+     * automatically recalculates because
+     * segmentList changes.
+     */
+
     setSegmentList((prev) =>
       prev.map((item) =>
         item.id === row.id
@@ -431,6 +497,7 @@ export default function SelectedSegments({
     /*
      * Update parent/database.
      */
+
     onUpdate?.(
       row.id,
       {
@@ -462,12 +529,12 @@ export default function SelectedSegments({
 
     setEditStart(
       row.start ||
-      "00:00:00"
+        "00:00:00"
     );
 
     setEditEnd(
       row.end ||
-      "00:00:00"
+        "00:00:00"
     );
 
     setEditBrand(
@@ -491,7 +558,7 @@ export default function SelectedSegments({
     const newEnd =
       secondsToTime(
         toSeconds(start) +
-        duration
+          duration
       );
 
     const newText =
@@ -533,7 +600,7 @@ export default function SelectedSegments({
     const newEnd =
       secondsToTime(
         toSeconds(value) +
-        duration
+          duration
       );
 
     const newText =
@@ -574,6 +641,10 @@ export default function SelectedSegments({
       status:
         "completed" as const,
     };
+
+    /*
+     * Update local UI.
+     */
 
     setSegmentList((prev) =>
       prev
@@ -732,6 +803,67 @@ export default function SelectedSegments({
 
   /*
    * =====================================================
+   * FIND OVERLAPPING SEGMENTS
+   * =====================================================
+   *
+   * IMPORTANT:
+   *
+   * We calculate this directly from
+   * the current segmentList.
+   *
+   * Therefore changing the duration
+   * immediately changes the highlighting.
+   */
+
+  const overlappingIds =
+    new Set<number>();
+
+  for (
+    let i = 0;
+    i < sortedSegments.length;
+    i++
+  ) {
+    for (
+      let j = i + 1;
+      j < sortedSegments.length;
+      j++
+    ) {
+      const first =
+        sortedSegments[i];
+
+      const second =
+        sortedSegments[j];
+
+      if (
+        isRangeOverlapping(
+          first.start,
+          first.end,
+          second.start,
+          second.end
+        )
+      ) {
+        overlappingIds.add(
+          first.id
+        );
+
+        overlappingIds.add(
+          second.id
+        );
+      }
+    }
+  }
+
+  /*
+   * =====================================================
+   * TOTAL OVERLAPS
+   * =====================================================
+   */
+
+  const hasOverlaps =
+    overlappingIds.size > 0;
+
+  /*
+   * =====================================================
    * UI
    * =====================================================
    */
@@ -741,7 +873,7 @@ export default function SelectedSegments({
 
       {/* HEADER */}
 
-      <div className="flex items-center justify-between rounded-xl border bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4 shadow-sm">
 
         <div>
           <h2 className="text-lg font-bold">
@@ -753,13 +885,31 @@ export default function SelectedSegments({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={saveAll}
-          className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700"
-        >
-          Save All
-        </button>
+        <div className="flex items-center gap-3">
+
+          {/* OVERLAP WARNING */}
+
+          {hasOverlaps && (
+            <div className="rounded-lg border border-red-300 bg-red-100 px-4 py-2 text-sm font-bold text-red-700">
+              ⚠ {overlappingIds.size}{" "}
+              advertisement
+              {overlappingIds.size !==
+              1
+                ? "s"
+                : ""}{" "}
+              overlapping
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={saveAll}
+            className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            Save All
+          </button>
+
+        </div>
 
       </div>
 
@@ -771,6 +921,19 @@ export default function SelectedSegments({
           const selected =
             selectedResultId ===
             row.id;
+
+          /*
+           * IMPORTANT:
+           *
+           * This is true when this
+           * advertisement overlaps
+           * another advertisement.
+           */
+
+          const overlapping =
+            overlappingIds.has(
+              row.id
+            );
 
           const duration =
             getDuration(
@@ -820,12 +983,61 @@ export default function SelectedSegments({
                   row.id
                 );
               }}
-              className={`relative overflow-visible rounded-2xl border bg-white p-5 shadow-sm ${
-                selected
-                  ? "ring-2 ring-blue-300 bg-blue-50"
-                  : ""
-              }`}
+              className={`
+                relative
+                overflow-visible
+                rounded-2xl
+                border
+                p-5
+                shadow-sm
+                transition-all
+                duration-200
+
+                ${
+                  overlapping
+                    ? `
+                      border-red-500
+                      bg-red-50
+                      ring-2
+                      ring-red-300
+                      shadow-md
+                    `
+                    : selected
+                      ? `
+                        border-blue-200
+                        bg-blue-50
+                        ring-2
+                        ring-blue-300
+                      `
+                      : `
+                        border-gray-200
+                        bg-white
+                      `
+                }
+              `}
             >
+
+              {/* OVERLAP WARNING */}
+
+              {overlapping && (
+                <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-300 bg-red-100 px-4 py-3 text-sm font-semibold text-red-700">
+                  <span className="text-lg">
+                    ⚠
+                  </span>
+
+                  <div>
+                    <div className="font-bold">
+                      OVERLAPPING ADVERTISEMENT
+                    </div>
+
+                    <div className="text-xs font-normal text-red-600">
+                      This advertisement overlaps
+                      with another selected
+                      advertisement.
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* TOP */}
 
@@ -835,7 +1047,24 @@ export default function SelectedSegments({
 
                   {/* NUMBER */}
 
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 font-bold">
+                  <div
+                    className={`
+                      flex
+                      h-10
+                      w-10
+                      shrink-0
+                      items-center
+                      justify-center
+                      rounded-full
+                      font-bold
+
+                      ${
+                        overlapping
+                          ? "bg-red-600 text-white"
+                          : "bg-gray-100"
+                      }
+                    `}
+                  >
                     {index + 1}
                   </div>
 
@@ -859,19 +1088,29 @@ export default function SelectedSegments({
 
                       {/* STATUS */}
 
-                      <span
-                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-                          row.status ===
+                      <div className="flex items-center gap-2">
+
+                        {overlapping && (
+                          <span className="shrink-0 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
+                            ⚠ OVERLAPPING
+                          </span>
+                        )}
+
+                        <span
+                          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                            row.status ===
+                            "completed"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }`}
+                        >
+                          {row.status ===
                           "completed"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}
-                      >
-                        {row.status ===
-                        "completed"
-                          ? "🟢 Completed"
-                          : "● Pending"}
-                      </span>
+                            ? "🟢 Completed"
+                            : "● Pending"}
+                        </span>
+
+                      </div>
 
                     </div>
 
@@ -928,7 +1167,22 @@ export default function SelectedSegments({
 
                     ) : (
 
-                      <div className="min-h-11 w-full rounded-xl border border-yellow-300 bg-yellow-50 px-4 py-2">
+                      <div
+                        className={`
+                          min-h-11
+                          w-full
+                          rounded-xl
+                          border
+                          px-4
+                          py-2
+
+                          ${
+                            overlapping
+                              ? "border-red-300 bg-red-100"
+                              : "border-yellow-300 bg-yellow-50"
+                          }
+                        `}
+                      >
 
                         <div className="flex items-start gap-2">
 
@@ -1022,7 +1276,16 @@ export default function SelectedSegments({
                   Transcript
                 </label>
 
-                <div className="rounded-xl bg-gray-50 p-4">
+                <div
+                  className={`
+                    rounded-xl p-4
+                    ${
+                      overlapping
+                        ? "bg-white border border-red-200"
+                        : "bg-gray-50"
+                    }
+                  `}
+                >
 
                   {editingId ===
                   row.id ? (
@@ -1057,10 +1320,33 @@ export default function SelectedSegments({
 
               {/* TIME */}
 
-              <div className="mt-5 rounded-xl border bg-gray-50 p-4">
+              <div
+                className={`
+                  mt-5
+                  rounded-xl
+                  border
+                  p-4
 
-                <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  ⏱ Time
+                  ${
+                    overlapping
+                      ? "border-red-300 bg-red-100"
+                      : "border-gray-200 bg-gray-50"
+                  }
+                `}
+              >
+
+                <div className="mb-3 flex items-center justify-between">
+
+                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    ⏱ Time
+                  </div>
+
+                  {overlapping && (
+                    <div className="text-xs font-bold text-red-600">
+                      ⚠ TIME RANGE CONFLICT
+                    </div>
+                  )}
+
                 </div>
 
                 {editingId ===
@@ -1113,7 +1399,20 @@ export default function SelectedSegments({
                         onClick={(e) =>
                           e.stopPropagation()
                         }
-                        className="h-9 min-w-32 rounded-lg border bg-white px-3 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                        className={`
+                          h-9
+                          min-w-32
+                          rounded-lg
+                          border
+                          bg-white
+                          px-3
+                          text-sm
+                          font-semibold
+                          outline-none
+                          focus:border-blue-400
+                          focus:ring-2
+                          focus:ring-blue-100
+                        `}
                       >
 
                         {getDurationOptions(
@@ -1177,7 +1476,20 @@ export default function SelectedSegments({
                         Start
                       </span>
 
-                      <span className="rounded-lg border bg-white px-3 py-2 font-semibold">
+                      <span
+                        className={`
+                          rounded-lg
+                          border
+                          px-3
+                          py-2
+                          font-semibold
+                          ${
+                            overlapping
+                              ? "border-red-300 bg-white text-red-700"
+                              : "bg-white"
+                          }
+                        `}
+                      >
                         {row.start ||
                           "00:00:00"}
                       </span>
@@ -1211,7 +1523,26 @@ export default function SelectedSegments({
                         onClick={(e) =>
                           e.stopPropagation()
                         }
-                        className="h-10 min-w-32 rounded-lg border bg-white px-3 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                        className={`
+                          h-10
+                          min-w-32
+                          rounded-lg
+                          border
+                          bg-white
+                          px-3
+                          text-sm
+                          font-semibold
+                          outline-none
+                          focus:border-blue-400
+                          focus:ring-2
+                          focus:ring-blue-100
+
+                          ${
+                            overlapping
+                              ? "border-red-400 text-red-700"
+                              : ""
+                          }
+                        `}
                       >
 
                         {getDurationOptions(
@@ -1250,7 +1581,21 @@ export default function SelectedSegments({
                         End
                       </span>
 
-                      <span className="rounded-lg border bg-white px-3 py-2 font-semibold">
+                      <span
+                        className={`
+                          rounded-lg
+                          border
+                          px-3
+                          py-2
+                          font-semibold
+
+                          ${
+                            overlapping
+                              ? "border-red-300 bg-white text-red-700"
+                              : "bg-white"
+                          }
+                        `}
+                      >
                         {row.end ||
                           "00:00:00"}
                       </span>
@@ -1267,6 +1612,7 @@ export default function SelectedSegments({
           );
         }
       )}
+
     </div>
   );
 }

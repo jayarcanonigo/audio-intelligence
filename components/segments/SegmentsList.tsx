@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  getAdvertisements,
-  getLogs,
-  updateAdvertisement,
-  deleteAdvertisement,
-} from "@/services/api";
+import BrandCombobox from "@/components/BrandCombobox";
 
 interface Segment {
   id: number;
@@ -15,54 +10,82 @@ interface Segment {
   text: string;
   segment_type?: string;
   brand_name?: string;
-}
-
-interface TranscriptSegment {
-  id?: number;
-  start?: string;
-  end?: string;
-  text: string;
-  segment_type?: string;
+  status?: "pending" | "completed";
 }
 
 interface Props {
-  projectId: number;
-  refresh: number;
+  segments: Segment[];
+
+  // IMPORTANT:
+  // This must contain the ORIGINAL/full transcript segments.
+  transcriptSegments?: Segment[];
+
+  selectedResultId: number | null;
+  setSelectedResultId: (id: number | null) => void;
+
+  onPlay: (row: Segment) => void;
+
+  onUpdate?: (
+    id: number,
+    data: {
+      text: string;
+      start: string;
+      end: string;
+      brand_name: string;
+      status: "pending" | "completed";
+    }
+  ) => void;
+
+  onRemove?: (id: number) => void;
+
+  onSave?: (segments: Segment[]) => void;
+
+  onDownload?: (segment: Segment) => void;
 }
 
 const DURATION_OPTIONS = [5, 10, 20, 30, 45];
 
-export default function SegmentsList({
-  projectId,
-  refresh,
+export default function SelectedSegments({
+  segments,
+  transcriptSegments = [],
+  selectedResultId,
+  setSelectedResultId,
+  onPlay,
+  onUpdate,
+  onRemove,
+  onSave,
 }: Props) {
-  const [segments, setSegments] = useState<Segment[]>([]);
-
-  // Full transcript from getLogs()
-  const [transcriptSegments, setTranscriptSegments] =
-    useState<TranscriptSegment[]>([]);
+  const [segmentList, setSegmentList] =
+    useState<Segment[]>(segments);
 
   const [editingId, setEditingId] =
     useState<number | null>(null);
 
-  const [editStart, setEditStart] = useState("");
-  const [editEnd, setEditEnd] = useState("");
-  const [editText, setEditText] = useState("");
-
-  const [editDuration, setEditDuration] =
-    useState<number>(30);
-
-  const [loading, setLoading] = useState(false);
-  const [savingId, setSavingId] =
+  const [brandOpenId, setBrandOpenId] =
     useState<number | null>(null);
 
+  const [editText, setEditText] =
+    useState("");
+
+  const [editStart, setEditStart] =
+    useState("");
+
+  const [editEnd, setEditEnd] =
+    useState("");
+
+  const [editBrand, setEditBrand] =
+    useState("");
+
+  const [customDurations, setCustomDurations] =
+    useState<Record<number, number>>({});
+
   /*
-   * ==========================================
+   * =====================================================
    * TIME HELPERS
-   * ==========================================
+   * =====================================================
    */
 
-  function timeToSeconds(time?: string): number {
+  function toSeconds(time?: string): number {
     if (!time) return 0;
 
     const value = String(time).trim();
@@ -71,53 +94,71 @@ export default function SegmentsList({
 
     const parts = value.split(":").map(Number);
 
-    if (parts.some((part) => Number.isNaN(part))) {
-      return 0;
-    }
-
-    if (parts.length === 3) {
-      const [hours, minutes, seconds] = parts;
+    if (
+      parts.length === 3 &&
+      parts.every(
+        (value) => !Number.isNaN(value)
+      )
+    ) {
+      const [hour, minute, second] = parts;
 
       return (
-        hours * 3600 +
-        minutes * 60 +
-        seconds
+        hour * 3600 +
+        minute * 60 +
+        second
       );
     }
 
-    if (parts.length === 2) {
-      const [minutes, seconds] = parts;
+    if (
+      parts.length === 2 &&
+      parts.every(
+        (value) => !Number.isNaN(value)
+      )
+    ) {
+      const [minute, second] = parts;
 
-      return minutes * 60 + seconds;
+      return minute * 60 + second;
     }
 
-    if (parts.length === 1) {
+    if (
+      parts.length === 1 &&
+      !Number.isNaN(parts[0])
+    ) {
       return parts[0];
     }
 
     return 0;
   }
 
-  function secondsToTime(totalSeconds: number): string {
-    const seconds = Math.max(
+  function secondsToTime(
+    totalSeconds: number
+  ): string {
+    totalSeconds = Math.max(
       0,
       Math.floor(totalSeconds)
     );
 
-    const hours = Math.floor(seconds / 3600);
-
-    const minutes = Math.floor(
-      (seconds % 3600) / 60
+    const hours = Math.floor(
+      totalSeconds / 3600
     );
 
-    const remainingSeconds = seconds % 60;
+    const minutes = Math.floor(
+      (totalSeconds % 3600) / 60
+    );
+
+    const seconds =
+      totalSeconds % 60;
 
     return (
-      String(hours).padStart(2, "0") +
-      ":" +
-      String(minutes).padStart(2, "0") +
-      ":" +
-      String(remainingSeconds).padStart(2, "0")
+      `${hours
+        .toString()
+        .padStart(2, "0")}:` +
+      `${minutes
+        .toString()
+        .padStart(2, "0")}:` +
+      `${seconds
+        .toString()
+        .padStart(2, "0")}`
     );
   }
 
@@ -125,150 +166,229 @@ export default function SegmentsList({
     start?: string,
     end?: string
   ): number {
-    const startSeconds = timeToSeconds(start);
-    const endSeconds = timeToSeconds(end);
-
     return Math.max(
       0,
-      Math.round(endSeconds - startSeconds)
+      Math.round(
+        toSeconds(end) -
+          toSeconds(start)
+      )
     );
   }
 
   /*
-   * ==========================================
-   * LOAD DATA
-   * ==========================================
+   * =====================================================
+   * OVERLAP CHECK
+   * =====================================================
    */
 
-  async function loadSegments() {
-    try {
-      setLoading(true);
-
-      /*
-       * Load advertisements.
-       */
-      const advertisements =
-        await getAdvertisements(projectId);
-
-      console.log(
-        "ADVERTISEMENT DATA",
-        advertisements
-      );
-
-      setSegments(advertisements || []);
-
-      /*
-       * Load complete transcript.
-       *
-       * This is what allows us to reconstruct
-       * the text when Duration changes.
-       */
-      const logs = await getLogs(projectId);
-
-      console.log(
-        "TRANSCRIPT LOGS",
-        logs
-      );
-
-      /*
-       * getLogs() normally returns an array.
-       *
-       * Some APIs may return:
-       *
-       * { segments: [...] }
-       *
-       * so support both.
-       */
-      let transcript: any[] = [];
-
-      if (Array.isArray(logs)) {
-        transcript = logs;
-      } else if (
-        logs &&
-        Array.isArray(logs.segments)
-      ) {
-        transcript = logs.segments;
-      } else if (
-        logs &&
-        Array.isArray(logs.logs)
-      ) {
-        transcript = logs.logs;
-      }
-
-      setTranscriptSegments(
-        transcript.map((item) => ({
-          id: item.id,
-          start:
-            item.start ??
-            item.start_time ??
-            item.startTime,
-          end:
-            item.end ??
-            item.end_time ??
-            item.endTime,
-          text: item.text ?? "",
-          segment_type:
-            item.segment_type,
-        }))
-      );
-
-      console.log(
-        "NORMALIZED TRANSCRIPT",
-        transcript
-      );
-    } catch (error) {
-      console.error(
-        "Failed loading segments:",
-        error
-      );
-    } finally {
-      setLoading(false);
+  function isRangeOverlapping(
+    startA?: string,
+    endA?: string,
+    startB?: string,
+    endB?: string
+  ): boolean {
+    if (
+      !startA ||
+      !endA ||
+      !startB ||
+      !endB
+    ) {
+      return false;
     }
+
+    const aStart =
+      toSeconds(startA);
+
+    const aEnd =
+      toSeconds(endA);
+
+    const bStart =
+      toSeconds(startB);
+
+    const bEnd =
+      toSeconds(endB);
+
+    /*
+     * Invalid ranges are ignored.
+     */
+
+    if (aEnd <= aStart) {
+      return false;
+    }
+
+    if (bEnd <= bStart) {
+      return false;
+    }
+
+    /*
+     * Overlap formula:
+     *
+     * A.start < B.end
+     * AND
+     * A.end > B.start
+     */
+
+    return (
+      aStart < bEnd &&
+      aEnd > bStart
+    );
   }
 
-  useEffect(() => {
-    loadSegments();
-  }, [projectId, refresh]);
-
   /*
-   * ==========================================
-   * FIND TRANSCRIPT FOR TIME RANGE
-   * ==========================================
+   * =====================================================
+   * FIND OVERLAPPING IDS
+   * =====================================================
    */
 
-  function getTranscriptForDuration(
+  function getOverlappingIds(
+    list: Segment[]
+  ): Set<number> {
+    const ids = new Set<number>();
+
+    for (
+      let i = 0;
+      i < list.length;
+      i++
+    ) {
+      for (
+        let j = i + 1;
+        j < list.length;
+        j++
+      ) {
+        const first = list[i];
+        const second = list[j];
+
+        if (
+          isRangeOverlapping(
+            first.start,
+            first.end,
+            second.start,
+            second.end
+          )
+        ) {
+          ids.add(first.id);
+          ids.add(second.id);
+        }
+      }
+    }
+
+    return ids;
+  }
+
+  /*
+   * =====================================================
+   * SYNC PARENT SEGMENTS
+   * =====================================================
+   */
+
+  useEffect(() => {
+    setSegmentList((prev) =>
+      segments.map((incoming) => {
+        const local = prev.find(
+          (item) =>
+            item.id === incoming.id
+        );
+
+        return {
+          ...incoming,
+          status:
+            incoming.status ??
+            local?.status ??
+            "completed",
+        };
+      })
+    );
+
+    setCustomDurations((prev) => {
+      const next = { ...prev };
+
+      let changed = false;
+
+      segments.forEach((seg) => {
+        if (
+          next[seg.id] === undefined
+        ) {
+          const duration =
+            getDuration(
+              seg.start,
+              seg.end
+            );
+
+          if (
+            duration > 0 &&
+            !DURATION_OPTIONS.includes(
+              duration
+            )
+          ) {
+            next[seg.id] =
+              duration;
+
+            changed = true;
+          }
+        }
+      });
+
+      return changed
+        ? next
+        : prev;
+    });
+  }, [segments]);
+
+  /*
+   * =====================================================
+   * DURATION OPTIONS
+   * =====================================================
+   */
+
+  function getDurationOptions(
+    rowId: number
+  ): number[] {
+    const custom =
+      customDurations[rowId];
+
+    if (
+      custom === undefined ||
+      DURATION_OPTIONS.includes(custom)
+    ) {
+      return DURATION_OPTIONS;
+    }
+
+    return [
+      ...DURATION_OPTIONS,
+      custom,
+    ].sort(
+      (a, b) => a - b
+    );
+  }
+
+  /*
+   * =====================================================
+   * GET TRANSCRIPT FOR RANGE
+   * =====================================================
+   */
+
+  function getTranscriptForRange(
     start: string,
     duration: number,
-    fallbackText = ""
+    fallbackText: string
   ): string {
+    if (
+      !transcriptSegments ||
+      transcriptSegments.length === 0
+    ) {
+      console.warn(
+        "No transcriptSegments supplied. Keeping existing text."
+      );
+
+      return fallbackText;
+    }
+
     const startSeconds =
-      timeToSeconds(start);
+      toSeconds(start);
 
     const endSeconds =
       startSeconds + duration;
 
-    console.log(
-      "COPY TRANSCRIPT RANGE:",
-      {
-        start,
-        duration,
-        startSeconds,
-        endSeconds,
-      }
-    );
-
-    /*
-     * Find every transcript segment that
-     * overlaps the requested time range.
-     *
-     * Example:
-     *
-     * Advertisement:
-     * 00:01:20 -> 00:01:50
-     *
-     * We collect transcript segments that
-     * overlap that range.
-     */
     const matchingSegments =
       transcriptSegments
         .filter((segment) => {
@@ -280,654 +400,1176 @@ export default function SegmentsList({
           }
 
           const segmentStart =
-            timeToSeconds(
+            toSeconds(
               segment.start
             );
 
           const segmentEnd =
-            timeToSeconds(
+            toSeconds(
               segment.end
             );
 
-          /*
-           * Overlap condition:
-           *
-           * segment starts before requested end
-           * AND
-           * segment ends after requested start
-           */
           return (
-            segmentStart < endSeconds &&
-            segmentEnd > startSeconds
+            segmentStart <
+              endSeconds &&
+            segmentEnd >
+              startSeconds
           );
         })
         .sort(
           (a, b) =>
-            timeToSeconds(a.start) -
-            timeToSeconds(b.start)
+            toSeconds(a.start) -
+            toSeconds(b.start)
         );
 
-    console.log(
-      "MATCHING TRANSCRIPT:",
+    const text =
       matchingSegments
-    );
-
-    /*
-     * If we found transcript segments,
-     * combine their text.
-     */
-    if (matchingSegments.length > 0) {
-      return matchingSegments
-        .map((segment) =>
-          segment.text?.trim()
+        .map(
+          (segment) =>
+            segment.text?.trim()
         )
         .filter(Boolean)
         .join(" ");
-    }
 
-    /*
-     * If no transcript was found, keep
-     * the existing text instead of making
-     * the text blank.
-     */
-    return fallbackText;
+    return (
+      text ||
+      fallbackText
+    );
   }
 
   /*
-   * ==========================================
-   * DURATION CHANGE - NORMAL ROW
-   * ==========================================
+   * =====================================================
+   * CHANGE NORMAL DURATION
+   * =====================================================
+   *
+   * THIS IS THE IMPORTANT PART.
+   *
+   * The selected duration immediately changes
+   * the local segmentList.
+   *
+   * Then overlap detection uses the updated
+   * segmentList on the next render.
    */
 
   function changeDuration(
     row: Segment,
     duration: number
   ) {
-    if (!row.start) {
-      console.warn(
-        "Cannot change duration: missing start time"
-      );
+    const start =
+      row.start ||
+      "00:00:00";
 
-      return;
-    }
-
-    /*
-     * Calculate new end.
-     */
     const startSeconds =
-      timeToSeconds(row.start);
-
-    const endSeconds =
-      startSeconds + duration;
+      toSeconds(start);
 
     const newEnd =
-      secondsToTime(endSeconds);
+      secondsToTime(
+        startSeconds +
+          duration
+      );
 
-    /*
-     * Get transcript for the new
-     * duration.
-     */
     const newText =
-      getTranscriptForDuration(
-        row.start,
+      getTranscriptForRange(
+        start,
         duration,
         row.text
       );
 
     console.log(
-      "DURATION CHANGED:",
+      "DURATION CHANGED",
       {
         id: row.id,
+        start,
         duration,
-        start: row.start,
-        end: newEnd,
-        text: newText,
+        newEnd,
+        newText,
       }
     );
 
     /*
-     * Update UI immediately.
+     * Save custom duration.
      */
-    setSegments((prev) =>
+
+    setCustomDurations(
+      (prev) => ({
+        ...prev,
+        [row.id]:
+          duration,
+      })
+    );
+
+    /*
+     * Update local segment immediately.
+     */
+
+    setSegmentList((prev) =>
       prev.map((item) =>
         item.id === row.id
           ? {
               ...item,
+              start,
               end: newEnd,
               text: newText,
+              status:
+                "completed",
             }
           : item
       )
     );
+
+    /*
+     * Update parent/database.
+     */
+
+    onUpdate?.(
+      row.id,
+      {
+        text: newText,
+        start,
+        end: newEnd,
+        brand_name:
+          row.brand_name || "",
+        status:
+          "completed",
+      }
+    );
   }
 
   /*
-   * ==========================================
+   * =====================================================
    * EDIT
-   * ==========================================
+   * =====================================================
    */
 
-  function editSegment(row: Segment) {
-    console.log(
-      "EDIT CLICK",
-      row
-    );
-
-    const duration =
-      getDuration(
-        row.start,
-        row.end
-      );
-
+  function edit(row: Segment) {
     setEditingId(row.id);
 
+    setBrandOpenId(null);
+
+    setEditText(
+      row.text || ""
+    );
+
     setEditStart(
-      row.start ?? ""
+      row.start ||
+        "00:00:00"
     );
 
     setEditEnd(
-      row.end ?? ""
+      row.end ||
+        "00:00:00"
     );
 
-    setEditText(
-      row.text ?? ""
+    setEditBrand(
+      row.brand_name || ""
     );
-
-    /*
-     * If the existing duration is one
-     * of the dropdown options, select it.
-     *
-     * Otherwise use the closest option.
-     */
-    if (
-      DURATION_OPTIONS.includes(
-        duration
-      )
-    ) {
-      setEditDuration(duration);
-    } else if (duration > 0) {
-      setEditDuration(duration);
-    } else {
-      setEditDuration(30);
-    }
   }
 
   /*
-   * ==========================================
-   * EDIT DURATION
-   * ==========================================
+   * =====================================================
+   * CHANGE EDIT DURATION
+   * =====================================================
    */
 
   function changeEditDuration(
     duration: number
   ) {
-    if (!editStart) {
-      return;
-    }
-
-    /*
-     * Calculate new end.
-     */
-    const startSeconds =
-      timeToSeconds(editStart);
+    const start =
+      editStart ||
+      "00:00:00";
 
     const newEnd =
       secondsToTime(
-        startSeconds + duration
+        toSeconds(start) +
+          duration
       );
 
-    /*
-     * Get transcript based on
-     * start + selected duration.
-     */
     const newText =
-      getTranscriptForDuration(
-        editStart,
+      getTranscriptForRange(
+        start,
         duration,
         editText
       );
 
-    setEditDuration(duration);
-    setEditEnd(newEnd);
-    setEditText(newText);
+    setEditEnd(
+      newEnd
+    );
+
+    setEditText(
+      newText
+    );
   }
 
   /*
-   * ==========================================
-   * EDIT START TIME
-   * ==========================================
+   * =====================================================
+   * CHANGE EDIT START
+   * =====================================================
    */
 
   function changeEditStart(
     value: string
   ) {
-    setEditStart(value);
+    const oldDuration =
+      getDuration(
+        editStart,
+        editEnd
+      );
 
-    /*
-     * If a duration is selected,
-     * automatically recalculate the end
-     * and transcript.
-     */
-    if (value) {
-      const newEnd =
-        secondsToTime(
-          timeToSeconds(value) +
-            editDuration
-        );
+    const duration =
+      oldDuration > 0
+        ? oldDuration
+        : 30;
 
-      const newText =
-        getTranscriptForDuration(
-          value,
-          editDuration,
-          editText
-        );
+    const newEnd =
+      secondsToTime(
+        toSeconds(value) +
+          duration
+      );
 
-      setEditEnd(newEnd);
-      setEditText(newText);
-    }
+    const newText =
+      getTranscriptForRange(
+        value,
+        duration,
+        editText
+      );
+
+    setEditStart(
+      value
+    );
+
+    setEditEnd(
+      newEnd
+    );
+
+    setEditText(
+      newText
+    );
   }
 
   /*
-   * ==========================================
-   * SAVE
-   * ==========================================
+   * =====================================================
+   * SAVE EDIT
+   * =====================================================
    */
 
-  async function saveSegment(
-    id: number
+  function saveEdit(
+    row: Segment
   ) {
-    try {
-      setSavingId(id);
+    const data = {
+      text: editText,
+      start: editStart,
+      end: editEnd,
+      brand_name:
+        editBrand,
+      status:
+        "completed" as const,
+    };
 
-      /*
-       * Update backend.
-       */
-      const updated =
-        await updateAdvertisement(
-          id,
-          {
-            text: editText,
-            start: editStart,
-            end: editEnd,
-          }
-        );
-
-      console.log(
-        "ADVERTISEMENT UPDATED:",
-        updated
-      );
-
-      /*
-       * Update local UI.
-       */
-      setSegments((prev) =>
-        prev.map((row) =>
-          row.id === id
+    setSegmentList((prev) =>
+      prev
+        .map((item) =>
+          item.id === row.id
             ? {
-                ...row,
-                start: editStart,
-                end: editEnd,
-                text: editText,
+                ...item,
+                ...data,
               }
-            : row
+            : item
         )
-      );
+        .sort(
+          (a, b) =>
+            toSeconds(a.start) -
+            toSeconds(b.start)
+        )
+    );
 
-      setEditingId(null);
-    } catch (error) {
-      console.error(
-        "Failed to save advertisement:",
-        error
-      );
+    setEditingId(null);
 
-      alert(
-        "Failed to save advertisement."
-      );
-    } finally {
-      setSavingId(null);
-    }
+    setBrandOpenId(null);
+
+    onUpdate?.(
+      row.id,
+      data
+    );
   }
 
   /*
-   * ==========================================
-   * CANCEL EDIT
-   * ==========================================
+   * =====================================================
+   * BRAND
+   * =====================================================
+   */
+
+  function updateBrand(
+    row: Segment,
+    value: string
+  ) {
+    setEditBrand(
+      value
+    );
+
+    setSegmentList(
+      (prev) =>
+        prev.map(
+          (item) =>
+            item.id === row.id
+              ? {
+                  ...item,
+                  brand_name:
+                    value,
+                }
+              : item
+        )
+    );
+  }
+
+  /*
+   * =====================================================
+   * CANCEL
+   * =====================================================
    */
 
   function cancelEdit() {
     setEditingId(null);
 
-    setEditStart("");
-    setEditEnd("");
+    setBrandOpenId(null);
+
     setEditText("");
-    setEditDuration(30);
+
+    setEditStart("");
+
+    setEditEnd("");
+
+    setEditBrand("");
   }
 
   /*
-   * ==========================================
-   * DELETE
-   * ==========================================
+   * =====================================================
+   * TIME INPUT
+   * =====================================================
    */
 
-  async function deleteSegment(
-    id: number
-  ) {
-    const confirmed =
-      window.confirm(
-        "Are you sure you want to delete this advertisement?"
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await deleteAdvertisement(id);
-
-      setSegments((prev) =>
-        prev.filter(
-          (row) => row.id !== id
-        )
-      );
-    } catch (error) {
-      console.error(
-        "Failed to delete advertisement:",
-        error
-      );
-
-      alert(
-        "Failed to delete advertisement."
-      );
-    }
+  function TimeInput({
+    value,
+    onChange,
+  }: {
+    value: string;
+    onChange: (
+      value: string
+    ) => void;
+  }) {
+    return (
+      <input
+        type="text"
+        value={value}
+        maxLength={8}
+        placeholder="00:00:00"
+        onClick={(e) =>
+          e.stopPropagation()
+        }
+        onChange={(e) =>
+          onChange(
+            e.target.value
+          )
+        }
+        className="w-24 rounded-lg border px-2 py-1 text-center"
+      />
+    );
   }
 
   /*
-   * ==========================================
-   * RENDER
-   * ==========================================
+   * =====================================================
+   * SAVE ALL
+   * =====================================================
+   */
+
+  function saveAll() {
+    const completed =
+      segmentList.map(
+        (item) => ({
+          ...item,
+          status:
+            "completed" as const,
+        })
+      );
+
+    setSegmentList(
+      completed
+    );
+
+    onSave?.(
+      completed
+    );
+  }
+
+  /*
+   * =====================================================
+   * SORT
+   * =====================================================
+   */
+
+  const sortedSegments =
+    [...segmentList]
+      .map((item) => ({
+        ...item,
+        status:
+          item.status ??
+          "pending",
+      }))
+      .sort(
+        (a, b) =>
+          toSeconds(a.start) -
+          toSeconds(b.start)
+      );
+
+  /*
+   * =====================================================
+   * OVERLAPPING IDS
+   * =====================================================
+   *
+   * This is recalculated every render.
+   *
+   * Therefore:
+   *
+   * Change duration
+   *       ↓
+   * setSegmentList()
+   *       ↓
+   * React renders
+   *       ↓
+   * new overlap calculation
+   *       ↓
+   * highlight immediately
+   */
+
+  const overlappingIds =
+    getOverlappingIds(
+      sortedSegments
+    );
+
+  const hasOverlaps =
+    overlappingIds.size > 0;
+
+  /*
+   * =====================================================
+   * UI
+   * =====================================================
    */
 
   return (
-    <div className="mt-5">
-      <h2 className="font-bold text-xl mb-4">
-        Segments
-      </h2>
+    <div className="space-y-4">
 
-      {loading && (
-        <p className="mb-4">
-          Loading...
-        </p>
-      )}
+      {/* HEADER */}
 
-      <div className="overflow-x-auto bg-white rounded-xl shadow">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="p-3 text-left">
-                #
-              </th>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4 shadow-sm">
 
-              <th className="p-3 text-left">
-                Start
-              </th>
+        <div>
+          <h2 className="text-lg font-bold">
+            📢 Selected Advertisements
+          </h2>
 
-              <th className="p-3 text-left">
-                Duration
-              </th>
+          <p className="text-sm text-gray-500">
+            Review detected advertisements before saving.
+          </p>
+        </div>
 
-              <th className="p-3 text-left">
-                End
-              </th>
+        <div className="flex flex-wrap items-center gap-3">
 
-              <th className="p-3 text-left">
-                Text
-              </th>
+          {/* OVERLAP COUNT */}
 
-              <th className="p-3 text-left">
-                Type
-              </th>
+          {hasOverlaps && (
+            <div className="rounded-lg border border-red-300 bg-red-100 px-4 py-2 text-sm font-bold text-red-700">
+              ⚠ {overlappingIds.size}{" "}
+              overlapping
+              {overlappingIds.size !==
+              1
+                ? " advertisements"
+                : " advertisement"}
+            </div>
+          )}
 
-              <th className="p-3 text-left">
-                Action
-              </th>
-            </tr>
-          </thead>
+          {/* SAVE ALL */}
 
-          <tbody>
-            {segments.map(
-              (row, index) => {
-                const rowDuration =
-                  getDuration(
-                    row.start,
-                    row.end
-                  );
+          <button
+            type="button"
+            onClick={saveAll}
+            className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            Save All
+          </button>
 
-                const isEditing =
-                  editingId === row.id;
+        </div>
 
-                return (
-                  <tr
-                    key={row.id}
-                    className="border-b align-top"
+      </div>
+
+      {/* SEGMENTS */}
+
+      {sortedSegments.map(
+        (row, index) => {
+
+          const selected =
+            selectedResultId ===
+            row.id;
+
+          const overlapping =
+            overlappingIds.has(
+              row.id
+            );
+
+          const duration =
+            getDuration(
+              row.start,
+              row.end
+            );
+
+          const editDuration =
+            getDuration(
+              editStart,
+              editEnd
+            );
+
+          return (
+            <div
+              key={row.id}
+              id={`segment-${row.id}`}
+              onClick={(e) => {
+
+                const target =
+                  e.target as HTMLElement;
+
+                if (
+                  target.closest(
+                    "button"
+                  ) ||
+                  target.closest(
+                    "input"
+                  ) ||
+                  target.closest(
+                    "textarea"
+                  ) ||
+                  target.closest(
+                    "select"
+                  ) ||
+                  target.closest(
+                    ".brand-combobox"
+                  ) ||
+                  target.closest(
+                    "[data-radix-popper-content-wrapper]"
+                  )
+                ) {
+                  return;
+                }
+
+                setSelectedResultId(
+                  row.id
+                );
+              }}
+              className={`
+                relative
+                overflow-visible
+                rounded-2xl
+                border
+                p-5
+                shadow-sm
+                transition-all
+                duration-200
+
+                ${
+                  overlapping
+                    ? "border-red-500 bg-red-50 ring-2 ring-red-300 shadow-md"
+                    : selected
+                      ? "border-blue-200 bg-blue-50 ring-2 ring-blue-300"
+                      : "border-gray-200 bg-white"
+                }
+              `}
+            >
+
+              {/* OVERLAP WARNING */}
+
+              {overlapping && (
+                <div className="mb-4 flex items-center gap-3 rounded-xl border border-red-300 bg-red-100 px-4 py-3 text-red-700">
+
+                  <span className="text-xl">
+                    ⚠
+                  </span>
+
+                  <div>
+                    <div className="font-bold">
+                      OVERLAPPING ADVERTISEMENT
+                    </div>
+
+                    <div className="text-xs">
+                      This advertisement overlaps
+                      with another selected
+                      advertisement.
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+              {/* TOP */}
+
+              <div className="flex items-start justify-between gap-4">
+
+                <div className="flex flex-1 gap-4">
+
+                  {/* NUMBER */}
+
+                  <div
+                    className={`
+                      flex
+                      h-10
+                      w-10
+                      shrink-0
+                      items-center
+                      justify-center
+                      rounded-full
+                      font-bold
+
+                      ${
+                        overlapping
+                          ? "bg-red-600 text-white"
+                          : "bg-gray-100 text-gray-700"
+                      }
+                    `}
                   >
-                    {/* NUMBER */}
-                    <td className="p-3">
-                      {index + 1}
-                    </td>
+                    {index + 1}
+                  </div>
+
+                  {/* MAIN */}
+
+                  <div className="min-w-0 flex-1">
+
+                    <div className="flex items-center justify-between gap-2">
+
+                      <div>
+
+                        <h3 className="font-bold">
+                          Advertisement
+                        </h3>
+
+                        <p className="text-xs text-gray-500">
+                          Detected Segment
+                        </p>
+
+                      </div>
+
+                      {/* STATUS */}
+
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+
+                        {overlapping && (
+                          <span className="shrink-0 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
+                            ⚠ OVERLAPPING
+                          </span>
+                        )}
+
+                        <span
+                          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                            row.status ===
+                            "completed"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }`}
+                        >
+                          {row.status ===
+                          "completed"
+                            ? "🟢 Completed"
+                            : "● Pending"}
+                        </span>
+
+                      </div>
+
+                    </div>
+
+                    {/* BRAND */}
+
+                    <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Brand
+                    </label>
+
+                    {editingId ===
+                    row.id ? (
+
+                      <div
+                        className="brand-combobox w-full"
+                        onClick={(e) =>
+                          e.stopPropagation()
+                        }
+                      >
+
+                        <BrandCombobox
+                          value={
+                            editBrand
+                          }
+                          open={
+                            brandOpenId ===
+                            row.id
+                          }
+                          onOpenChange={(
+                            open
+                          ) =>
+                            setBrandOpenId(
+                              open
+                                ? row.id
+                                : null
+                            )
+                          }
+                          onChange={(
+                            value
+                          ) => {
+
+                            updateBrand(
+                              row,
+                              value
+                            );
+
+                            setBrandOpenId(
+                              null
+                            );
+
+                          }}
+                        />
+
+                      </div>
+
+                    ) : (
+
+                      <div
+                        className={`
+                          min-h-11
+                          w-full
+                          rounded-xl
+                          border
+                          px-4
+                          py-2
+
+                          ${
+                            overlapping
+                              ? "border-red-300 bg-red-100"
+                              : "border-yellow-300 bg-yellow-50"
+                          }
+                        `}
+                      >
+
+                        <div className="flex items-start gap-2">
+
+                          <span className="text-lg">
+                            🏷
+                          </span>
+
+                          <span className="break-words text-sm font-semibold leading-6 text-gray-800">
+                            {row.brand_name ||
+                              "No brand selected"}
+                          </span>
+
+                        </div>
+
+                      </div>
+
+                    )}
+
+                  </div>
+
+                </div>
+
+                {/* ACTIONS */}
+
+                <div className="flex shrink-0 items-center gap-2">
+
+                  {/* PLAY */}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onPlay(row)
+                    }
+                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600"
+                  >
+                    ▶
+                  </button>
+
+                  {/* EDIT / SAVE */}
+
+                  {editingId ===
+                  row.id ? (
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        saveEdit(row)
+                      }
+                      className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+                    >
+                      💾 Save
+                    </button>
+
+                  ) : (
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        edit(row)
+                      }
+                      className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200"
+                    >
+                      ✏️
+                    </button>
+
+                  )}
+
+                  {/* DELETE */}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onRemove?.(
+                        row.id
+                      )
+                    }
+                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 hover:bg-red-100"
+                  >
+                    🗑
+                  </button>
+
+                </div>
+
+              </div>
+
+              {/* TRANSCRIPT */}
+
+              <div className="mt-5">
+
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Transcript
+                </label>
+
+                <div
+                  className={`
+                    rounded-xl
+                    p-4
+
+                    ${
+                      overlapping
+                        ? "border border-red-200 bg-white"
+                        : "bg-gray-50"
+                    }
+                  `}
+                >
+
+                  {editingId ===
+                  row.id ? (
+
+                    <textarea
+                      value={
+                        editText
+                      }
+                      rows={5}
+                      onClick={(e) =>
+                        e.stopPropagation()
+                      }
+                      onChange={(e) =>
+                        setEditText(
+                          e.target.value
+                        )
+                      }
+                      className="w-full rounded-lg border p-3 outline-none focus:border-blue-400"
+                    />
+
+                  ) : (
+
+                    <p className="whitespace-pre-wrap leading-7">
+                      {row.text}
+                    </p>
+
+                  )}
+
+                </div>
+
+              </div>
+
+              {/* TIME */}
+
+              <div
+                className={`
+                  mt-5
+                  rounded-xl
+                  border
+                  p-4
+
+                  ${
+                    overlapping
+                      ? "border-red-300 bg-red-100"
+                      : "border-gray-200 bg-gray-50"
+                  }
+                `}
+              >
+
+                <div className="mb-3 flex items-center justify-between">
+
+                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    ⏱ Time
+                  </div>
+
+                  {overlapping && (
+                    <div className="text-xs font-bold text-red-600">
+                      ⚠ TIME RANGE CONFLICT
+                    </div>
+                  )}
+
+                </div>
+
+                {editingId ===
+                row.id ? (
+
+                  <div className="flex flex-wrap items-center gap-3">
 
                     {/* START */}
-                    <td className="p-3">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editStart}
-                          onChange={(e) =>
-                            changeEditStart(
-                              e.target.value
-                            )
-                          }
-                          className="border rounded p-2 w-32"
-                          placeholder="00:00:00"
-                        />
-                      ) : (
-                        row.start
-                      )}
-                    </td>
+
+                    <div className="flex flex-col gap-1">
+
+                      <span className="text-xs text-gray-500">
+                        Start
+                      </span>
+
+                      <TimeInput
+                        value={
+                          editStart
+                        }
+                        onChange={
+                          changeEditStart
+                        }
+                      />
+
+                    </div>
+
+                    <span className="mt-5 text-gray-400">
+                      →
+                    </span>
 
                     {/* DURATION */}
-                    <td className="p-3">
-                      {isEditing ? (
-                        <select
-                          value={editDuration}
-                          onChange={(e) =>
-                            changeEditDuration(
-                              Number(
-                                e.target.value
-                              )
-                            )
-                          }
-                          className="border rounded p-2 w-36 bg-white"
-                        >
-                          {DURATION_OPTIONS.map(
-                            (duration) => (
-                              <option
-                                key={duration}
-                                value={duration}
-                              >
-                                {duration} seconds
-                              </option>
-                            )
-                          )}
 
-                          {editDuration > 0 &&
-                            !DURATION_OPTIONS.includes(
-                              editDuration
-                            ) && (
-                              <option
-                                value={
-                                  editDuration
-                                }
-                              >
-                                {editDuration}{" "}
-                                seconds
-                              </option>
-                            )}
-                        </select>
-                      ) : (
-                        <select
-                          value={
-                            DURATION_OPTIONS.includes(
-                              rowDuration
-                            )
-                              ? rowDuration
-                              : ""
-                          }
-                          onChange={(e) =>
-                            changeDuration(
-                              row,
-                              Number(
-                                e.target.value
-                              )
-                            )
-                          }
-                          className="border rounded p-2 w-36 bg-white"
-                        >
-                          {!DURATION_OPTIONS.includes(
-                            rowDuration
-                          ) && (
-                            <option
-                              value=""
-                              disabled
-                            >
-                              {rowDuration > 0
-                                ? `${rowDuration} seconds`
-                                : "Select duration"}
-                            </option>
-                          )}
+                    <div className="flex flex-col gap-1">
 
-                          {DURATION_OPTIONS.map(
-                            (duration) => (
-                              <option
-                                key={duration}
-                                value={duration}
-                              >
-                                {duration} seconds
-                              </option>
-                            )
-                          )}
-                        </select>
-                      )}
-                    </td>
+                      <span className="text-xs text-gray-500">
+                        Duration
+                      </span>
 
-                    {/* END */}
-                    <td className="p-3">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editEnd}
-                          readOnly
-                          className="border rounded p-2 w-32 bg-gray-100"
-                        />
-                      ) : (
-                        row.end
-                      )}
-                    </td>
-
-                    {/* TEXT */}
-                    <td className="p-3 min-w-[350px]">
-                      {isEditing ? (
-                        <textarea
-                          value={editText}
-                          onChange={(e) =>
-                            setEditText(
+                      <select
+                        value={
+                          editDuration
+                        }
+                        onChange={(e) =>
+                          changeEditDuration(
+                            Number(
                               e.target.value
                             )
-                          }
-                          className="border rounded p-2 w-full min-h-[120px]"
-                        />
-                      ) : (
-                        <div className="whitespace-pre-wrap">
-                          {row.text}
-                        </div>
-                      )}
-                    </td>
+                          )
+                        }
+                        onClick={(e) =>
+                          e.stopPropagation()
+                        }
+                        className="h-9 min-w-32 rounded-lg border bg-white px-3 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      >
 
-                    {/* TYPE */}
-                    <td className="p-3">
-                      <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs">
-                        {row.segment_type ||
-                          "AD"}
+                        {getDurationOptions(
+                          row.id
+                        ).map(
+                          (value) => (
+                            <option
+                              key={
+                                value
+                              }
+                              value={
+                                value
+                              }
+                            >
+                              {
+                                value
+                              }{" "}
+                              seconds
+                            </option>
+                          )
+                        )}
+
+                      </select>
+
+                    </div>
+
+                    <span className="mt-5 text-gray-400">
+                      →
+                    </span>
+
+                    {/* END */}
+
+                    <div className="flex flex-col gap-1">
+
+                      <span className="text-xs text-gray-500">
+                        End
                       </span>
-                    </td>
 
-                    {/* ACTION */}
-                    <td className="p-3 whitespace-nowrap">
-                      {isEditing ? (
-                        <>
-                          <button
-                            type="button"
-                            disabled={
-                              savingId ===
-                              row.id
-                            }
-                            onClick={() =>
-                              saveSegment(
-                                row.id
-                              )
-                            }
-                            className="bg-blue-500 text-white px-3 py-1 rounded mr-2 disabled:opacity-50"
-                          >
-                            {savingId ===
-                            row.id
-                              ? "Saving..."
-                              : "Save"}
-                          </button>
+                      <TimeInput
+                        value={
+                          editEnd
+                        }
+                        onChange={
+                          setEditEnd
+                        }
+                      />
 
-                          <button
-                            type="button"
-                            onClick={
-                              cancelEdit
-                            }
-                            className="bg-gray-300 px-3 py-1 rounded"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              editSegment(
-                                row
-                              )
-                            }
-                            className="text-blue-600 mr-3"
-                          >
-                            ✏️ Edit
-                          </button>
+                    </div>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              deleteSegment(
-                                row.id
-                              )
-                            }
-                            className="text-red-600"
-                          >
-                            🗑 Delete
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                );
-              }
-            )}
-          </tbody>
-        </table>
-      </div>
+                  </div>
+
+                ) : (
+
+                  <div className="flex flex-wrap items-center gap-3">
+
+                    {/* START */}
+
+                    <div className="flex flex-col gap-1">
+
+                      <span className="text-xs text-gray-500">
+                        Start
+                      </span>
+
+                      <span
+                        className={`
+                          rounded-lg
+                          border
+                          px-3
+                          py-2
+                          font-semibold
+
+                          ${
+                            overlapping
+                              ? "border-red-300 bg-white text-red-700"
+                              : "bg-white"
+                          }
+                        `}
+                      >
+                        {row.start ||
+                          "00:00:00"}
+                      </span>
+
+                    </div>
+
+                    <span className="mt-5 text-gray-400">
+                      →
+                    </span>
+
+                    {/* DURATION */}
+
+                    <div className="flex flex-col gap-1">
+
+                      <span className="text-xs text-gray-500">
+                        Duration
+                      </span>
+
+                      <select
+                        value={
+                          duration
+                        }
+                        onChange={(e) =>
+                          changeDuration(
+                            row,
+                            Number(
+                              e.target.value
+                            )
+                          )
+                        }
+                        onClick={(e) =>
+                          e.stopPropagation()
+                        }
+                        className={`
+                          h-10
+                          min-w-32
+                          rounded-lg
+                          border
+                          bg-white
+                          px-3
+                          text-sm
+                          font-semibold
+                          outline-none
+                          focus:border-blue-400
+                          focus:ring-2
+                          focus:ring-blue-100
+
+                          ${
+                            overlapping
+                              ? "border-red-500 bg-red-50 text-red-700"
+                              : "border-gray-300"
+                          }
+                        `}
+                      >
+
+                        {getDurationOptions(
+                          row.id
+                        ).map(
+                          (value) => (
+                            <option
+                              key={
+                                value
+                              }
+                              value={
+                                value
+                              }
+                            >
+                              {
+                                value
+                              }{" "}
+                              seconds
+                            </option>
+                          )
+                        )}
+
+                      </select>
+
+                    </div>
+
+                    <span className="mt-5 text-gray-400">
+                      →
+                    </span>
+
+                    {/* END */}
+
+                    <div className="flex flex-col gap-1">
+
+                      <span className="text-xs text-gray-500">
+                        End
+                      </span>
+
+                      <span
+                        className={`
+                          rounded-lg
+                          border
+                          px-3
+                          py-2
+                          font-semibold
+
+                          ${
+                            overlapping
+                              ? "border-red-300 bg-white text-red-700"
+                              : "bg-white"
+                          }
+                        `}
+                      >
+                        {row.end ||
+                          "00:00:00"}
+                      </span>
+
+                    </div>
+
+                  </div>
+
+                )}
+
+              </div>
+
+            </div>
+          );
+        }
+      )}
+
     </div>
   );
 }
