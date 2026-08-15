@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import BrandCombobox from "@/components/BrandCombobox";
 
 interface Segment {
@@ -16,8 +21,7 @@ interface Segment {
 interface Props {
   segments: Segment[];
 
-  // IMPORTANT:
-  // This must contain the ORIGINAL/full transcript segments.
+  // Original/full transcript segments
   transcriptSegments?: Segment[];
 
   selectedResultId: number | null;
@@ -43,7 +47,23 @@ interface Props {
   onDownload?: (segment: Segment) => void;
 }
 
-const DURATION_OPTIONS = [5, 10, 20, 30, 45];
+/*
+ * ============================================================
+ * DURATION OPTIONS
+ * ============================================================
+ */
+
+const DURATION_OPTIONS = [
+  5,
+  10,
+  15,
+  20,
+  25,
+  30,
+  35,
+  40,
+  45,
+];
 
 export default function SelectedSegments({
   segments,
@@ -55,6 +75,12 @@ export default function SelectedSegments({
   onRemove,
   onSave,
 }: Props) {
+  /*
+   * ============================================================
+   * STATE
+   * ============================================================
+   */
+
   const [segmentList, setSegmentList] =
     useState<Segment[]>(segments);
 
@@ -76,31 +102,56 @@ export default function SelectedSegments({
   const [editBrand, setEditBrand] =
     useState("");
 
+  /*
+   * Custom duration is stored for durations
+   * that are not part of the preset list.
+   */
   const [customDurations, setCustomDurations] =
     useState<Record<number, number>>({});
 
   /*
-   * =====================================================
+   * Duration dropdown
+   */
+  const [durationOpenId, setDurationOpenId] =
+    useState<number | null>(null);
+
+  const [durationSearch, setDurationSearch] =
+    useState("");
+
+  const durationDropdownRef =
+    useRef<HTMLDivElement | null>(null);
+
+  /*
+   * ============================================================
    * TIME HELPERS
-   * =====================================================
+   * ============================================================
    */
 
-  function toSeconds(time?: string): number {
+  function toSeconds(
+    time?: string
+  ): number {
     if (!time) return 0;
 
-    const value = String(time).trim();
+    const value =
+      String(time).trim();
 
     if (!value) return 0;
 
-    const parts = value.split(":").map(Number);
+    const parts =
+      value.split(":").map(Number);
 
     if (
       parts.length === 3 &&
       parts.every(
-        (value) => !Number.isNaN(value)
+        (value) =>
+          !Number.isNaN(value)
       )
     ) {
-      const [hour, minute, second] = parts;
+      const [
+        hour,
+        minute,
+        second,
+      ] = parts;
 
       return (
         hour * 3600 +
@@ -112,12 +163,19 @@ export default function SelectedSegments({
     if (
       parts.length === 2 &&
       parts.every(
-        (value) => !Number.isNaN(value)
+        (value) =>
+          !Number.isNaN(value)
       )
     ) {
-      const [minute, second] = parts;
+      const [
+        minute,
+        second,
+      ] = parts;
 
-      return minute * 60 + second;
+      return (
+        minute * 60 +
+        second
+      );
     }
 
     if (
@@ -138,13 +196,16 @@ export default function SelectedSegments({
       Math.floor(totalSeconds)
     );
 
-    const hours = Math.floor(
-      totalSeconds / 3600
-    );
+    const hours =
+      Math.floor(
+        totalSeconds / 3600
+      );
 
-    const minutes = Math.floor(
-      (totalSeconds % 3600) / 60
-    );
+    const minutes =
+      Math.floor(
+        (totalSeconds % 3600) /
+          60
+      );
 
     const seconds =
       totalSeconds % 60;
@@ -176,11 +237,11 @@ export default function SelectedSegments({
   }
 
   /*
-   * =====================================================
+   * ============================================================
    * OVERLAP DETECTION
-   * =====================================================
+   * ============================================================
    *
-   * Two ranges overlap when:
+   * A overlaps B when:
    *
    * A.start < B.end
    * AND
@@ -188,15 +249,10 @@ export default function SelectedSegments({
    *
    * Example:
    *
-   * A = 10:00 -> 10:30
-   * B = 10:20 -> 10:50
+   * Ad 1: 10:00 -> 10:30
+   * Ad 2: 10:20 -> 10:50
    *
-   * TRUE
-   *
-   * A = 10:00 -> 10:20
-   * B = 10:20 -> 10:50
-   *
-   * FALSE
+   * Both are highlighted.
    */
 
   function isRangeOverlapping(
@@ -240,69 +296,158 @@ export default function SelectedSegments({
     );
   }
 
+  function getOverlappingIds(
+    list: Segment[]
+  ): Set<number> {
+    const ids =
+      new Set<number>();
+
+    for (
+      let i = 0;
+      i < list.length;
+      i++
+    ) {
+      for (
+        let j = i + 1;
+        j < list.length;
+        j++
+      ) {
+        const first =
+          list[i];
+
+        const second =
+          list[j];
+
+        if (
+          isRangeOverlapping(
+            first.start,
+            first.end,
+            second.start,
+            second.end
+          )
+        ) {
+          ids.add(first.id);
+          ids.add(second.id);
+        }
+      }
+    }
+
+    return ids;
+  }
+
   /*
-   * =====================================================
+   * ============================================================
+   * CLOSE DURATION DROPDOWN
+   * ============================================================
+   */
+
+  useEffect(() => {
+    function handleOutsideClick(
+      event: MouseEvent
+    ) {
+      if (
+        durationDropdownRef.current &&
+        !durationDropdownRef.current.contains(
+          event.target as Node
+        )
+      ) {
+        setDurationOpenId(null);
+        setDurationSearch("");
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick
+      );
+    };
+  }, []);
+
+  /*
+   * ============================================================
    * SYNC PARENT SEGMENTS
-   * =====================================================
+   * ============================================================
    */
 
   useEffect(() => {
     setSegmentList((prev) =>
-      segments.map((incoming) => {
-        const local = prev.find(
-          (item) =>
-            item.id === incoming.id
-        );
-
-        return {
-          ...incoming,
-          status:
-            incoming.status ??
-            local?.status ??
-            "completed",
-        };
-      })
-    );
-
-    setCustomDurations((prev) => {
-      const next = { ...prev };
-
-      let changed = false;
-
-      segments.forEach((seg) => {
-        if (
-          next[seg.id] === undefined
-        ) {
-          const duration =
-            getDuration(
-              seg.start,
-              seg.end
+      segments.map(
+        (incoming) => {
+          const local =
+            prev.find(
+              (item) =>
+                item.id ===
+                incoming.id
             );
 
-          if (
-            duration > 0 &&
-            !DURATION_OPTIONS.includes(
-              duration
-            )
-          ) {
-            next[seg.id] =
-              duration;
+          return {
+            ...incoming,
 
-            changed = true;
-          }
+            status:
+              incoming.status ??
+              local?.status ??
+              "completed",
+          };
         }
-      });
+      )
+    );
 
-      return changed
-        ? next
-        : prev;
-    });
+    /*
+     * Remember custom durations
+     * such as 37 seconds.
+     */
+    setCustomDurations(
+      (prev) => {
+        const next = {
+          ...prev,
+        };
+
+        let changed = false;
+
+        segments.forEach(
+          (seg) => {
+            if (
+              next[seg.id] ===
+              undefined
+            ) {
+              const duration =
+                getDuration(
+                  seg.start,
+                  seg.end
+                );
+
+              if (
+                duration > 0 &&
+                !DURATION_OPTIONS.includes(
+                  duration
+                )
+              ) {
+                next[seg.id] =
+                  duration;
+
+                changed = true;
+              }
+            }
+          }
+        );
+
+        return changed
+          ? next
+          : prev;
+      }
+    );
   }, [segments]);
 
   /*
-   * =====================================================
+   * ============================================================
    * DURATION OPTIONS
-   * =====================================================
+   * ============================================================
    */
 
   function getDurationOptions(
@@ -313,7 +458,9 @@ export default function SelectedSegments({
 
     if (
       custom === undefined ||
-      DURATION_OPTIONS.includes(custom)
+      DURATION_OPTIONS.includes(
+        custom
+      )
     ) {
       return DURATION_OPTIONS;
     }
@@ -327,9 +474,9 @@ export default function SelectedSegments({
   }
 
   /*
-   * =====================================================
-   * GET TRANSCRIPT FOR TIME RANGE
-   * =====================================================
+   * ============================================================
+   * TRANSCRIPT RANGE
+   * ============================================================
    */
 
   function getTranscriptForRange(
@@ -341,10 +488,6 @@ export default function SelectedSegments({
       !transcriptSegments ||
       transcriptSegments.length === 0
     ) {
-      console.warn(
-        "No transcriptSegments supplied. Keeping existing text."
-      );
-
       return fallbackText;
     }
 
@@ -352,57 +495,51 @@ export default function SelectedSegments({
       toSeconds(start);
 
     const endSeconds =
-      startSeconds + duration;
-
-    console.log(
-      "SEARCH TRANSCRIPT RANGE",
-      {
-        start,
-        startSeconds,
-        duration,
-        endSeconds,
-        transcriptCount:
-          transcriptSegments.length,
-      }
-    );
+      startSeconds +
+      duration;
 
     const matchingSegments =
       transcriptSegments
-        .filter((segment) => {
-          if (
-            !segment.start ||
-            !segment.end
-          ) {
-            return false;
+        .filter(
+          (segment) => {
+            if (
+              !segment.start ||
+              !segment.end
+            ) {
+              return false;
+            }
+
+            const segmentStart =
+              toSeconds(
+                segment.start
+              );
+
+            const segmentEnd =
+              toSeconds(
+                segment.end
+              );
+
+            /*
+             * Segment overlaps
+             * selected duration.
+             */
+            return (
+              segmentStart <
+                endSeconds &&
+              segmentEnd >
+                startSeconds
+            );
           }
-
-          const segmentStart =
-            toSeconds(
-              segment.start
-            );
-
-          const segmentEnd =
-            toSeconds(
-              segment.end
-            );
-
-          return (
-            segmentStart <
-              endSeconds &&
-            segmentEnd >
-              startSeconds
-          );
-        })
+        )
         .sort(
           (a, b) =>
-            toSeconds(a.start) -
-            toSeconds(b.start)
+            toSeconds(
+              a.start
+            ) -
+            toSeconds(
+              b.start
+            )
         );
-
-    console.log(
-      "MATCHING TRANSCRIPT SEGMENTS",
-      matchingSegments
-    );
 
     const text =
       matchingSegments
@@ -420,28 +557,36 @@ export default function SelectedSegments({
   }
 
   /*
-   * =====================================================
-   * CHANGE NORMAL DURATION
-   * =====================================================
+   * ============================================================
+   * CHANGE DURATION
+   * ============================================================
    */
 
   function changeDuration(
     row: Segment,
     duration: number
   ) {
+    if (
+      !Number.isFinite(duration) ||
+      duration <= 0
+    ) {
+      return;
+    }
+
     const start =
       row.start ||
       "00:00:00";
 
-    const startSeconds =
-      toSeconds(start);
-
     const newEnd =
       secondsToTime(
-        startSeconds +
+        toSeconds(start) +
           duration
       );
 
+    /*
+     * Rebuild transcript
+     * according to new duration.
+     */
     const newText =
       getTranscriptForRange(
         start,
@@ -449,21 +594,9 @@ export default function SelectedSegments({
         row.text
       );
 
-    console.log(
-      "DURATION CHANGED",
-      {
-        id: row.id,
-        start,
-        duration,
-        newEnd,
-        newText,
-      }
-    );
-
     /*
-     * Update custom duration.
+     * Remember custom duration.
      */
-
     setCustomDurations(
       (prev) => ({
         ...prev,
@@ -473,31 +606,31 @@ export default function SelectedSegments({
     );
 
     /*
-     * Update UI immediately.
+     * Update local UI immediately.
      *
-     * The overlap detection below
-     * automatically recalculates because
-     * segmentList changes.
+     * This also causes overlap
+     * detection to run again.
      */
-
-    setSegmentList((prev) =>
-      prev.map((item) =>
-        item.id === row.id
-          ? {
-              ...item,
-              end: newEnd,
-              text: newText,
-              status:
-                "completed",
-            }
-          : item
-      )
+    setSegmentList(
+      (prev) =>
+        prev.map(
+          (item) =>
+            item.id === row.id
+              ? {
+                  ...item,
+                  start,
+                  end: newEnd,
+                  text: newText,
+                  status:
+                    "completed",
+                }
+              : item
+        )
     );
 
     /*
      * Update parent/database.
      */
-
     onUpdate?.(
       row.id,
       {
@@ -505,21 +638,356 @@ export default function SelectedSegments({
         start,
         end: newEnd,
         brand_name:
-          row.brand_name || "",
+          row.brand_name ||
+          "",
         status:
           "completed",
       }
     );
+
+    /*
+     * Close dropdown.
+     */
+    setDurationOpenId(null);
+    setDurationSearch("");
   }
 
   /*
-   * =====================================================
-   * EDIT
-   * =====================================================
+   * ============================================================
+   * FILTER DURATION OPTIONS
+   * ============================================================
    */
 
-  function edit(row: Segment) {
-    setEditingId(row.id);
+  function getFilteredDurations(
+    rowId: number
+  ): number[] {
+    const options =
+      getDurationOptions(
+        rowId
+      );
+
+    const search =
+      durationSearch
+        .trim()
+        .toLowerCase();
+
+    if (!search) {
+      return options;
+    }
+
+    return options.filter(
+      (value) =>
+        String(value).includes(
+          search
+        )
+    );
+  }
+
+  /*
+   * ============================================================
+   * CUSTOM DURATION
+   * ============================================================
+   */
+
+  function applyCustomDuration(
+    row: Segment
+  ) {
+    const value =
+      Number(
+        durationSearch
+      );
+
+    if (
+      !Number.isFinite(value) ||
+      value <= 0
+    ) {
+      return;
+    }
+
+    changeDuration(
+      row,
+      Math.floor(value)
+    );
+  }
+
+  /*
+   * ============================================================
+   * EDITABLE DURATION DROPDOWN
+   * ============================================================
+   */
+
+  function DurationDropdown({
+    row,
+    duration,
+    overlapping,
+  }: {
+    row: Segment;
+    duration: number;
+    overlapping: boolean;
+  }) {
+    const isOpen =
+      durationOpenId ===
+      row.id;
+
+    const filtered =
+      getFilteredDurations(
+        row.id
+      );
+
+    return (
+      <div
+        ref={
+          isOpen
+            ? durationDropdownRef
+            : undefined
+        }
+        className="relative"
+        onClick={(e) =>
+          e.stopPropagation()
+        }
+      >
+
+        {/* CURRENT DURATION */}
+
+        <button
+          type="button"
+          onClick={() => {
+            setDurationOpenId(
+              isOpen
+                ? null
+                : row.id
+            );
+
+            setDurationSearch("");
+          }}
+          className={`
+            flex
+            h-10
+            min-w-36
+            items-center
+            justify-between
+            gap-3
+            rounded-lg
+            border
+            bg-white
+            px-3
+            text-sm
+            font-semibold
+            shadow-sm
+            transition
+
+            ${
+              overlapping
+                ? "border-red-500 bg-red-50 text-red-700 ring-2 ring-red-100"
+                : "border-gray-300 hover:border-blue-400"
+            }
+          `}
+        >
+
+          <span className="flex items-center gap-2">
+
+            {overlapping && (
+              <span>
+                ⚠
+              </span>
+            )}
+
+            <span>
+              {duration} seconds
+            </span>
+
+          </span>
+
+          <span
+            className={`
+              text-xs
+              transition-transform
+
+              ${
+                isOpen
+                  ? "rotate-180"
+                  : ""
+              }
+            `}
+          >
+            ▼
+          </span>
+
+        </button>
+
+        {/* DROPDOWN */}
+
+        {isOpen && (
+          <div className="absolute left-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+
+            {/* SEARCH */}
+
+            <div className="border-b p-2">
+
+              <div className="relative">
+
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  🔍
+                </span>
+
+                <input
+                  autoFocus
+                  type="number"
+                  min={1}
+                  value={
+                    durationSearch
+                  }
+                  onChange={(e) =>
+                    setDurationSearch(
+                      e.target.value
+                    )
+                  }
+                  onKeyDown={(e) => {
+
+                    if (
+                      e.key ===
+                      "Enter"
+                    ) {
+                      applyCustomDuration(
+                        row
+                      );
+                    }
+
+                    if (
+                      e.key ===
+                      "Escape"
+                    ) {
+                      setDurationOpenId(
+                        null
+                      );
+
+                      setDurationSearch(
+                        ""
+                      );
+                    }
+
+                  }}
+                  placeholder="Type duration..."
+                  className="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                />
+
+              </div>
+
+            </div>
+
+            {/* PRESET DURATIONS */}
+
+            <div className="max-h-72 overflow-y-auto p-1">
+
+              {filtered.map(
+                (value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() =>
+                      changeDuration(
+                        row,
+                        value
+                      )
+                    }
+                    className={`
+                      flex
+                      w-full
+                      items-center
+                      justify-between
+                      rounded-lg
+                      px-3
+                      py-2.5
+                      text-left
+                      text-sm
+                      transition
+
+                      ${
+                        value ===
+                        duration
+                          ? "bg-blue-50 font-semibold text-blue-700"
+                          : "text-gray-700 hover:bg-gray-50"
+                      }
+                    `}
+                  >
+
+                    <span>
+                      {value} seconds
+                    </span>
+
+                    {value ===
+                      duration && (
+                      <span className="font-bold text-blue-600">
+                        ✓
+                      </span>
+                    )}
+
+                  </button>
+                )
+              )}
+
+              {filtered.length ===
+                0 &&
+                durationSearch && (
+                  <div className="px-3 py-3 text-sm text-gray-500">
+                    No preset duration
+                    found.
+                  </div>
+                )}
+
+            </div>
+
+            {/* CUSTOM */}
+
+            <div className="border-t p-2">
+
+              <button
+                type="button"
+                disabled={
+                  !durationSearch ||
+                  Number(
+                    durationSearch
+                  ) <= 0
+                }
+                onClick={() =>
+                  applyCustomDuration(
+                    row
+                  )
+                }
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+
+                <span>
+                  ✏
+                </span>
+
+                <span>
+                  Custom duration
+                </span>
+
+              </button>
+
+            </div>
+
+          </div>
+        )}
+
+      </div>
+    );
+  }
+
+  /*
+   * ============================================================
+   * EDIT
+   * ============================================================
+   */
+
+  function edit(
+    row: Segment
+  ) {
+    setEditingId(
+      row.id
+    );
 
     setBrandOpenId(null);
 
@@ -538,14 +1006,15 @@ export default function SelectedSegments({
     );
 
     setEditBrand(
-      row.brand_name || ""
+      row.brand_name ||
+        ""
     );
   }
 
   /*
-   * =====================================================
-   * CHANGE EDIT DURATION
-   * =====================================================
+   * ============================================================
+   * EDIT DURATION
+   * ============================================================
    */
 
   function changeEditDuration(
@@ -578,9 +1047,9 @@ export default function SelectedSegments({
   }
 
   /*
-   * =====================================================
-   * CHANGE EDIT START
-   * =====================================================
+   * ============================================================
+   * EDIT START
+   * ============================================================
    */
 
   function changeEditStart(
@@ -624,9 +1093,9 @@ export default function SelectedSegments({
   }
 
   /*
-   * =====================================================
+   * ============================================================
    * SAVE EDIT
-   * =====================================================
+   * ============================================================
    */
 
   function saveEdit(
@@ -642,25 +1111,27 @@ export default function SelectedSegments({
         "completed" as const,
     };
 
-    /*
-     * Update local UI.
-     */
-
-    setSegmentList((prev) =>
-      prev
-        .map((item) =>
-          item.id === row.id
-            ? {
-                ...item,
-                ...data,
-              }
-            : item
-        )
-        .sort(
-          (a, b) =>
-            toSeconds(a.start) -
-            toSeconds(b.start)
-        )
+    setSegmentList(
+      (prev) =>
+        prev
+          .map(
+            (item) =>
+              item.id === row.id
+                ? {
+                    ...item,
+                    ...data,
+                  }
+                : item
+          )
+          .sort(
+            (a, b) =>
+              toSeconds(
+                a.start
+              ) -
+              toSeconds(
+                b.start
+              )
+          )
     );
 
     setEditingId(null);
@@ -674,9 +1145,9 @@ export default function SelectedSegments({
   }
 
   /*
-   * =====================================================
+   * ============================================================
    * BRAND
-   * =====================================================
+   * ============================================================
    */
 
   function updateBrand(
@@ -703,9 +1174,9 @@ export default function SelectedSegments({
   }
 
   /*
-   * =====================================================
-   * CANCEL
-   * =====================================================
+   * ============================================================
+   * CANCEL EDIT
+   * ============================================================
    */
 
   function cancelEdit() {
@@ -723,9 +1194,9 @@ export default function SelectedSegments({
   }
 
   /*
-   * =====================================================
+   * ============================================================
    * TIME INPUT
-   * =====================================================
+   * ============================================================
    */
 
   function TimeInput({
@@ -757,9 +1228,9 @@ export default function SelectedSegments({
   }
 
   /*
-   * =====================================================
+   * ============================================================
    * SAVE ALL
-   * =====================================================
+   * ============================================================
    */
 
   function saveAll() {
@@ -782,9 +1253,9 @@ export default function SelectedSegments({
   }
 
   /*
-   * =====================================================
+   * ============================================================
    * SORT
-   * =====================================================
+   * ============================================================
    */
 
   const sortedSegments =
@@ -802,70 +1273,23 @@ export default function SelectedSegments({
       );
 
   /*
-   * =====================================================
-   * FIND OVERLAPPING SEGMENTS
-   * =====================================================
-   *
-   * IMPORTANT:
-   *
-   * We calculate this directly from
-   * the current segmentList.
-   *
-   * Therefore changing the duration
-   * immediately changes the highlighting.
+   * ============================================================
+   * OVERLAPPING IDS
+   * ============================================================
    */
 
   const overlappingIds =
-    new Set<number>();
-
-  for (
-    let i = 0;
-    i < sortedSegments.length;
-    i++
-  ) {
-    for (
-      let j = i + 1;
-      j < sortedSegments.length;
-      j++
-    ) {
-      const first =
-        sortedSegments[i];
-
-      const second =
-        sortedSegments[j];
-
-      if (
-        isRangeOverlapping(
-          first.start,
-          first.end,
-          second.start,
-          second.end
-        )
-      ) {
-        overlappingIds.add(
-          first.id
-        );
-
-        overlappingIds.add(
-          second.id
-        );
-      }
-    }
-  }
-
-  /*
-   * =====================================================
-   * TOTAL OVERLAPS
-   * =====================================================
-   */
+    getOverlappingIds(
+      sortedSegments
+    );
 
   const hasOverlaps =
     overlappingIds.size > 0;
 
   /*
-   * =====================================================
+   * ============================================================
    * UI
-   * =====================================================
+   * ============================================================
    */
 
   return (
@@ -887,17 +1311,12 @@ export default function SelectedSegments({
 
         <div className="flex items-center gap-3">
 
-          {/* OVERLAP WARNING */}
-
           {hasOverlaps && (
             <div className="rounded-lg border border-red-300 bg-red-100 px-4 py-2 text-sm font-bold text-red-700">
-              ⚠ {overlappingIds.size}{" "}
-              advertisement
-              {overlappingIds.size !==
-              1
-                ? "s"
-                : ""}{" "}
+              ⚠{" "}
+              {overlappingIds.size}{" "}
               overlapping
+              advertisements
             </div>
           )}
 
@@ -921,14 +1340,6 @@ export default function SelectedSegments({
           const selected =
             selectedResultId ===
             row.id;
-
-          /*
-           * IMPORTANT:
-           *
-           * This is true when this
-           * advertisement overlaps
-           * another advertisement.
-           */
 
           const overlapping =
             overlappingIds.has(
@@ -971,9 +1382,6 @@ export default function SelectedSegments({
                   ) ||
                   target.closest(
                     ".brand-combobox"
-                  ) ||
-                  target.closest(
-                    "[data-radix-popper-content-wrapper]"
                   )
                 ) {
                   return;
@@ -991,28 +1399,13 @@ export default function SelectedSegments({
                 p-5
                 shadow-sm
                 transition-all
-                duration-200
 
                 ${
                   overlapping
-                    ? `
-                      border-red-500
-                      bg-red-50
-                      ring-2
-                      ring-red-300
-                      shadow-md
-                    `
+                    ? "border-red-500 bg-red-50 ring-2 ring-red-300"
                     : selected
-                      ? `
-                        border-blue-200
-                        bg-blue-50
-                        ring-2
-                        ring-blue-300
-                      `
-                      : `
-                        border-gray-200
-                        bg-white
-                      `
+                      ? "border-blue-200 bg-blue-50 ring-2 ring-blue-300"
+                      : "border-gray-200 bg-white"
                 }
               `}
             >
@@ -1020,8 +1413,9 @@ export default function SelectedSegments({
               {/* OVERLAP WARNING */}
 
               {overlapping && (
-                <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-300 bg-red-100 px-4 py-3 text-sm font-semibold text-red-700">
-                  <span className="text-lg">
+                <div className="mb-4 flex items-center gap-3 rounded-xl border border-red-300 bg-red-100 px-4 py-3 text-red-700">
+
+                  <span className="text-xl">
                     ⚠
                   </span>
 
@@ -1030,12 +1424,11 @@ export default function SelectedSegments({
                       OVERLAPPING ADVERTISEMENT
                     </div>
 
-                    <div className="text-xs font-normal text-red-600">
-                      This advertisement overlaps
-                      with another selected
-                      advertisement.
+                    <div className="text-xs">
+                      This advertisement overlaps with another selected advertisement.
                     </div>
                   </div>
+
                 </div>
               )}
 
@@ -1086,18 +1479,16 @@ export default function SelectedSegments({
 
                       </div>
 
-                      {/* STATUS */}
-
                       <div className="flex items-center gap-2">
 
                         {overlapping && (
-                          <span className="shrink-0 rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
+                          <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
                             ⚠ OVERLAPPING
                           </span>
                         )}
 
                         <span
-                          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             row.status ===
                             "completed"
                               ? "bg-green-100 text-green-700"
@@ -1278,10 +1669,12 @@ export default function SelectedSegments({
 
                 <div
                   className={`
-                    rounded-xl p-4
+                    rounded-xl
+                    p-4
+
                     ${
                       overlapping
-                        ? "bg-white border border-red-200"
+                        ? "border border-red-200 bg-white"
                         : "bg-gray-50"
                     }
                   `}
@@ -1399,20 +1792,7 @@ export default function SelectedSegments({
                         onClick={(e) =>
                           e.stopPropagation()
                         }
-                        className={`
-                          h-9
-                          min-w-32
-                          rounded-lg
-                          border
-                          bg-white
-                          px-3
-                          text-sm
-                          font-semibold
-                          outline-none
-                          focus:border-blue-400
-                          focus:ring-2
-                          focus:ring-blue-100
-                        `}
+                        className="h-9 min-w-32 rounded-lg border bg-white px-3 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                       >
 
                         {getDurationOptions(
@@ -1483,6 +1863,7 @@ export default function SelectedSegments({
                           px-3
                           py-2
                           font-semibold
+
                           ${
                             overlapping
                               ? "border-red-300 bg-white text-red-700"
@@ -1508,64 +1889,15 @@ export default function SelectedSegments({
                         Duration
                       </span>
 
-                      <select
-                        value={
+                      <DurationDropdown
+                        row={row}
+                        duration={
                           duration
                         }
-                        onChange={(e) =>
-                          changeDuration(
-                            row,
-                            Number(
-                              e.target.value
-                            )
-                          )
+                        overlapping={
+                          overlapping
                         }
-                        onClick={(e) =>
-                          e.stopPropagation()
-                        }
-                        className={`
-                          h-10
-                          min-w-32
-                          rounded-lg
-                          border
-                          bg-white
-                          px-3
-                          text-sm
-                          font-semibold
-                          outline-none
-                          focus:border-blue-400
-                          focus:ring-2
-                          focus:ring-blue-100
-
-                          ${
-                            overlapping
-                              ? "border-red-400 text-red-700"
-                              : ""
-                          }
-                        `}
-                      >
-
-                        {getDurationOptions(
-                          row.id
-                        ).map(
-                          (value) => (
-                            <option
-                              key={
-                                value
-                              }
-                              value={
-                                value
-                              }
-                            >
-                              {
-                                value
-                              }{" "}
-                              seconds
-                            </option>
-                          )
-                        )}
-
-                      </select>
+                      />
 
                     </div>
 
