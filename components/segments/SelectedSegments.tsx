@@ -20,8 +20,6 @@ interface Segment {
 
 interface Props {
   segments: Segment[];
-
-  // Original/full transcript segments
   transcriptSegments?: Segment[];
 
   selectedResultId: number | null;
@@ -47,12 +45,6 @@ interface Props {
   onDownload?: (segment: Segment) => void;
 }
 
-/*
- * ============================================================
- * DURATION OPTIONS
- * ============================================================
- */
-
 const DURATION_OPTIONS = [
   5,
   10,
@@ -75,12 +67,6 @@ export default function SelectedSegments({
   onRemove,
   onSave,
 }: Props) {
-  /*
-   * ============================================================
-   * STATE
-   * ============================================================
-   */
-
   const [segmentList, setSegmentList] =
     useState<Segment[]>(segments);
 
@@ -102,16 +88,9 @@ export default function SelectedSegments({
   const [editBrand, setEditBrand] =
     useState("");
 
-  /*
-   * Custom duration is stored for durations
-   * that are not part of the preset list.
-   */
   const [customDurations, setCustomDurations] =
     useState<Record<number, number>>({});
 
-  /*
-   * Duration dropdown
-   */
   const [durationOpenId, setDurationOpenId] =
     useState<number | null>(null);
 
@@ -123,58 +102,49 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * TIME HELPERS
+   * TIME
    * ============================================================
    */
 
-  function toSeconds(
-    time?: string
-  ): number {
+  function toSeconds(time?: string): number {
     if (!time) return 0;
 
-    const value =
-      String(time).trim();
+    const value = String(time).trim();
 
     if (!value) return 0;
 
-    const parts =
-      value.split(":").map(Number);
+    const parts = value
+      .split(":")
+      .map(Number);
 
     if (
       parts.length === 3 &&
       parts.every(
-        (value) =>
-          !Number.isNaN(value)
+        (value) => !Number.isNaN(value)
       )
     ) {
-      const [
-        hour,
-        minute,
-        second,
-      ] = parts;
+      const [hours, minutes, seconds] =
+        parts;
 
       return (
-        hour * 3600 +
-        minute * 60 +
-        second
+        hours * 3600 +
+        minutes * 60 +
+        seconds
       );
     }
 
     if (
       parts.length === 2 &&
       parts.every(
-        (value) =>
-          !Number.isNaN(value)
+        (value) => !Number.isNaN(value)
       )
     ) {
-      const [
-        minute,
-        second,
-      ] = parts;
+      const [minutes, seconds] =
+        parts;
 
       return (
-        minute * 60 +
-        second
+        minutes * 60 +
+        seconds
       );
     }
 
@@ -196,16 +166,13 @@ export default function SelectedSegments({
       Math.floor(totalSeconds)
     );
 
-    const hours =
-      Math.floor(
-        totalSeconds / 3600
-      );
+    const hours = Math.floor(
+      totalSeconds / 3600
+    );
 
-    const minutes =
-      Math.floor(
-        (totalSeconds % 3600) /
-          60
-      );
+    const minutes = Math.floor(
+      (totalSeconds % 3600) / 60
+    );
 
     const seconds =
       totalSeconds % 60;
@@ -238,106 +205,88 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * OVERLAP DETECTION
+   * SYNC SEGMENTS
+   *
+   * IMPORTANT:
+   * Dependency array is FIXED:
+   *
+   * [segments]
+   *
    * ============================================================
-   *
-   * A overlaps B when:
-   *
-   * A.start < B.end
-   * AND
-   * A.end > B.start
-   *
-   * Example:
-   *
-   * Ad 1: 10:00 -> 10:30
-   * Ad 2: 10:20 -> 10:50
-   *
-   * Both are highlighted.
    */
 
-  function isRangeOverlapping(
-    startA?: string,
-    endA?: string,
-    startB?: string,
-    endB?: string
-  ): boolean {
-    if (
-      !startA ||
-      !endA ||
-      !startB ||
-      !endB
-    ) {
-      return false;
-    }
+  useEffect(() => {
+    setSegmentList((previous) => {
+      return segments.map(
+        (incoming) => {
+          const local =
+            previous.find(
+              (item) =>
+                item.id ===
+                incoming.id
+            );
 
-    const aStart =
-      toSeconds(startA);
-
-    const aEnd =
-      toSeconds(endA);
-
-    const bStart =
-      toSeconds(startB);
-
-    const bEnd =
-      toSeconds(endB);
-
-    if (aEnd <= aStart) {
-      return false;
-    }
-
-    if (bEnd <= bStart) {
-      return false;
-    }
-
-    return (
-      aStart < bEnd &&
-      aEnd > bStart
-    );
-  }
-
-  function getOverlappingIds(
-    list: Segment[]
-  ): Set<number> {
-    const ids =
-      new Set<number>();
-
-    for (
-      let i = 0;
-      i < list.length;
-      i++
-    ) {
-      for (
-        let j = i + 1;
-        j < list.length;
-        j++
-      ) {
-        const first =
-          list[i];
-
-        const second =
-          list[j];
-
-        if (
-          isRangeOverlapping(
-            first.start,
-            first.end,
-            second.start,
-            second.end
-          )
-        ) {
-          ids.add(first.id);
-          ids.add(second.id);
+          return {
+            ...incoming,
+            status:
+              incoming.status ??
+              local?.status ??
+              "completed",
+          };
         }
-      }
-    }
+      );
+    });
 
-    return ids;
-  }
+    setCustomDurations(
+      (previous) => {
+        const next = {
+          ...previous,
+        };
+
+        let changed = false;
+
+        segments.forEach(
+          (segment) => {
+            if (
+              next[segment.id] ===
+              undefined
+            ) {
+              const duration =
+                getDuration(
+                  segment.start,
+                  segment.end
+                );
+
+              if (
+                duration > 0 &&
+                !DURATION_OPTIONS.includes(
+                  duration
+                )
+              ) {
+                next[segment.id] =
+                  duration;
+
+                changed = true;
+              }
+            }
+          }
+        );
+
+        return changed
+          ? next
+          : previous;
+      }
+    );
+  }, [segments]);
 
   /*
    * ============================================================
    * CLOSE DURATION DROPDOWN
+   *
+   * IMPORTANT:
+   * Dependency array is FIXED:
+   *
+   * []
    * ============================================================
    */
 
@@ -371,90 +320,15 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * SYNC PARENT SEGMENTS
-   * ============================================================
-   */
-
-  useEffect(() => {
-    setSegmentList((prev) =>
-      segments.map(
-        (incoming) => {
-          const local =
-            prev.find(
-              (item) =>
-                item.id ===
-                incoming.id
-            );
-
-          return {
-            ...incoming,
-
-            status:
-              incoming.status ??
-              local?.status ??
-              "completed",
-          };
-        }
-      )
-    );
-
-    /*
-     * Remember custom durations
-     * such as 37 seconds.
-     */
-    setCustomDurations(
-      (prev) => {
-        const next = {
-          ...prev,
-        };
-
-        let changed = false;
-
-        segments.forEach(
-          (seg) => {
-            if (
-              next[seg.id] ===
-              undefined
-            ) {
-              const duration =
-                getDuration(
-                  seg.start,
-                  seg.end
-                );
-
-              if (
-                duration > 0 &&
-                !DURATION_OPTIONS.includes(
-                  duration
-                )
-              ) {
-                next[seg.id] =
-                  duration;
-
-                changed = true;
-              }
-            }
-          }
-        );
-
-        return changed
-          ? next
-          : prev;
-      }
-    );
-  }, [segments]);
-
-  /*
-   * ============================================================
    * DURATION OPTIONS
    * ============================================================
    */
 
   function getDurationOptions(
-    rowId: number
+    id: number
   ): number[] {
     const custom =
-      customDurations[rowId];
+      customDurations[id];
 
     if (
       custom === undefined ||
@@ -485,8 +359,8 @@ export default function SelectedSegments({
     fallbackText: string
   ): string {
     if (
-      !transcriptSegments ||
-      transcriptSegments.length === 0
+      transcriptSegments.length ===
+      0
     ) {
       return fallbackText;
     }
@@ -495,54 +369,43 @@ export default function SelectedSegments({
       toSeconds(start);
 
     const endSeconds =
-      startSeconds +
-      duration;
+      startSeconds + duration;
 
-    const matchingSegments =
+    const matching =
       transcriptSegments
-        .filter(
-          (segment) => {
-            if (
-              !segment.start ||
-              !segment.end
-            ) {
-              return false;
-            }
-
-            const segmentStart =
-              toSeconds(
-                segment.start
-              );
-
-            const segmentEnd =
-              toSeconds(
-                segment.end
-              );
-
-            /*
-             * Segment overlaps
-             * selected duration.
-             */
-            return (
-              segmentStart <
-                endSeconds &&
-              segmentEnd >
-                startSeconds
-            );
+        .filter((segment) => {
+          if (
+            !segment.start ||
+            !segment.end
+          ) {
+            return false;
           }
-        )
+
+          const segmentStart =
+            toSeconds(
+              segment.start
+            );
+
+          const segmentEnd =
+            toSeconds(
+              segment.end
+            );
+
+          return (
+            segmentStart <
+              endSeconds &&
+            segmentEnd >
+              startSeconds
+          );
+        })
         .sort(
           (a, b) =>
-            toSeconds(
-              a.start
-            ) -
-            toSeconds(
-              b.start
-            )
+            toSeconds(a.start) -
+            toSeconds(b.start)
         );
 
     const text =
-      matchingSegments
+      matching
         .map(
           (segment) =>
             segment.text?.trim()
@@ -551,9 +414,76 @@ export default function SelectedSegments({
         .join(" ");
 
     return (
-      text ||
-      fallbackText
+      text || fallbackText
     );
+  }
+
+  /*
+   * ============================================================
+   * OVERLAP
+   * ============================================================
+   */
+
+  function segmentsOverlap(
+    a: Segment,
+    b: Segment
+  ): boolean {
+    if (
+      !a.start ||
+      !a.end ||
+      !b.start ||
+      !b.end
+    ) {
+      return false;
+    }
+
+    const aStart =
+      toSeconds(a.start);
+
+    const aEnd =
+      toSeconds(a.end);
+
+    const bStart =
+      toSeconds(b.start);
+
+    const bEnd =
+      toSeconds(b.end);
+
+    return (
+      aStart < bEnd &&
+      aEnd > bStart
+    );
+  }
+
+  function getOverlappingIds(
+    list: Segment[]
+  ): Set<number> {
+    const ids =
+      new Set<number>();
+
+    for (
+      let i = 0;
+      i < list.length;
+      i++
+    ) {
+      for (
+        let j = i + 1;
+        j < list.length;
+        j++
+      ) {
+        if (
+          segmentsOverlap(
+            list[i],
+            list[j]
+          )
+        ) {
+          ids.add(list[i].id);
+          ids.add(list[j].id);
+        }
+      }
+    }
+
+    return ids;
   }
 
   /*
@@ -583,10 +513,6 @@ export default function SelectedSegments({
           duration
       );
 
-    /*
-     * Rebuild transcript
-     * according to new duration.
-     */
     const newText =
       getTranscriptForRange(
         start,
@@ -594,26 +520,16 @@ export default function SelectedSegments({
         row.text
       );
 
-    /*
-     * Remember custom duration.
-     */
     setCustomDurations(
-      (prev) => ({
-        ...prev,
-        [row.id]:
-          duration,
+      (previous) => ({
+        ...previous,
+        [row.id]: duration,
       })
     );
 
-    /*
-     * Update local UI immediately.
-     *
-     * This also causes overlap
-     * detection to run again.
-     */
     setSegmentList(
-      (prev) =>
-        prev.map(
+      (previous) =>
+        previous.map(
           (item) =>
             item.id === row.id
               ? {
@@ -628,9 +544,6 @@ export default function SelectedSegments({
         )
     );
 
-    /*
-     * Update parent/database.
-     */
     onUpdate?.(
       row.id,
       {
@@ -645,42 +558,8 @@ export default function SelectedSegments({
       }
     );
 
-    /*
-     * Close dropdown.
-     */
     setDurationOpenId(null);
     setDurationSearch("");
-  }
-
-  /*
-   * ============================================================
-   * FILTER DURATION OPTIONS
-   * ============================================================
-   */
-
-  function getFilteredDurations(
-    rowId: number
-  ): number[] {
-    const options =
-      getDurationOptions(
-        rowId
-      );
-
-    const search =
-      durationSearch
-        .trim()
-        .toLowerCase();
-
-    if (!search) {
-      return options;
-    }
-
-    return options.filter(
-      (value) =>
-        String(value).includes(
-          search
-        )
-    );
   }
 
   /*
@@ -693,9 +572,7 @@ export default function SelectedSegments({
     row: Segment
   ) {
     const value =
-      Number(
-        durationSearch
-      );
+      Number(durationSearch);
 
     if (
       !Number.isFinite(value) ||
@@ -712,7 +589,7 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * EDITABLE DURATION DROPDOWN
+   * DURATION DROPDOWN
    * ============================================================
    */
 
@@ -725,35 +602,46 @@ export default function SelectedSegments({
     duration: number;
     overlapping: boolean;
   }) {
-    const isOpen =
-      durationOpenId ===
-      row.id;
+    const open =
+      durationOpenId === row.id;
 
-    const filtered =
-      getFilteredDurations(
+    const search =
+      durationSearch
+        .trim()
+        .toLowerCase();
+
+    const options =
+      getDurationOptions(
         row.id
       );
 
+    const filtered =
+      search
+        ? options.filter(
+            (value) =>
+              String(
+                value
+              ).includes(search)
+          )
+        : options;
+
     return (
       <div
+        className="relative"
         ref={
-          isOpen
+          open
             ? durationDropdownRef
             : undefined
         }
-        className="relative"
         onClick={(e) =>
           e.stopPropagation()
         }
       >
-
-        {/* CURRENT DURATION */}
-
         <button
           type="button"
           onClick={() => {
             setDurationOpenId(
-              isOpen
+              open
                 ? null
                 : row.id
             );
@@ -766,7 +654,6 @@ export default function SelectedSegments({
             min-w-36
             items-center
             justify-between
-            gap-3
             rounded-lg
             border
             bg-white
@@ -774,16 +661,14 @@ export default function SelectedSegments({
             text-sm
             font-semibold
             shadow-sm
-            transition
 
             ${
               overlapping
-                ? "border-red-500 bg-red-50 text-red-700 ring-2 ring-red-100"
+                ? "border-red-500 bg-red-50 text-red-700"
                 : "border-gray-300 hover:border-blue-400"
             }
           `}
         >
-
           <span className="flex items-center gap-2">
 
             {overlapping && (
@@ -799,28 +684,18 @@ export default function SelectedSegments({
           </span>
 
           <span
-            className={`
-              text-xs
-              transition-transform
-
-              ${
-                isOpen
-                  ? "rotate-180"
-                  : ""
-              }
-            `}
+            className={
+              open
+                ? "rotate-180"
+                : ""
+            }
           >
             ▼
           </span>
-
         </button>
 
-        {/* DROPDOWN */}
-
-        {isOpen && (
-          <div className="absolute left-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
-
-            {/* SEARCH */}
+        {open && (
+          <div className="absolute left-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border bg-white shadow-xl">
 
             <div className="border-b p-2">
 
@@ -843,7 +718,6 @@ export default function SelectedSegments({
                     )
                   }
                   onKeyDown={(e) => {
-
                     if (
                       e.key ===
                       "Enter"
@@ -865,17 +739,14 @@ export default function SelectedSegments({
                         ""
                       );
                     }
-
                   }}
                   placeholder="Type duration..."
-                  className="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                  className="h-10 w-full rounded-lg border bg-gray-50 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
                 />
 
               </div>
 
             </div>
-
-            {/* PRESET DURATIONS */}
 
             <div className="max-h-72 overflow-y-auto p-1">
 
@@ -900,44 +771,37 @@ export default function SelectedSegments({
                       py-2.5
                       text-left
                       text-sm
-                      transition
 
                       ${
                         value ===
                         duration
                           ? "bg-blue-50 font-semibold text-blue-700"
-                          : "text-gray-700 hover:bg-gray-50"
+                          : "hover:bg-gray-50"
                       }
                     `}
                   >
-
                     <span>
                       {value} seconds
                     </span>
 
                     {value ===
                       duration && (
-                      <span className="font-bold text-blue-600">
+                      <span>
                         ✓
                       </span>
                     )}
-
                   </button>
                 )
               )}
 
               {filtered.length ===
-                0 &&
-                durationSearch && (
-                  <div className="px-3 py-3 text-sm text-gray-500">
-                    No preset duration
-                    found.
-                  </div>
-                )}
+                0 && (
+                <div className="px-3 py-3 text-sm text-gray-500">
+                  No preset duration found.
+                </div>
+              )}
 
             </div>
-
-            {/* CUSTOM */}
 
             <div className="border-t p-2">
 
@@ -954,24 +818,15 @@ export default function SelectedSegments({
                     row
                   )
                 }
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-semibold hover:bg-gray-50 disabled:opacity-40"
               >
-
-                <span>
-                  ✏
-                </span>
-
-                <span>
-                  Custom duration
-                </span>
-
+                ✏ Custom duration
               </button>
 
             </div>
 
           </div>
         )}
-
       </div>
     );
   }
@@ -982,13 +837,8 @@ export default function SelectedSegments({
    * ============================================================
    */
 
-  function edit(
-    row: Segment
-  ) {
-    setEditingId(
-      row.id
-    );
-
+  function edit(row: Segment) {
+    setEditingId(row.id);
     setBrandOpenId(null);
 
     setEditText(
@@ -1037,13 +887,8 @@ export default function SelectedSegments({
         editText
       );
 
-    setEditEnd(
-      newEnd
-    );
-
-    setEditText(
-      newText
-    );
+    setEditEnd(newEnd);
+    setEditText(newText);
   }
 
   /*
@@ -1055,15 +900,15 @@ export default function SelectedSegments({
   function changeEditStart(
     value: string
   ) {
-    const oldDuration =
+    const currentDuration =
       getDuration(
         editStart,
         editEnd
       );
 
     const duration =
-      oldDuration > 0
-        ? oldDuration
+      currentDuration > 0
+        ? currentDuration
         : 30;
 
     const newEnd =
@@ -1079,17 +924,9 @@ export default function SelectedSegments({
         editText
       );
 
-    setEditStart(
-      value
-    );
-
-    setEditEnd(
-      newEnd
-    );
-
-    setEditText(
-      newText
-    );
+    setEditStart(value);
+    setEditEnd(newEnd);
+    setEditText(newText);
   }
 
   /*
@@ -1105,23 +942,21 @@ export default function SelectedSegments({
       text: editText,
       start: editStart,
       end: editEnd,
-      brand_name:
-        editBrand,
+      brand_name: editBrand,
       status:
         "completed" as const,
     };
 
     setSegmentList(
-      (prev) =>
-        prev
-          .map(
-            (item) =>
-              item.id === row.id
-                ? {
-                    ...item,
-                    ...data,
-                  }
-                : item
+      (previous) =>
+        previous
+          .map((item) =>
+            item.id === row.id
+              ? {
+                  ...item,
+                  ...data,
+                }
+              : item
           )
           .sort(
             (a, b) =>
@@ -1135,7 +970,6 @@ export default function SelectedSegments({
     );
 
     setEditingId(null);
-
     setBrandOpenId(null);
 
     onUpdate?.(
@@ -1154,13 +988,11 @@ export default function SelectedSegments({
     row: Segment,
     value: string
   ) {
-    setEditBrand(
-      value
-    );
+    setEditBrand(value);
 
     setSegmentList(
-      (prev) =>
-        prev.map(
+      (previous) =>
+        previous.map(
           (item) =>
             item.id === row.id
               ? {
@@ -1175,21 +1007,72 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * CANCEL EDIT
+   * DELETE
+   *
+   * NO TOAST HERE.
+   *
+   * onRemove is called exactly once.
+   * ============================================================
+   */
+
+  function deleteSegment(
+    id: number
+  ) {
+    setSegmentList(
+      (previous) =>
+        previous.filter(
+          (item) =>
+            item.id !== id
+        )
+    );
+
+    if (
+      selectedResultId === id
+    ) {
+      setSelectedResultId(
+        null
+      );
+    }
+
+    if (
+      editingId === id
+    ) {
+      setEditingId(null);
+    }
+
+    if (
+      brandOpenId === id
+    ) {
+      setBrandOpenId(null);
+    }
+
+    if (
+      durationOpenId === id
+    ) {
+      setDurationOpenId(null);
+    }
+
+    setDurationSearch("");
+
+    /*
+     * ONE CALLBACK ONLY
+     */
+    onRemove?.(id);
+  }
+
+  /*
+   * ============================================================
+   * CANCEL
    * ============================================================
    */
 
   function cancelEdit() {
     setEditingId(null);
-
     setBrandOpenId(null);
 
     setEditText("");
-
     setEditStart("");
-
     setEditEnd("");
-
     setEditBrand("");
   }
 
@@ -1283,9 +1166,6 @@ export default function SelectedSegments({
       sortedSegments
     );
 
-  const hasOverlaps =
-    overlappingIds.size > 0;
-
   /*
    * ============================================================
    * UI
@@ -1311,12 +1191,14 @@ export default function SelectedSegments({
 
         <div className="flex items-center gap-3">
 
-          {hasOverlaps && (
-            <div className="rounded-lg border border-red-300 bg-red-100 px-4 py-2 text-sm font-bold text-red-700">
+          {overlappingIds.size >
+            0 && (
+            <div className="rounded-lg border border-red-300 bg-red-100 px-3 py-2 text-xs font-bold text-red-700">
               ⚠{" "}
-              {overlappingIds.size}{" "}
+              {
+                overlappingIds.size
+              }{" "}
               overlapping
-              advertisements
             </div>
           )}
 
@@ -1331,6 +1213,23 @@ export default function SelectedSegments({
         </div>
 
       </div>
+
+      {/* EMPTY */}
+
+      {sortedSegments.length ===
+        0 && (
+        <div className="rounded-2xl border border-dashed bg-white p-10 text-center">
+
+          <div className="text-4xl">
+            📭
+          </div>
+
+          <h3 className="mt-3 font-semibold text-gray-700">
+            No selected advertisements
+          </h3>
+
+        </div>
+      )}
 
       {/* SEGMENTS */}
 
@@ -1363,7 +1262,6 @@ export default function SelectedSegments({
               key={row.id}
               id={`segment-${row.id}`}
               onClick={(e) => {
-
                 const target =
                   e.target as HTMLElement;
 
@@ -1398,19 +1296,18 @@ export default function SelectedSegments({
                 border
                 p-5
                 shadow-sm
-                transition-all
 
                 ${
                   overlapping
                     ? "border-red-500 bg-red-50 ring-2 ring-red-300"
                     : selected
-                      ? "border-blue-200 bg-blue-50 ring-2 ring-blue-300"
+                      ? "border-blue-300 bg-blue-50 ring-2 ring-blue-300"
                       : "border-gray-200 bg-white"
                 }
               `}
             >
 
-              {/* OVERLAP WARNING */}
+              {/* OVERLAP */}
 
               {overlapping && (
                 <div className="mb-4 flex items-center gap-3 rounded-xl border border-red-300 bg-red-100 px-4 py-3 text-red-700">
@@ -1425,7 +1322,7 @@ export default function SelectedSegments({
                     </div>
 
                     <div className="text-xs">
-                      This advertisement overlaps with another selected advertisement.
+                      This advertisement overlaps another selected advertisement.
                     </div>
                   </div>
 
@@ -1437,8 +1334,6 @@ export default function SelectedSegments({
               <div className="flex items-start justify-between gap-4">
 
                 <div className="flex flex-1 gap-4">
-
-                  {/* NUMBER */}
 
                   <div
                     className={`
@@ -1461,14 +1356,11 @@ export default function SelectedSegments({
                     {index + 1}
                   </div>
 
-                  {/* MAIN */}
-
                   <div className="min-w-0 flex-1">
 
                     <div className="flex items-center justify-between gap-2">
 
                       <div>
-
                         <h3 className="font-bold">
                           Advertisement
                         </h3>
@@ -1476,10 +1368,9 @@ export default function SelectedSegments({
                         <p className="text-xs text-gray-500">
                           Detected Segment
                         </p>
-
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
 
                         {overlapping && (
                           <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
@@ -1541,7 +1432,6 @@ export default function SelectedSegments({
                           onChange={(
                             value
                           ) => {
-
                             updateBrand(
                               row,
                               value
@@ -1550,7 +1440,6 @@ export default function SelectedSegments({
                             setBrandOpenId(
                               null
                             );
-
                           }}
                         />
 
@@ -1600,28 +1489,26 @@ export default function SelectedSegments({
 
                 <div className="flex shrink-0 items-center gap-2">
 
-                  {/* PLAY */}
-
                   <button
                     type="button"
-                    onClick={() =>
-                      onPlay(row)
-                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPlay(row);
+                    }}
                     className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600"
                   >
                     ▶
                   </button>
-
-                  {/* EDIT / SAVE */}
 
                   {editingId ===
                   row.id ? (
 
                     <button
                       type="button"
-                      onClick={() =>
-                        saveEdit(row)
-                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        saveEdit(row);
+                      }}
                       className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
                     >
                       💾 Save
@@ -1631,9 +1518,10 @@ export default function SelectedSegments({
 
                     <button
                       type="button"
-                      onClick={() =>
-                        edit(row)
-                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        edit(row);
+                      }}
                       className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200"
                     >
                       ✏️
@@ -1645,11 +1533,12 @@ export default function SelectedSegments({
 
                   <button
                     type="button"
-                    onClick={() =>
-                      onRemove?.(
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteSegment(
                         row.id
-                      )
-                    }
+                      );
+                    }}
                     className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 hover:bg-red-100"
                   >
                     🗑
@@ -1667,18 +1556,7 @@ export default function SelectedSegments({
                   Transcript
                 </label>
 
-                <div
-                  className={`
-                    rounded-xl
-                    p-4
-
-                    ${
-                      overlapping
-                        ? "border border-red-200 bg-white"
-                        : "bg-gray-50"
-                    }
-                  `}
-                >
+                <div className="rounded-xl bg-gray-50 p-4">
 
                   {editingId ===
                   row.id ? (
@@ -1747,8 +1625,6 @@ export default function SelectedSegments({
 
                   <div className="flex flex-wrap items-center gap-3">
 
-                    {/* START */}
-
                     <div className="flex flex-col gap-1">
 
                       <span className="text-xs text-gray-500">
@@ -1770,8 +1646,6 @@ export default function SelectedSegments({
                       →
                     </span>
 
-                    {/* DURATION */}
-
                     <div className="flex flex-col gap-1">
 
                       <span className="text-xs text-gray-500">
@@ -1792,9 +1666,8 @@ export default function SelectedSegments({
                         onClick={(e) =>
                           e.stopPropagation()
                         }
-                        className="h-9 min-w-32 rounded-lg border bg-white px-3 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                        className="h-9 min-w-32 rounded-lg border bg-white px-3 text-sm font-semibold"
                       >
-
                         {getDurationOptions(
                           row.id
                         ).map(
@@ -1807,14 +1680,11 @@ export default function SelectedSegments({
                                 value
                               }
                             >
-                              {
-                                value
-                              }{" "}
+                              {value}{" "}
                               seconds
                             </option>
                           )
                         )}
-
                       </select>
 
                     </div>
@@ -1822,8 +1692,6 @@ export default function SelectedSegments({
                     <span className="mt-5 text-gray-400">
                       →
                     </span>
-
-                    {/* END */}
 
                     <div className="flex flex-col gap-1">
 

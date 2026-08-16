@@ -1,5 +1,4 @@
 import "./globals.css";
-import AppLayout from "@/components/layout/AppLayout";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Geist } from "next/font/google";
@@ -18,9 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn("font-sans", geist.variable)}>
       <body>
-        <AppLayout>
-          {children}
-        </AppLayout>
+        {children}
 
         <ToastContainer
           position="top-right"

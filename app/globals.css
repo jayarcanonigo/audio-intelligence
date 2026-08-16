@@ -46,6 +46,143 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* -------------------------------------------------------------
+     Brand extension tokens — Radio Intelligence
+     Exposed as Tailwind utilities: bg-signal, text-alert-foreground,
+     border-success, etc. Kept separate from shadcn's own --primary/
+     --accent so they read as intentional status colors (an ad
+     detection, a healthy service) rather than the app's base theme.
+  ------------------------------------------------------------- */
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-signal-muted: var(--signal-muted);
+  --color-alert: var(--alert);
+  --color-alert-foreground: var(--alert-foreground);
+  --color-alert-muted: var(--alert-muted);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  /* Primary now carries the brand signal-teal rather than shadcn's
+     default near-black, so buttons, focus rings, and active nav
+     states read as this product rather than a generic scaffold. */
+  --primary: oklch(0.538 0.091 210.8);
+  --primary-foreground: oklch(0.985 0 0);
+
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.959 0.017 205.8);
+  --accent-foreground: oklch(0.538 0.091 210.8);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.629 0.107 209.6);
+
+  /* Chart / stat scale: teal → amber → green → slate, used for the
+     dashboard's stat-card accents instead of a monochrome ramp. */
+  --chart-1: oklch(0.629 0.107 209.6);
+  --chart-2: oklch(0.634 0.139 65.6);
+  --chart-3: oklch(0.553 0.118 160.1);
+  --chart-4: oklch(0.556 0 0);
+  --chart-5: oklch(0.371 0 0);
+
+  --radius: 0.625rem;
+
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.538 0.091 210.8);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.959 0.017 205.8);
+  --sidebar-accent-foreground: oklch(0.538 0.091 210.8);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.629 0.107 209.6);
+
+  /* Status tones */
+  --signal: oklch(0.629 0.107 209.6);
+  --signal-foreground: oklch(0.985 0 0);
+  --signal-muted: oklch(0.959 0.017 205.8);
+
+  --alert: oklch(0.634 0.139 65.6);
+  --alert-foreground: oklch(0.985 0 0);
+  --alert-muted: oklch(0.959 0.025 78.9);
+
+  --success: oklch(0.553 0.118 160.1);
+  --success-foreground: oklch(0.985 0 0);
+  --success-muted: oklch(0.955 0.017 164.7);
+}
+
+.dark {
+  --background: oklch(0.213 0.019 262.1);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.242 0.019 258.4);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.242 0.019 258.4);
+  --popover-foreground: oklch(0.985 0 0);
+
+  --primary: oklch(0.629 0.107 209.6);
+  --primary-foreground: oklch(0.145 0.019 258.4);
+
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.3 0.04 210);
+  --accent-foreground: oklch(0.9 0.05 205);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.629 0.107 209.6);
+
+  --chart-1: oklch(0.629 0.107 209.6);
+  --chart-2: oklch(0.72 0.13 65.6);
+  --chart-3: oklch(0.65 0.12 160.1);
+  --chart-4: oklch(0.708 0 0);
+  --chart-5: oklch(0.87 0 0);
+
+  --sidebar: oklch(0.242 0.019 258.4);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.629 0.107 209.6);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
+  --sidebar-accent: oklch(0.3 0.04 210);
+  --sidebar-accent-foreground: oklch(0.9 0.05 205);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.629 0.107 209.6);
+
+  --signal: oklch(0.629 0.107 209.6);
+  --signal-foreground: oklch(0.145 0.019 258.4);
+  --signal-muted: oklch(0.3 0.04 210);
+
+  --alert: oklch(0.72 0.13 65.6);
+  --alert-foreground: oklch(0.145 0.019 258.4);
+  --alert-muted: oklch(0.32 0.05 70);
+
+  --success: oklch(0.65 0.12 160.1);
+  --success-foreground: oklch(0.145 0.019 258.4);
+  --success-muted: oklch(0.3 0.05 160);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }
 
 .layout {
@@ -65,83 +202,35 @@
   padding: 24px;
 }
 
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+/* Signature element keyframes — used by the header's live signal
+   meter and status-dot pulse. Referenced via Tailwind arbitrary
+   animate-[...] utilities in the dashboard, kept here since Tailwind
+   v4 doesn't read custom keyframes from @theme by default. */
+@keyframes signal-meter {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+@keyframes status-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.45;
+  }
+  70%,
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
 }
 
-@layer base {
+@media (prefers-reduced-motion: reduce) {
   * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

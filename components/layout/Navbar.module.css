@@ -1,185 +1,390 @@
 .navbar {
-  width: 100%;
-  background: #111827;
-  color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  position: sticky;
-  top: 0;
-  z-index: 100;
+    width: 100%;
+
+    background: #111827;
+
+    color: white;
+
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.15);
+
+    position: sticky;
+
+    top: 0;
+
+    z-index: 100;
 }
+
+
+/* ============================================================
+   NAVBAR INNER
+============================================================ */
 
 .navbarInner {
-  width: 100%;
-  min-height: 64px;
+    width: 100%;
 
-  display: flex;
-  align-items: center;
+    min-height: 64px;
 
-  padding: 0 20px;
+    display: flex;
+
+    align-items: center;
+
+    padding: 0 20px;
 }
 
-/* =========================
+
+/* ============================================================
    MENU BUTTON
-========================= */
+============================================================ */
 
 .menuButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    display: flex;
 
-  width: 42px;
-  height: 42px;
+    align-items: center;
 
-  margin-right: 14px;
+    justify-content: center;
 
-  border: none;
-  border-radius: 8px;
+    width: 42px;
 
-  background: transparent;
-  color: white;
+    height: 42px;
 
-  font-size: 26px;
+    margin-right: 14px;
 
-  cursor: pointer;
+    border: none;
+
+    border-radius: 8px;
+
+    background: transparent;
+
+    color: white;
+
+    font-size: 26px;
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease;
 }
 
 .menuButton:hover {
-  background: #1f2937;
+    background: #1f2937;
 }
 
-/* =========================
+.menuButton:active {
+    transform: scale(0.96);
+}
+
+
+/* ============================================================
    LOGO
-========================= */
+============================================================ */
 
 .navbarLogo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+    display: flex;
 
-  color: white;
-  text-decoration: none;
+    align-items: center;
 
-  font-size: 18px;
-  font-weight: 700;
+    gap: 8px;
 
-  white-space: nowrap;
+    color: white;
+
+    text-decoration: none;
+
+    font-size: 18px;
+
+    font-weight: 700;
+
+    white-space: nowrap;
 }
 
 .navbarLogo span:first-child {
-  font-size: 24px;
+    font-size: 24px;
 }
 
-/* =========================
+
+/* ============================================================
    DESKTOP MENU
-========================= */
+============================================================ */
 
 .desktopMenu {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+    display: flex;
 
-  margin-left: 24px;
+    align-items: center;
+
+    gap: 4px;
+
+    margin-left: 24px;
 }
+
 
 .menuLink {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+    display: flex;
 
-  padding: 10px 12px;
+    align-items: center;
 
-  border-radius: 8px;
+    gap: 8px;
 
-  color: #e5e7eb;
-  text-decoration: none;
+    padding: 10px 12px;
 
-  font-size: 14px;
-  font-weight: 500;
+    border-radius: 8px;
+
+    color: #e5e7eb;
+
+    text-decoration: none;
+
+    font-size: 14px;
+
+    font-weight: 500;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
 }
+
 
 .menuLink:hover {
-  background: #1f2937;
-  color: white;
+    background: #1f2937;
+
+    color: white;
 }
 
-/* =========================
+
+/* ============================================================
    ADMIN
-========================= */
+============================================================ */
 
 .desktopAdmin {
-  margin-left: auto;
+    margin-left: auto;
 
-  display: flex;
-  align-items: center;
-  gap: 8px;
+    display: flex;
 
-  font-size: 14px;
+    align-items: center;
+
+    gap: 12px;
+
+    font-size: 14px;
 }
 
-/* =========================
-   DROPDOWN PANEL
-========================= */
+
+.adminInfo {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    color: #e5e7eb;
+}
+
+
+/* ============================================================
+   LOGOUT
+============================================================ */
+
+.logoutButton {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 7px;
+
+    padding: 8px 14px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    background: #dc2626;
+
+    color: white;
+
+    font-family: inherit;
+
+    font-size: 14px;
+
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        transform 0.1s ease;
+}
+
+
+.logoutButton:hover {
+    background: #b91c1c;
+}
+
+
+.logoutButton:active {
+    transform: scale(0.97);
+}
+
+
+/* ============================================================
+   MOBILE MENU PANEL
+============================================================ */
 
 .menuPanel {
-  position: absolute;
+    position: absolute;
 
-  top: 64px;
-  left: 20px;
+    top: 64px;
 
-  width: 240px;
+    left: 20px;
 
-  padding: 8px;
+    width: 240px;
 
-  background: #111827;
+    padding: 8px;
 
-  border: 1px solid #374151;
-  border-radius: 10px;
+    background: #111827;
 
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    border: 1px solid #374151;
+
+    border-radius: 10px;
+
+    box-shadow:
+        0 10px 25px rgba(0, 0, 0, 0.3);
 }
+
+
+/* ============================================================
+   MOBILE MENU LINK
+============================================================ */
 
 .menuPanelLink {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+    display: flex;
 
-  padding: 12px 14px;
+    align-items: center;
 
-  border-radius: 8px;
+    gap: 12px;
 
-  color: #e5e7eb;
-  text-decoration: none;
+    padding: 12px 14px;
 
-  font-size: 15px;
+    border-radius: 8px;
+
+    color: #e5e7eb;
+
+    text-decoration: none;
+
+    font-size: 15px;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
 }
+
 
 .menuPanelLink:hover {
-  background: #1f2937;
-  color: white;
+    background: #1f2937;
+
+    color: white;
 }
 
-/* =========================
+
+/* ============================================================
+   MOBILE LOGOUT
+============================================================ */
+
+.mobileLogout {
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    width: 100%;
+
+    margin-top: 4px;
+
+    padding: 12px 14px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    background: transparent;
+
+    color: #f87171;
+
+    font-family: inherit;
+
+    font-size: 15px;
+
+    font-weight: 600;
+
+    text-align: left;
+
+    cursor: pointer;
+}
+
+
+.mobileLogout:hover {
+    background: #1f2937;
+
+    color: #fca5a5;
+}
+
+
+/* ============================================================
    MOBILE
-========================= */
+============================================================ */
 
 @media (max-width: 767px) {
 
-  .navbarInner {
-    padding: 0 12px;
-  }
+    .navbarInner {
+        padding: 0 12px;
+    }
 
-  .navbarLogo {
-    font-size: 17px;
-  }
 
-  .desktopMenu,
-  .desktopAdmin {
-    display: none;
-  }
+    .navbarLogo {
+        font-size: 17px;
+    }
 
-  .menuPanel {
-    left: 12px;
-    right: 12px;
-    width: auto;
-  }
+
+    .desktopMenu,
+    .desktopAdmin {
+        display: none;
+    }
+
+
+    .menuPanel {
+        left: 12px;
+
+        right: 12px;
+
+        width: auto;
+    }
+
+}
+
+
+/* ============================================================
+   SMALL MOBILE
+============================================================ */
+
+@media (max-width: 380px) {
+
+    .navbarLogo {
+        font-size: 16px;
+    }
+
+
+    .navbarLogo span:first-child {
+        font-size: 22px;
+    }
+
+
+    .menuButton {
+        width: 38px;
+
+        height: 38px;
+
+        margin-right: 10px;
+
+        font-size: 24px;
+    }
+
 }
