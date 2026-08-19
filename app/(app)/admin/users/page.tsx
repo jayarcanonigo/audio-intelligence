@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://127.0.0.1:8000";
 
 type User = {
     id: number;
@@ -21,18 +22,29 @@ export default function AdminUsersPage() {
 
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
-    const [actionLoading, setActionLoading] = useState<number | null>(null);
+    const [actionLoading, setActionLoading] =
+        useState<number | null>(null);
 
-    const [showAddUser, setShowAddUser] = useState(false);
+    const [showAddUser, setShowAddUser] =
+        useState(false);
 
-    const [username, setUsername] = useState("");
-    const [password, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
+    const [username, setUsername] =
+        useState("");
 
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
+    const [password, setPassword] =
+        useState("");
 
-    const [mobileMenu, setMobileMenu] = useState(false);
+    const [confirmPassword, setConfirmPassword] =
+        useState("");
+
+    const [error, setError] =
+        useState("");
+
+    const [success, setSuccess] =
+        useState("");
+
+    const [mobileMenu, setMobileMenu] =
+        useState(false);
 
     /* ============================================================
        AUTH
@@ -43,7 +55,9 @@ export default function AdminUsersPage() {
             return null;
         }
 
-        return localStorage.getItem("access_token");
+        return localStorage.getItem(
+            "access_token"
+        );
     }
 
     function getCurrentUsername() {
@@ -51,12 +65,20 @@ export default function AdminUsersPage() {
             return "";
         }
 
-        return localStorage.getItem("username") || "Admin";
+        return (
+            localStorage.getItem(
+                "username"
+            ) || "Admin"
+        );
     }
 
     function checkAdmin() {
         const token = getToken();
-        const role = localStorage.getItem("role");
+
+        const role =
+            typeof window !== "undefined"
+                ? localStorage.getItem("role")
+                : null;
 
         if (!token) {
             router.replace("/login");
@@ -86,12 +108,16 @@ export default function AdminUsersPage() {
         try {
             const token = getToken();
 
-            const response = await fetch(`${API_URL}/users`, {
-                method: "GET",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
+            const response = await fetch(
+                `${API_URL}/users`,
+                {
+                    method: "GET",
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`,
+                    },
+                }
+            );
 
             if (response.status === 401) {
                 logout();
@@ -103,15 +129,21 @@ export default function AdminUsersPage() {
                 return;
             }
 
-            const data = await response.json();
+            const data =
+                await response.json();
 
             if (!response.ok) {
                 throw new Error(
-                    data?.detail || "Unable to load users"
+                    data?.detail ||
+                        "Unable to load users"
                 );
             }
 
-            setUsers(Array.isArray(data) ? data : []);
+            setUsers(
+                Array.isArray(data)
+                    ? data
+                    : []
+            );
         } catch (error) {
             setError(
                 error instanceof Error
@@ -139,8 +171,17 @@ export default function AdminUsersPage() {
         setError("");
         setSuccess("");
 
+        if (!username.trim()) {
+            setError(
+                "Username is required."
+            );
+            return;
+        }
+
         if (password !== confirmPassword) {
-            setError("Passwords do not match.");
+            setError(
+                "Passwords do not match."
+            );
             return;
         }
 
@@ -156,30 +197,49 @@ export default function AdminUsersPage() {
         try {
             const token = getToken();
 
-            const response = await fetch(`${API_URL}/users`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    username: username.trim(),
-                    password,
-                }),
-            });
+            const response = await fetch(
+                `${API_URL}/users`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
 
-            const data = await response.json();
+                        Authorization:
+                            `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        username:
+                            username.trim(),
+
+                        password,
+                    }),
+                }
+            );
+
+            const data =
+                await response.json();
 
             if (response.status === 401) {
                 logout();
                 return;
             }
 
+            if (response.status === 403) {
+                router.replace("/dashboard");
+                return;
+            }
+
             if (!response.ok) {
                 throw new Error(
-                    data?.detail || "Unable to create user"
+                    data?.detail ||
+                        "Unable to create user"
                 );
             }
+
+            const createdUsername =
+                data?.username ||
+                username.trim();
 
             setUsername("");
             setPassword("");
@@ -188,7 +248,7 @@ export default function AdminUsersPage() {
             setShowAddUser(false);
 
             setSuccess(
-                `User "${data.username || username}" created successfully.`
+                `User "${createdUsername}" created successfully.`
             );
 
             await loadUsers();
@@ -217,6 +277,7 @@ export default function AdminUsersPage() {
     ) {
         setError("");
         setSuccess("");
+
         setActionLoading(userId);
 
         try {
@@ -227,15 +288,22 @@ export default function AdminUsersPage() {
                 {
                     method: "PATCH",
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization:
+                            `Bearer ${token}`,
                     },
                 }
             );
 
-            const data = await response.json();
+            const data =
+                await response.json();
 
             if (response.status === 401) {
                 logout();
+                return;
+            }
+
+            if (response.status === 403) {
+                router.replace("/dashboard");
                 return;
             }
 
@@ -246,8 +314,17 @@ export default function AdminUsersPage() {
                 );
             }
 
+            const actionLabel =
+                action === "approve"
+                    ? "approved"
+                    : action === "reject"
+                    ? "rejected"
+                    : action === "activate"
+                    ? "activated"
+                    : "deactivated";
+
             setSuccess(
-                `User successfully ${action}d.`
+                `User successfully ${actionLabel}.`
             );
 
             await loadUsers();
@@ -267,34 +344,68 @@ export default function AdminUsersPage() {
     ============================================================ */
 
     function logout() {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("token_type");
-        localStorage.removeItem("user_id");
-        localStorage.removeItem("username");
-        localStorage.removeItem("role");
+        localStorage.removeItem(
+            "access_token"
+        );
+
+        localStorage.removeItem(
+            "token_type"
+        );
+
+        localStorage.removeItem(
+            "user_id"
+        );
+
+        localStorage.removeItem(
+            "username"
+        );
+
+        localStorage.removeItem(
+            "role"
+        );
 
         router.replace("/login");
+    }
+
+    /* ============================================================
+       NAVIGATION
+    ============================================================ */
+
+    function goDashboard() {
+        setMobileMenu(false);
+        router.push("/dashboard");
+    }
+
+    function goWallet() {
+        setMobileMenu(false);
+        router.push("/wallet");
     }
 
     /* ============================================================
        STATS
     ============================================================ */
 
-    const totalUsers = users.length;
+    const totalUsers =
+        users.length;
 
-    const pendingUsers = users.filter(
-        (user) => user.status === "PENDING"
-    ).length;
+    const pendingUsers =
+        users.filter(
+            (user) =>
+                user.status === "PENDING"
+        ).length;
 
-    const approvedUsers = users.filter(
-        (user) => user.status === "APPROVED"
-    ).length;
+    const approvedUsers =
+        users.filter(
+            (user) =>
+                user.status === "APPROVED"
+        ).length;
 
-    const inactiveUsers = users.filter(
-        (user) =>
-            user.status === "INACTIVE" ||
-            user.status === "REJECTED"
-    ).length;
+    const inactiveUsers =
+        users.filter(
+            (user) =>
+                user.status === "INACTIVE" ||
+                user.status === "REJECTED"
+        ).length;
 
     /* ============================================================
        RENDER
@@ -303,9 +414,9 @@ export default function AdminUsersPage() {
     return (
         <main className="min-h-screen bg-slate-100 text-slate-900">
 
-            {/* ========================================================
+            {/* ====================================================
                 MOBILE HEADER
-            ========================================================= */}
+            ==================================================== */}
 
             <header className="lg:hidden sticky top-0 z-40 bg-white border-b border-slate-200">
 
@@ -329,9 +440,12 @@ export default function AdminUsersPage() {
 
                     <button
                         onClick={() =>
-                            setMobileMenu(!mobileMenu)
+                            setMobileMenu(
+                                !mobileMenu
+                            )
                         }
                         className="w-10 h-10 rounded-lg border border-slate-200 flex items-center justify-center"
+                        aria-label="Toggle menu"
                     >
                         {mobileMenu ? (
                             <CloseIcon />
@@ -364,22 +478,41 @@ export default function AdminUsersPage() {
                         </div>
 
                         <button
-                            onClick={() => router.push("/dashboard")}
-                            className="w-full text-left rounded-lg px-3 py-3 text-sm hover:bg-slate-50"
+                            onClick={
+                                goDashboard
+                            }
+                            className="w-full flex items-center gap-3 text-left rounded-lg px-3 py-3 text-sm hover:bg-slate-50"
                         >
+                            <DashboardIcon />
+
                             Dashboard
                         </button>
 
                         <button
-                            className="w-full text-left rounded-lg px-3 py-3 text-sm bg-indigo-50 text-indigo-700 font-semibold"
+                            className="w-full flex items-center gap-3 text-left rounded-lg px-3 py-3 text-sm bg-indigo-50 text-indigo-700 font-semibold"
                         >
+                            <UsersIcon />
+
                             User Management
                         </button>
 
                         <button
-                            onClick={logout}
-                            className="w-full text-left rounded-lg px-3 py-3 text-sm text-red-600 hover:bg-red-50"
+                            onClick={
+                                goWallet
+                            }
+                            className="w-full flex items-center gap-3 text-left rounded-lg px-3 py-3 text-sm hover:bg-slate-50"
                         >
+                            <WalletIcon />
+
+                            Wallet
+                        </button>
+
+                        <button
+                            onClick={logout}
+                            className="w-full flex items-center gap-3 text-left rounded-lg px-3 py-3 text-sm text-red-600 hover:bg-red-50"
+                        >
+                            <LogoutIcon />
+
                             Logout
                         </button>
 
@@ -388,9 +521,9 @@ export default function AdminUsersPage() {
 
             </header>
 
-            {/* ========================================================
+            {/* ====================================================
                 DESKTOP SIDEBAR
-            ========================================================= */}
+            ==================================================== */}
 
             <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 bg-slate-950 text-white flex-col">
 
@@ -412,9 +545,11 @@ export default function AdminUsersPage() {
 
                 <nav className="flex-1 p-4">
 
+                    {/* Dashboard */}
+
                     <button
-                        onClick={() =>
-                            router.push("/dashboard")
+                        onClick={
+                            goDashboard
                         }
                         className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
                     >
@@ -423,12 +558,27 @@ export default function AdminUsersPage() {
                         Dashboard
                     </button>
 
+                    {/* User Management */}
+
                     <button
                         className="w-full flex items-center gap-3 rounded-xl px-4 py-3 mt-1 text-sm bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
                     >
                         <UsersIcon />
 
                         User Management
+                    </button>
+
+                    {/* Wallet */}
+
+                    <button
+                        onClick={
+                            goWallet
+                        }
+                        className="w-full flex items-center gap-3 rounded-xl px-4 py-3 mt-1 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
+                    >
+                        <WalletIcon />
+
+                        Wallet
                     </button>
 
                 </nav>
@@ -468,16 +618,18 @@ export default function AdminUsersPage() {
 
             </aside>
 
-            {/* ========================================================
+            {/* ====================================================
                 MAIN
-            ========================================================= */}
+            ==================================================== */}
 
             <div className="lg:ml-64 min-h-screen">
 
                 {/* Desktop topbar */}
+
                 <header className="hidden lg:flex h-20 bg-white border-b border-slate-200 items-center justify-between px-8">
 
                     <div>
+
                         <h1 className="text-lg font-bold">
                             User Management
                         </h1>
@@ -485,17 +637,28 @@ export default function AdminUsersPage() {
                         <p className="text-sm text-slate-500">
                             Manage system users and approval requests.
                         </p>
+
                     </div>
 
                     <div className="flex items-center gap-3">
 
                         <button
-                            onClick={loadUsers}
-                            className="h-10 px-4 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-50"
+                            onClick={
+                                loadUsers
+                            }
+                            disabled={
+                                loading
+                            }
+                            className="h-10 px-4 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
                         >
                             <span className="flex items-center gap-2">
+
                                 <RefreshIcon />
-                                Refresh
+
+                                {loading
+                                    ? "Refreshing..."
+                                    : "Refresh"}
+
                             </span>
                         </button>
 
@@ -503,13 +666,18 @@ export default function AdminUsersPage() {
                             onClick={() => {
                                 setError("");
                                 setSuccess("");
-                                setShowAddUser(true);
+                                setShowAddUser(
+                                    true
+                                );
                             }}
                             className="h-10 px-4 rounded-lg bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700 shadow-sm"
                         >
                             <span className="flex items-center gap-2">
+
                                 <PlusIcon />
+
                                 Add User
+
                             </span>
                         </button>
 
@@ -518,14 +686,17 @@ export default function AdminUsersPage() {
                 </header>
 
                 {/* Content */}
+
                 <div className="p-4 sm:p-6 lg:p-8">
 
                     {/* Mobile title */}
+
                     <div className="lg:hidden mb-5">
 
                         <div className="flex items-start justify-between gap-4">
 
                             <div>
+
                                 <h1 className="text-xl font-bold">
                                     User Management
                                 </h1>
@@ -533,19 +704,25 @@ export default function AdminUsersPage() {
                                 <p className="text-sm text-slate-500 mt-1">
                                     Manage users and approvals.
                                 </p>
+
                             </div>
 
                             <button
                                 onClick={() => {
                                     setError("");
                                     setSuccess("");
-                                    setShowAddUser(true);
+                                    setShowAddUser(
+                                        true
+                                    );
                                 }}
                                 className="shrink-0 h-10 px-3 rounded-lg bg-indigo-600 text-white text-sm font-semibold"
                             >
                                 <span className="flex items-center gap-1.5">
+
                                     <PlusIcon />
+
                                     Add
+
                                 </span>
                             </button>
 
@@ -555,13 +732,15 @@ export default function AdminUsersPage() {
 
                     {/* =================================================
                         ALERTS
-                    ================================================== */}
+                    ================================================= */}
 
                     {error && (
                         <Alert
                             type="error"
                             message={error}
-                            onClose={() => setError("")}
+                            onClose={() =>
+                                setError("")
+                            }
                         />
                     )}
 
@@ -569,68 +748,94 @@ export default function AdminUsersPage() {
                         <Alert
                             type="success"
                             message={success}
-                            onClose={() => setSuccess("")}
+                            onClose={() =>
+                                setSuccess("")
+                            }
                         />
                     )}
 
                     {/* =================================================
                         STATISTICS
-                    ================================================== */}
+                    ================================================= */}
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
 
                         <StatCard
                             title="Total Users"
-                            value={totalUsers}
-                            icon={<UsersIcon />}
+                            value={
+                                totalUsers
+                            }
+                            icon={
+                                <UsersIcon />
+                            }
                         />
 
                         <StatCard
                             title="Pending"
-                            value={pendingUsers}
-                            icon={<ClockIcon />}
+                            value={
+                                pendingUsers
+                            }
+                            icon={
+                                <ClockIcon />
+                            }
                             warning
                         />
 
                         <StatCard
                             title="Approved"
-                            value={approvedUsers}
-                            icon={<CheckIcon />}
+                            value={
+                                approvedUsers
+                            }
+                            icon={
+                                <CheckIcon />
+                            }
                         />
 
                         <StatCard
                             title="Inactive"
-                            value={inactiveUsers}
-                            icon={<UserOffIcon />}
+                            value={
+                                inactiveUsers
+                            }
+                            icon={
+                                <UserOffIcon />
+                            }
                         />
 
                     </div>
 
                     {/* =================================================
                         USERS
-                    ================================================== */}
+                    ================================================= */}
 
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
 
                         {/* Table header */}
+
                         <div className="hidden md:flex items-center justify-between px-6 py-4 border-b border-slate-200">
 
                             <div>
+
                                 <h2 className="font-bold">
                                     System Users
                                 </h2>
 
                                 <p className="text-xs text-slate-500 mt-1">
+
                                     {totalUsers} user
-                                    {totalUsers !== 1
+                                    {totalUsers !==
+                                    1
                                         ? "s"
                                         : ""}{" "}
                                     registered
+
                                 </p>
+
                             </div>
 
                             <button
-                                onClick={loadUsers}
+                                onClick={
+                                    loadUsers
+                                }
                                 className="text-sm text-slate-500 hover:text-indigo-600"
                             >
                                 Refresh
@@ -639,12 +844,16 @@ export default function AdminUsersPage() {
                         </div>
 
                         {/* Loading */}
+
                         {loading ? (
                             <LoadingState />
-                        ) : users.length === 0 ? (
+                        ) : users.length ===
+                          0 ? (
                             <EmptyState
                                 onAdd={() =>
-                                    setShowAddUser(true)
+                                    setShowAddUser(
+                                        true
+                                    )
                                 }
                             />
                         ) : (
@@ -687,92 +896,100 @@ export default function AdminUsersPage() {
 
                                         <tbody className="divide-y divide-slate-100">
 
-                                            {users.map((user) => (
-                                                <tr
-                                                    key={user.id}
-                                                    className="hover:bg-slate-50/70"
-                                                >
+                                            {users.map(
+                                                (
+                                                    user
+                                                ) => (
+                                                    <tr
+                                                        key={
+                                                            user.id
+                                                        }
+                                                        className="hover:bg-slate-50/70"
+                                                    >
 
-                                                    <td className="px-6 py-4">
+                                                        <td className="px-6 py-4">
 
-                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex items-center gap-3">
 
-                                                            <Avatar
-                                                                username={
-                                                                    user.username
-                                                                }
-                                                            />
-
-                                                            <div>
-
-                                                                <p className="font-semibold text-sm">
-                                                                    {
+                                                                <Avatar
+                                                                    username={
                                                                         user.username
                                                                     }
-                                                                </p>
+                                                                />
 
-                                                                <p className="text-xs text-slate-400">
-                                                                    ID #
-                                                                    {user.id}
-                                                                </p>
+                                                                <div>
+
+                                                                    <p className="font-semibold text-sm">
+                                                                        {
+                                                                            user.username
+                                                                        }
+                                                                    </p>
+
+                                                                    <p className="text-xs text-slate-400">
+                                                                        ID #
+                                                                        {
+                                                                            user.id
+                                                                        }
+                                                                    </p>
+
+                                                                </div>
 
                                                             </div>
 
-                                                        </div>
+                                                        </td>
 
-                                                    </td>
+                                                        <td className="px-6 py-4">
 
-                                                    <td className="px-6 py-4">
-
-                                                        <RoleBadge
-                                                            role={
-                                                                user.role
-                                                            }
-                                                        />
-
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-
-                                                        <StatusBadge
-                                                            status={
-                                                                user.status
-                                                            }
-                                                        />
-
-                                                    </td>
-
-                                                    <td className="px-6 py-4 text-sm text-slate-500">
-
-                                                        {formatDate(
-                                                            user.created_at
-                                                        )}
-
-                                                    </td>
-
-                                                    <td className="px-6 py-4">
-
-                                                        <div className="flex justify-end gap-2">
-
-                                                            <Actions
-                                                                user={
-                                                                    user
-                                                                }
-                                                                loading={
-                                                                    actionLoading ===
-                                                                    user.id
-                                                                }
-                                                                onAction={
-                                                                    updateStatus
+                                                            <RoleBadge
+                                                                role={
+                                                                    user.role
                                                                 }
                                                             />
 
-                                                        </div>
+                                                        </td>
 
-                                                    </td>
+                                                        <td className="px-6 py-4">
 
-                                                </tr>
-                                            ))}
+                                                            <StatusBadge
+                                                                status={
+                                                                    user.status
+                                                                }
+                                                            />
+
+                                                        </td>
+
+                                                        <td className="px-6 py-4 text-sm text-slate-500">
+
+                                                            {formatDate(
+                                                                user.created_at
+                                                            )}
+
+                                                        </td>
+
+                                                        <td className="px-6 py-4">
+
+                                                            <div className="flex justify-end gap-2">
+
+                                                                <Actions
+                                                                    user={
+                                                                        user
+                                                                    }
+                                                                    loading={
+                                                                        actionLoading ===
+                                                                        user.id
+                                                                    }
+                                                                    onAction={
+                                                                        updateStatus
+                                                                    }
+                                                                />
+
+                                                            </div>
+
+                                                        </td>
+
+                                                    </tr>
+                                                )
+                                            )}
 
                                         </tbody>
 
@@ -786,99 +1003,111 @@ export default function AdminUsersPage() {
 
                                 <div className="md:hidden divide-y divide-slate-100">
 
-                                    {users.map((user) => (
-                                        <div
-                                            key={user.id}
-                                            className="p-4"
-                                        >
+                                    {users.map(
+                                        (
+                                            user
+                                        ) => (
+                                            <div
+                                                key={
+                                                    user.id
+                                                }
+                                                className="p-4"
+                                            >
 
-                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex items-start justify-between gap-3">
 
-                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="flex items-center gap-3 min-w-0">
 
-                                                    <Avatar
-                                                        username={
-                                                            user.username
+                                                        <Avatar
+                                                            username={
+                                                                user.username
+                                                            }
+                                                        />
+
+                                                        <div className="min-w-0">
+
+                                                            <p className="font-semibold text-sm truncate">
+                                                                {
+                                                                    user.username
+                                                                }
+                                                            </p>
+
+                                                            <p className="text-xs text-slate-400">
+                                                                User ID #
+                                                                {
+                                                                    user.id
+                                                                }
+                                                            </p>
+
+                                                        </div>
+
+                                                    </div>
+
+                                                    <StatusBadge
+                                                        status={
+                                                            user.status
                                                         }
                                                     />
 
-                                                    <div className="min-w-0">
+                                                </div>
 
-                                                        <p className="font-semibold text-sm truncate">
-                                                            {
-                                                                user.username
-                                                            }
+                                                <div className="mt-4 grid grid-cols-2 gap-3">
+
+                                                    <div className="rounded-lg bg-slate-50 p-3">
+
+                                                        <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                                                            Role
                                                         </p>
 
-                                                        <p className="text-xs text-slate-400">
-                                                            User ID #
-                                                            {user.id}
+                                                        <div className="mt-1">
+
+                                                            <RoleBadge
+                                                                role={
+                                                                    user.role
+                                                                }
+                                                            />
+
+                                                        </div>
+
+                                                    </div>
+
+                                                    <div className="rounded-lg bg-slate-50 p-3">
+
+                                                        <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                                                            Created
+                                                        </p>
+
+                                                        <p className="mt-1 text-xs font-medium">
+                                                            {formatDate(
+                                                                user.created_at
+                                                            )}
                                                         </p>
 
                                                     </div>
 
                                                 </div>
 
-                                                <StatusBadge
-                                                    status={
-                                                        user.status
-                                                    }
-                                                />
+                                                <div className="mt-4">
 
-                                            </div>
-
-                                            <div className="mt-4 grid grid-cols-2 gap-3">
-
-                                                <div className="rounded-lg bg-slate-50 p-3">
-
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                                                        Role
-                                                    </p>
-
-                                                    <div className="mt-1">
-                                                        <RoleBadge
-                                                            role={
-                                                                user.role
-                                                            }
-                                                        />
-                                                    </div>
-
-                                                </div>
-
-                                                <div className="rounded-lg bg-slate-50 p-3">
-
-                                                    <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                                                        Created
-                                                    </p>
-
-                                                    <p className="mt-1 text-xs font-medium">
-                                                        {formatDate(
-                                                            user.created_at
-                                                        )}
-                                                    </p>
+                                                    <Actions
+                                                        user={
+                                                            user
+                                                        }
+                                                        loading={
+                                                            actionLoading ===
+                                                            user.id
+                                                        }
+                                                        onAction={
+                                                            updateStatus
+                                                        }
+                                                        mobile
+                                                    />
 
                                                 </div>
 
                                             </div>
-
-                                            <div className="mt-4">
-
-                                                <Actions
-                                                    user={user}
-                                                    loading={
-                                                        actionLoading ===
-                                                        user.id
-                                                    }
-                                                    onAction={
-                                                        updateStatus
-                                                    }
-                                                    mobile
-                                                />
-
-                                            </div>
-
-                                        </div>
-                                    ))}
+                                        )
+                                    )}
 
                                 </div>
                             </>
@@ -897,19 +1126,24 @@ export default function AdminUsersPage() {
             {showAddUser && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
-                    onMouseDown={(event) => {
+                    onMouseDown={(
+                        event
+                    ) => {
                         if (
                             event.target ===
                             event.currentTarget
                         ) {
-                            setShowAddUser(false);
+                            setShowAddUser(
+                                false
+                            );
                         }
                     }}
                 >
 
                     <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
 
-                        {/* Modal header */}
+                        {/* Header */}
+
                         <div className="px-5 sm:px-6 py-5 border-b border-slate-200 flex items-center justify-between">
 
                             <div>
@@ -926,7 +1160,9 @@ export default function AdminUsersPage() {
 
                             <button
                                 onClick={() =>
-                                    setShowAddUser(false)
+                                    setShowAddUser(
+                                        false
+                                    )
                                 }
                                 className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                             >
@@ -936,12 +1172,16 @@ export default function AdminUsersPage() {
                         </div>
 
                         {/* Form */}
+
                         <form
-                            onSubmit={createUser}
+                            onSubmit={
+                                createUser
+                            }
                             className="p-5 sm:p-6 space-y-5"
                         >
 
                             {/* Username */}
+
                             <div>
 
                                 <label className="block text-sm font-semibold mb-2">
@@ -950,10 +1190,16 @@ export default function AdminUsersPage() {
 
                                 <input
                                     type="text"
-                                    value={username}
-                                    onChange={(event) =>
+                                    value={
+                                        username
+                                    }
+                                    onChange={(
+                                        event
+                                    ) =>
                                         setUsername(
-                                            event.target.value
+                                            event
+                                                .target
+                                                .value
                                         )
                                     }
                                     placeholder="Enter username"
@@ -965,6 +1211,7 @@ export default function AdminUsersPage() {
                             </div>
 
                             {/* Password */}
+
                             <div>
 
                                 <label className="block text-sm font-semibold mb-2">
@@ -973,22 +1220,31 @@ export default function AdminUsersPage() {
 
                                 <input
                                     type="password"
-                                    value={password}
-                                    onChange={(event) =>
+                                    value={
+                                        password
+                                    }
+                                    onChange={(
+                                        event
+                                    ) =>
                                         setPassword(
-                                            event.target.value
+                                            event
+                                                .target
+                                                .value
                                         )
                                     }
                                     placeholder="Minimum 8 characters"
                                     autoComplete="new-password"
                                     required
-                                    minLength={8}
+                                    minLength={
+                                        8
+                                    }
                                     className="w-full h-12 rounded-xl border border-slate-300 px-4 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                                 />
 
                             </div>
 
                             {/* Confirm */}
+
                             <div>
 
                                 <label className="block text-sm font-semibold mb-2">
@@ -997,34 +1253,52 @@ export default function AdminUsersPage() {
 
                                 <input
                                     type="password"
-                                    value={confirmPassword}
-                                    onChange={(event) =>
+                                    value={
+                                        confirmPassword
+                                    }
+                                    onChange={(
+                                        event
+                                    ) =>
                                         setConfirmPassword(
-                                            event.target.value
+                                            event
+                                                .target
+                                                .value
                                         )
                                     }
                                     placeholder="Confirm password"
                                     autoComplete="new-password"
                                     required
-                                    minLength={8}
+                                    minLength={
+                                        8
+                                    }
                                     className="w-full h-12 rounded-xl border border-slate-300 px-4 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                                 />
 
                             </div>
 
                             {/* Notice */}
+
                             <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
 
                                 <div className="flex gap-3">
 
-                                    <ClockIcon />
+                                    <div className="text-amber-600 shrink-0">
+                                        <ClockIcon />
+                                    </div>
 
                                     <p className="text-xs text-amber-700 leading-5">
-                                        New users are created with
-                                        <strong> PENDING </strong>
-                                        status and must be approved
-                                        by an administrator before
-                                        they can log in.
+                                        New users are
+                                        created with
+                                        <strong>
+                                            {" "}
+                                            PENDING{" "}
+                                        </strong>
+                                        status and
+                                        must be
+                                        approved by
+                                        an administrator
+                                        before they
+                                        can log in.
                                     </p>
 
                                 </div>
@@ -1032,12 +1306,15 @@ export default function AdminUsersPage() {
                             </div>
 
                             {/* Buttons */}
+
                             <div className="flex flex-col-reverse sm:flex-row gap-3 pt-1">
 
                                 <button
                                     type="button"
                                     onClick={() =>
-                                        setShowAddUser(false)
+                                        setShowAddUser(
+                                            false
+                                        )
                                     }
                                     className="w-full sm:w-auto flex-1 h-11 rounded-xl border border-slate-300 text-sm font-semibold hover:bg-slate-50"
                                 >
@@ -1047,11 +1324,13 @@ export default function AdminUsersPage() {
                                 <button
                                     type="submit"
                                     disabled={
-                                        actionLoading === -1
+                                        actionLoading ===
+                                        -1
                                     }
                                     className="w-full sm:w-auto flex-1 h-11 rounded-xl bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
                                 >
-                                    {actionLoading === -1
+                                    {actionLoading ===
+                                    -1
                                         ? "Creating..."
                                         : "Create User"}
                                 </button>
@@ -1104,6 +1383,7 @@ function Actions({
         return (
             <div className="flex items-center gap-2 text-xs text-slate-500">
                 <Spinner />
+
                 Updating...
             </div>
         );
@@ -1118,6 +1398,7 @@ function Actions({
                         : "flex gap-2"
                 }
             >
+
                 <button
                     onClick={() =>
                         onAction(
@@ -1141,6 +1422,7 @@ function Actions({
                 >
                     Reject
                 </button>
+
             </div>
         );
     }
@@ -1193,13 +1475,19 @@ function StatusBadge({
 }: {
     status: string;
 }) {
-    const styles: Record<string, string> = {
+    const styles: Record<
+        string,
+        string
+    > = {
         APPROVED:
             "bg-green-50 text-green-700 border-green-200",
+
         PENDING:
             "bg-amber-50 text-amber-700 border-amber-200",
+
         REJECTED:
             "bg-red-50 text-red-700 border-red-200",
+
         INACTIVE:
             "bg-slate-100 text-slate-600 border-slate-200",
     };
@@ -1211,19 +1499,21 @@ function StatusBadge({
                 "bg-slate-100 text-slate-600 border-slate-200"
             }`}
         >
+
             <span
                 className={`h-1.5 w-1.5 rounded-full ${
                     status === "APPROVED"
                         ? "bg-green-500"
                         : status === "PENDING"
-                          ? "bg-amber-500"
-                          : status === "REJECTED"
-                            ? "bg-red-500"
-                            : "bg-slate-400"
+                        ? "bg-amber-500"
+                        : status === "REJECTED"
+                        ? "bg-red-500"
+                        : "bg-slate-400"
                 }`}
             />
 
             {status}
+
         </span>
     );
 }
@@ -1267,6 +1557,7 @@ function StatCard({
             <div className="flex items-start justify-between">
 
                 <div>
+
                     <p className="text-xs font-medium text-slate-500">
                         {title}
                     </p>
@@ -1274,6 +1565,7 @@ function StatCard({
                     <p className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">
                         {value}
                     </p>
+
                 </div>
 
                 <div
@@ -1408,7 +1700,8 @@ function Avatar({
     username: string;
 }) {
     const letter =
-        username?.charAt(0)?.toUpperCase() || "U";
+        username?.charAt(0)?.toUpperCase() ||
+        "U";
 
     return (
         <div className="w-9 h-9 shrink-0 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">
@@ -1422,22 +1715,32 @@ function Avatar({
    FORMAT DATE
 ================================================================ */
 
-function formatDate(date?: string) {
+function formatDate(
+    date?: string
+) {
     if (!date) {
         return "—";
     }
 
-    const parsed = new Date(date);
+    const parsed =
+        new Date(date);
 
-    if (Number.isNaN(parsed.getTime())) {
+    if (
+        Number.isNaN(
+            parsed.getTime()
+        )
+    ) {
         return "—";
     }
 
-    return parsed.toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-    });
+    return parsed.toLocaleDateString(
+        undefined,
+        {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        }
+    );
 }
 
 
@@ -1458,6 +1761,7 @@ function Logo({
                     : "bg-indigo-600 text-white"
             }`}
         >
+
             <svg
                 width="22"
                 height="22"
@@ -1474,13 +1778,14 @@ function Logo({
                 <path d="M19 6v12" />
                 <path d="M21 10v4" />
             </svg>
+
         </div>
     );
 }
 
 
 /* ================================================================
-   ICONS
+   DASHBOARD ICON
 ================================================================ */
 
 function DashboardIcon() {
@@ -1493,13 +1798,45 @@ function DashboardIcon() {
             stroke="currentColor"
             strokeWidth="1.8"
         >
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
+            <rect
+                x="3"
+                y="3"
+                width="7"
+                height="7"
+                rx="1"
+            />
+
+            <rect
+                x="14"
+                y="3"
+                width="7"
+                height="7"
+                rx="1"
+            />
+
+            <rect
+                x="3"
+                y="14"
+                width="7"
+                height="7"
+                rx="1"
+            />
+
+            <rect
+                x="14"
+                y="14"
+                width="7"
+                height="7"
+                rx="1"
+            />
         </svg>
     );
 }
+
+
+/* ================================================================
+   USERS ICON
+================================================================ */
 
 function UsersIcon() {
     return (
@@ -1514,12 +1851,56 @@ function UsersIcon() {
             strokeLinejoin="round"
         >
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
+
+            <circle
+                cx="9"
+                cy="7"
+                r="4"
+            />
+
             <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+
             <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   WALLET ICON
+================================================================ */
+
+function WalletIcon() {
+    return (
+        <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+
+            <path d="M3 7h16" />
+
+            <path d="M16 13h5" />
+
+            <circle
+                cx="16"
+                cy="13"
+                r="1"
+            />
+        </svg>
+    );
+}
+
+
+/* ================================================================
+   USER OFF ICON
+================================================================ */
 
 function UserOffIcon() {
     return (
@@ -1533,13 +1914,25 @@ function UserOffIcon() {
             strokeLinecap="round"
             strokeLinejoin="round"
         >
-            <circle cx="9" cy="7" r="4" />
+            <circle
+                cx="9"
+                cy="7"
+                r="4"
+            />
+
             <path d="M3 21v-2a4 4 0 0 1 4-4h4" />
+
             <path d="m16 16 5 5" />
+
             <path d="m21 16-5 5" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   CLOCK ICON
+================================================================ */
 
 function ClockIcon() {
     return (
@@ -1553,11 +1946,21 @@ function ClockIcon() {
             strokeLinecap="round"
             strokeLinejoin="round"
         >
-            <circle cx="12" cy="12" r="9" />
+            <circle
+                cx="12"
+                cy="12"
+                r="9"
+            />
+
             <path d="M12 7v5l3 2" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   CHECK ICON
+================================================================ */
 
 function CheckIcon() {
     return (
@@ -1576,6 +1979,11 @@ function CheckIcon() {
     );
 }
 
+
+/* ================================================================
+   PLUS ICON
+================================================================ */
+
 function PlusIcon() {
     return (
         <svg
@@ -1592,6 +2000,11 @@ function PlusIcon() {
         </svg>
     );
 }
+
+
+/* ================================================================
+   MENU ICON
+================================================================ */
 
 function MenuIcon() {
     return (
@@ -1610,6 +2023,11 @@ function MenuIcon() {
     );
 }
 
+
+/* ================================================================
+   CLOSE ICON
+================================================================ */
+
 function CloseIcon() {
     return (
         <svg
@@ -1627,6 +2045,11 @@ function CloseIcon() {
     );
 }
 
+
+/* ================================================================
+   REFRESH ICON
+================================================================ */
+
 function RefreshIcon() {
     return (
         <svg
@@ -1640,12 +2063,20 @@ function RefreshIcon() {
             strokeLinejoin="round"
         >
             <path d="M20 11a8.1 8.1 0 0 0-15.5-2" />
+
             <path d="M4 4v5h5" />
+
             <path d="M4 13a8.1 8.1 0 0 0 15.5 2" />
+
             <path d="M20 20v-5h-5" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   LOGOUT ICON
+================================================================ */
 
 function LogoutIcon() {
     return (
@@ -1660,11 +2091,18 @@ function LogoutIcon() {
             strokeLinejoin="round"
         >
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+
             <path d="M16 17l5-5-5-5" />
+
             <path d="M21 12H9" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   ALERT ICON
+================================================================ */
 
 function AlertIcon() {
     return (
@@ -1677,12 +2115,23 @@ function AlertIcon() {
             strokeWidth="2"
             strokeLinecap="round"
         >
-            <circle cx="12" cy="12" r="10" />
+            <circle
+                cx="12"
+                cy="12"
+                r="10"
+            />
+
             <path d="M12 8v4" />
+
             <path d="M12 16h.01" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   SPINNER
+================================================================ */
 
 function Spinner({
     large = false,
@@ -1692,8 +2141,16 @@ function Spinner({
     return (
         <svg
             className="animate-spin"
-            width={large ? 28 : 16}
-            height={large ? 28 : 16}
+            width={
+                large
+                    ? 28
+                    : 16
+            }
+            height={
+                large
+                    ? 28
+                    : 16
+            }
             viewBox="0 0 24 24"
             fill="none"
         >

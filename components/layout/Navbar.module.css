@@ -116,7 +116,6 @@
     margin-left: 24px;
 }
 
-
 .menuLink {
     display: flex;
 
@@ -141,7 +140,6 @@
         color 0.2s ease;
 }
 
-
 .menuLink:hover {
     background: #1f2937;
 
@@ -150,7 +148,7 @@
 
 
 /* ============================================================
-   ADMIN
+   DESKTOP ADMIN AREA
 ============================================================ */
 
 .desktopAdmin {
@@ -160,11 +158,78 @@
 
     align-items: center;
 
-    gap: 12px;
+    gap: 14px;
 
     font-size: 14px;
 }
 
+
+/* ============================================================
+   DESKTOP BALANCE
+============================================================ */
+
+.desktopBalance {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    padding: 6px 11px;
+
+    border-radius: 9px;
+
+    background: #1f2937;
+
+    border: 1px solid #374151;
+
+    white-space: nowrap;
+}
+
+.balanceIcon {
+    width: 30px;
+
+    height: 30px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border-radius: 8px;
+
+    background: #4f46e5;
+
+    font-size: 15px;
+}
+
+.desktopBalance div {
+    display: flex;
+
+    flex-direction: column;
+
+    line-height: 1.15;
+}
+
+.desktopBalance small {
+    font-size: 10px;
+
+    color: #9ca3af;
+}
+
+.desktopBalance strong {
+    margin-top: 2px;
+
+    font-size: 13px;
+
+    color: white;
+}
+
+
+/* ============================================================
+   USER
+============================================================ */
 
 .adminInfo {
     display: flex;
@@ -174,6 +239,46 @@
     gap: 8px;
 
     color: #e5e7eb;
+}
+
+.avatar {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 32px;
+
+    height: 32px;
+
+    border-radius: 50%;
+
+    background: #374151;
+
+    color: white;
+
+    font-size: 14px;
+
+    font-weight: 600;
+}
+
+.userText {
+    display: flex;
+
+    flex-direction: column;
+
+    line-height: 1.2;
+}
+
+.userText small {
+    margin-top: 2px;
+
+    font-size: 11px;
+
+    color: #9ca3af;
+
+    text-transform: capitalize;
 }
 
 
@@ -213,14 +318,21 @@
         transform 0.1s ease;
 }
 
-
 .logoutButton:hover {
     background: #b91c1c;
 }
 
-
 .logoutButton:active {
     transform: scale(0.97);
+}
+
+
+/* ============================================================
+   MOBILE BALANCE
+============================================================ */
+
+.mobileBalance {
+    display: none;
 }
 
 
@@ -235,7 +347,7 @@
 
     left: 20px;
 
-    width: 240px;
+    width: 280px;
 
     padding: 8px;
 
@@ -251,7 +363,66 @@
 
 
 /* ============================================================
-   MOBILE MENU LINK
+   MOBILE BALANCE CARD
+============================================================ */
+
+.mobileBalanceCard {
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    margin-bottom: 8px;
+
+    padding: 13px;
+
+    border-radius: 9px;
+
+    background: #1f2937;
+
+    border: 1px solid #374151;
+}
+
+.mobileBalanceCardIcon {
+    width: 40px;
+
+    height: 40px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border-radius: 9px;
+
+    background: #4f46e5;
+
+    font-size: 19px;
+}
+
+.mobileBalanceLabel {
+    font-size: 11px;
+
+    color: #9ca3af;
+}
+
+.mobileBalanceAmount {
+    margin-top: 2px;
+
+    font-size: 18px;
+
+    font-weight: 700;
+
+    color: white;
+}
+
+
+/* ============================================================
+   MOBILE MENU LINKS
 ============================================================ */
 
 .menuPanelLink {
@@ -276,11 +447,73 @@
         color 0.2s ease;
 }
 
-
 .menuPanelLink:hover {
     background: #1f2937;
 
     color: white;
+}
+
+
+/* ============================================================
+   MOBILE USER
+============================================================ */
+
+.mobileUser {
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    margin-top: 6px;
+
+    padding: 14px 8px;
+
+    border-top: 1px solid
+        rgba(255, 255, 255, 0.08);
+
+    border-bottom: 1px solid
+        rgba(255, 255, 255, 0.08);
+}
+
+.mobileAvatar {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 34px;
+
+    height: 34px;
+
+    border-radius: 50%;
+
+    background: #374151;
+
+    color: white;
+
+    font-size: 14px;
+
+    font-weight: 600;
+}
+
+.mobileUserText {
+    display: flex;
+
+    flex-direction: column;
+
+    line-height: 1.2;
+}
+
+.mobileUserText small {
+    margin-top: 2px;
+
+    font-size: 11px;
+
+    color: #9ca3af;
+
+    text-transform: capitalize;
 }
 
 
@@ -320,7 +553,6 @@
     cursor: pointer;
 }
 
-
 .mobileLogout:hover {
     background: #1f2937;
 
@@ -336,11 +568,22 @@
 
     .navbarInner {
         padding: 0 12px;
+
+        min-height: 64px;
     }
 
 
     .navbarLogo {
         font-size: 17px;
+
+        min-width: 0;
+    }
+
+
+    .navbarLogo span:last-child {
+        overflow: hidden;
+
+        text-overflow: ellipsis;
     }
 
 
@@ -350,14 +593,56 @@
     }
 
 
+    /* ============================================
+       MOBILE BALANCE IN HEADER
+    ============================================ */
+
+    .mobileBalance {
+        margin-left: auto;
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 5px;
+
+        padding: 7px 9px;
+
+        border-radius: 8px;
+
+        background: #1f2937;
+
+        border: 1px solid #374151;
+
+        white-space: nowrap;
+    }
+
+
+    .mobileBalanceIcon {
+        font-size: 13px;
+    }
+
+
+    .mobileBalanceValue {
+        font-size: 12px;
+
+        font-weight: 700;
+
+        color: white;
+    }
+
+
     .menuPanel {
+        top: 64px;
+
         left: 12px;
 
         right: 12px;
 
         width: auto;
-    }
 
+        max-width: none;
+    }
 }
 
 
@@ -368,12 +653,12 @@
 @media (max-width: 380px) {
 
     .navbarLogo {
-        font-size: 16px;
+        font-size: 15px;
     }
 
 
     .navbarLogo span:first-child {
-        font-size: 22px;
+        font-size: 21px;
     }
 
 
@@ -382,9 +667,20 @@
 
         height: 38px;
 
-        margin-right: 10px;
+        margin-right: 8px;
 
         font-size: 24px;
     }
 
+
+    .mobileBalance {
+        padding: 6px 7px;
+
+        gap: 4px;
+    }
+
+
+    .mobileBalanceValue {
+        font-size: 11px;
+    }
 }

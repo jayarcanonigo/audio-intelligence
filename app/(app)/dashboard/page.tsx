@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { getWallet } from "@/services/wallet";
+
 const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://127.0.0.1:8000";
 
 type Project = {
     id: number;
@@ -22,46 +25,86 @@ export default function DashboardPage() {
     const [username, setUsername] = useState("User");
     const [role, setRole] = useState("USER");
 
+    // ============================================================
+    // WALLET
+    // ============================================================
+
+    const [balance, setBalance] =
+        useState<number | null>(null);
+
+    const [balanceLoading, setBalanceLoading] =
+        useState(false);
+
+    // ============================================================
+    // INITIAL LOAD
+    // ============================================================
+
     useEffect(() => {
-        const token = localStorage.getItem("access_token");
+        const token =
+            localStorage.getItem("access_token");
 
         if (!token) {
             router.replace("/login");
             return;
         }
 
-        setUsername(
-            localStorage.getItem("username") || "User"
-        );
+        const savedUsername =
+            localStorage.getItem("username") ||
+            "User";
 
-        setRole(
-            localStorage.getItem("role") || "USER"
-        );
+        const savedRole =
+            localStorage.getItem("role") ||
+            "USER";
+
+        setUsername(savedUsername);
+        setRole(savedRole);
 
         loadProjects(token);
+
+        // Load wallet only for USER
+        if (
+            savedRole.toUpperCase() ===
+            "USER"
+        ) {
+            loadWallet();
+        }
     }, []);
 
-    async function loadProjects(token: string) {
-        try {
-            const response = await fetch(
-                `${API_URL}/projects`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
+    // ============================================================
+    // LOAD PROJECTS
+    // ============================================================
 
-            if (response.status === 401) {
+    async function loadProjects(
+        token: string
+    ) {
+        try {
+            const response =
+                await fetch(
+                    `${API_URL}/projects`,
+                    {
+                        headers: {
+                            Authorization:
+                                `Bearer ${token}`,
+                        },
+                    }
+                );
+
+            if (
+                response.status ===
+                401
+            ) {
                 logout();
                 return;
             }
 
-            const data = await response.json();
+            const data =
+                await response.json();
 
             if (response.ok) {
                 setProjects(
-                    Array.isArray(data) ? data : []
+                    Array.isArray(data)
+                        ? data
+                        : []
                 );
             }
         } catch (error) {
@@ -71,23 +114,97 @@ export default function DashboardPage() {
         }
     }
 
+    // ============================================================
+    // LOAD WALLET
+    // ============================================================
+
+    async function loadWallet() {
+        setBalanceLoading(true);
+
+        try {
+            const wallet =
+                await getWallet();
+
+            setBalance(
+                Number(wallet.balance)
+            );
+        } catch (error) {
+            console.error(
+                "Failed to load wallet:",
+                error
+            );
+
+            setBalance(null);
+        } finally {
+            setBalanceLoading(false);
+        }
+    }
+
+    // ============================================================
+    // LOGOUT
+    // ============================================================
+
     function logout() {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("token_type");
-        localStorage.removeItem("user_id");
-        localStorage.removeItem("username");
-        localStorage.removeItem("role");
+        localStorage.removeItem(
+            "access_token"
+        );
+
+        localStorage.removeItem(
+            "token_type"
+        );
+
+        localStorage.removeItem(
+            "user_id"
+        );
+
+        localStorage.removeItem(
+            "username"
+        );
+
+        localStorage.removeItem(
+            "role"
+        );
 
         router.replace("/login");
     }
 
-    function openProject(project: Project) {
+    // ============================================================
+    // OPEN PROJECT
+    // ============================================================
+
+    function openProject(
+        project: Project
+    ) {
         router.push(
             `/projects/${project.id}?projectName=${encodeURIComponent(
                 project.name
             )}`
         );
     }
+
+    // ============================================================
+    // FORMAT BALANCE
+    // ============================================================
+
+    function formatBalance() {
+        if (balanceLoading) {
+            return "...";
+        }
+
+        return `₱${(
+            balance ?? 0
+        ).toLocaleString(
+            "en-PH",
+            {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }
+        )}`;
+    }
+
+    // ============================================================
+    // RENDER
+    // ============================================================
 
     return (
         <main className="min-h-screen bg-slate-100">
@@ -118,7 +235,9 @@ export default function DashboardPage() {
 
                     <button
                         onClick={() =>
-                            setMobileMenu(!mobileMenu)
+                            setMobileMenu(
+                                !mobileMenu
+                            )
                         }
                         className="w-10 h-10 rounded-lg border border-slate-200 flex items-center justify-center"
                     >
@@ -134,9 +253,15 @@ export default function DashboardPage() {
                 {mobileMenu && (
                     <div className="border-t border-slate-100 bg-white p-4">
 
+                        {/* Mobile User */}
+
                         <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 mb-3">
 
-                            <Avatar username={username} />
+                            <Avatar
+                                username={
+                                    username
+                                }
+                            />
 
                             <div>
                                 <p className="text-sm font-semibold">
@@ -150,13 +275,47 @@ export default function DashboardPage() {
 
                         </div>
 
+                        {/* Mobile Balance */}
+
+                        {role.toUpperCase() ===
+                            "USER" && (
+                            <div className="mb-3 p-4 rounded-xl bg-indigo-50 border border-indigo-100">
+
+                                <div className="flex items-center justify-between">
+
+                                    <div>
+
+                                        <p className="text-xs font-medium text-indigo-600">
+                                            Current Balance
+                                        </p>
+
+                                        <p className="mt-1 text-xl font-bold text-indigo-900">
+                                            {formatBalance()}
+                                        </p>
+
+                                    </div>
+
+                                    <div className="w-10 h-10 rounded-lg bg-white text-indigo-600 flex items-center justify-center">
+                                        <WalletIcon />
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        )}
+
+                        {/* Dashboard */}
+
                         <button
                             className="w-full text-left px-3 py-3 rounded-lg bg-indigo-50 text-indigo-700 text-sm font-semibold"
                         >
                             Dashboard
                         </button>
 
-                        {role === "ADMIN" && (
+                        {/* Admin */}
+
+                        {role.toUpperCase() ===
+                            "ADMIN" && (
                             <button
                                 onClick={() =>
                                     router.push(
@@ -168,6 +327,8 @@ export default function DashboardPage() {
                                 User Management
                             </button>
                         )}
+
+                        {/* Logout */}
 
                         <button
                             onClick={logout}
@@ -221,7 +382,8 @@ export default function DashboardPage() {
                         Dashboard
                     </button>
 
-                    {role === "ADMIN" && (
+                    {role.toUpperCase() ===
+                        "ADMIN" && (
                         <button
                             onClick={() =>
                                 router.push(
@@ -245,7 +407,11 @@ export default function DashboardPage() {
 
                     <div className="flex items-center gap-3 px-2 mb-3">
 
-                        <Avatar username={username} />
+                        <Avatar
+                            username={
+                                username
+                            }
+                        />
 
                         <div className="min-w-0">
 
@@ -281,9 +447,13 @@ export default function DashboardPage() {
 
             <div className="lg:ml-64 min-h-screen">
 
-                {/* Desktop header */}
+                {/* =================================================
+                    DESKTOP HEADER
+                ================================================== */}
 
                 <header className="hidden lg:flex h-20 bg-white border-b border-slate-200 px-8 items-center justify-between">
+
+                    {/* Header Title */}
 
                     <div>
 
@@ -297,7 +467,37 @@ export default function DashboardPage() {
 
                     </div>
 
-                    <div className="flex items-center gap-3">
+
+                    {/* Header Right */}
+
+                    <div className="flex items-center gap-6">
+
+                        {/* Current Balance */}
+
+                        {role.toUpperCase() ===
+                            "USER" && (
+                            <div className="flex items-center gap-3 pr-6 border-r border-slate-200">
+
+                                <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                    <WalletIcon />
+                                </div>
+
+                                <div>
+
+                                    <p className="text-[11px] font-medium text-slate-400">
+                                        Current Balance
+                                    </p>
+
+                                    <p className="mt-0.5 text-sm font-bold text-slate-900">
+                                        {formatBalance()}
+                                    </p>
+
+                                </div>
+
+                            </div>
+                        )}
+
+                        {/* User */}
 
                         <div className="text-right">
 
@@ -311,7 +511,11 @@ export default function DashboardPage() {
 
                         </div>
 
-                        <Avatar username={username} />
+                        <Avatar
+                            username={
+                                username
+                            }
+                        />
 
                     </div>
 
@@ -333,7 +537,8 @@ export default function DashboardPage() {
                         </h1>
 
                         <p className="text-sm text-slate-500 mt-1">
-                            Welcome back, {username}.
+                            Welcome back,{" "}
+                            {username}.
                         </p>
 
                     </div>
@@ -356,8 +561,12 @@ export default function DashboardPage() {
                             </h2>
 
                             <p className="mt-2 text-sm text-indigo-100 max-w-xl">
-                                Analyze broadcasts, detect advertisements,
-                                and search your radio intelligence data.
+                                Analyze broadcasts,
+                                detect
+                                advertisements,
+                                and search your
+                                radio intelligence
+                                data.
                             </p>
 
                         </div>
@@ -375,28 +584,46 @@ export default function DashboardPage() {
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
 
+                        {/* Projects */}
+
                         <StatCard
                             title="Projects"
-                            value={projects.length}
-                            icon={<FolderIcon />}
+                            value={
+                                projects.length
+                            }
+                            icon={
+                                <FolderIcon />
+                            }
                         />
+
+                        {/* Broadcasts */}
 
                         <StatCard
                             title="Broadcasts"
                             value="—"
-                            icon={<RadioIcon />}
+                            icon={
+                                <RadioIcon />
+                            }
                         />
+
+                        {/* Advertisements */}
 
                         <StatCard
                             title="Advertisements"
                             value="—"
-                            icon={<AdIcon />}
+                            icon={
+                                <AdIcon />
+                            }
                         />
+
+                        {/* Segments */}
 
                         <StatCard
                             title="Segments"
                             value="—"
-                            icon={<AudioIcon />}
+                            icon={
+                                <AudioIcon />
+                            }
                         />
 
                     </div>
@@ -417,7 +644,8 @@ export default function DashboardPage() {
                                 </h2>
 
                                 <p className="text-xs text-slate-500 mt-1">
-                                    Select a project to continue.
+                                    Select a project to
+                                    continue.
                                 </p>
 
                             </div>
@@ -454,7 +682,8 @@ export default function DashboardPage() {
 
                             </div>
 
-                        ) : projects.length === 0 ? (
+                        ) : projects.length ===
+                          0 ? (
 
                             <div className="py-20 px-6 text-center">
 
@@ -467,7 +696,8 @@ export default function DashboardPage() {
                                 </h3>
 
                                 <p className="mt-1 text-sm text-slate-500">
-                                    Your radio projects will appear here.
+                                    Your radio projects
+                                    will appear here.
                                 </p>
 
                             </div>
@@ -476,51 +706,65 @@ export default function DashboardPage() {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 p-4 sm:p-6">
 
-                                {projects.map((project) => (
+                                {projects.map(
+                                    (
+                                        project
+                                    ) => (
 
-                                    <button
-                                        key={project.id}
-                                        onClick={() =>
-                                            openProject(project)
-                                        }
-                                        className="group text-left rounded-xl border border-slate-200 p-5 hover:border-indigo-300 hover:shadow-md hover:shadow-indigo-100 transition-all"
-                                    >
+                                        <button
+                                            key={
+                                                project.id
+                                            }
+                                            onClick={() =>
+                                                openProject(
+                                                    project
+                                                )
+                                            }
+                                            className="group text-left rounded-xl border border-slate-200 p-5 hover:border-indigo-300 hover:shadow-md hover:shadow-indigo-100 transition-all"
+                                        >
 
-                                        <div className="flex items-start justify-between">
+                                            <div className="flex items-start justify-between">
 
-                                            <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                                <FolderIcon />
+                                                <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                                    <FolderIcon />
+                                                </div>
+
+                                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition">
+                                                    <ArrowIcon />
+                                                </div>
+
                                             </div>
 
-                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition">
-                                                <ArrowIcon />
+                                            <h3 className="mt-5 font-bold text-base truncate">
+                                                {
+                                                    project.name
+                                                }
+                                            </h3>
+
+                                            <p className="mt-1 text-xs text-slate-400">
+                                                Project #
+                                                {
+                                                    project.id
+                                                }
+                                            </p>
+
+                                            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+
+                                                <span className="text-xs text-slate-500">
+                                                    Radio
+                                                    Intelligence
+                                                </span>
+
+                                                <span className="text-xs font-semibold text-indigo-600">
+                                                    Open →
+                                                </span>
+
                                             </div>
 
-                                        </div>
+                                        </button>
 
-                                        <h3 className="mt-5 font-bold text-base truncate">
-                                            {project.name}
-                                        </h3>
-
-                                        <p className="mt-1 text-xs text-slate-400">
-                                            Project #{project.id}
-                                        </p>
-
-                                        <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
-
-                                            <span className="text-xs text-slate-500">
-                                                Radio Intelligence
-                                            </span>
-
-                                            <span className="text-xs font-semibold text-indigo-600">
-                                                Open →
-                                            </span>
-
-                                        </div>
-
-                                    </button>
-
-                                ))}
+                                    )
+                                )}
 
                             </div>
 
@@ -589,6 +833,7 @@ function Logo({
 }) {
     return (
         <div className="w-10 h-10 shrink-0 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
+
             <svg
                 width="22"
                 height="22"
@@ -605,6 +850,7 @@ function Logo({
                 <path d="M19 6v12" />
                 <path d="M21 10v4" />
             </svg>
+
         </div>
     );
 }
@@ -621,14 +867,16 @@ function Avatar({
 }) {
     return (
         <div className="w-9 h-9 shrink-0 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">
-            {username?.charAt(0)?.toUpperCase() || "U"}
+            {username
+                ?.charAt(0)
+                ?.toUpperCase() || "U"}
         </div>
     );
 }
 
 
 /* ================================================================
-   ICONS
+   DASHBOARD ICON
 ================================================================ */
 
 function DashboardIcon() {
@@ -641,13 +889,45 @@ function DashboardIcon() {
             stroke="currentColor"
             strokeWidth="1.8"
         >
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
+            <rect
+                x="3"
+                y="3"
+                width="7"
+                height="7"
+                rx="1"
+            />
+
+            <rect
+                x="14"
+                y="3"
+                width="7"
+                height="7"
+                rx="1"
+            />
+
+            <rect
+                x="3"
+                y="14"
+                width="7"
+                height="7"
+                rx="1"
+            />
+
+            <rect
+                x="14"
+                y="14"
+                width="7"
+                height="7"
+                rx="1"
+            />
         </svg>
     );
 }
+
+
+/* ================================================================
+   USERS ICON
+================================================================ */
 
 function UsersIcon() {
     return (
@@ -660,12 +940,24 @@ function UsersIcon() {
             strokeWidth="1.8"
         >
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
+
+            <circle
+                cx="9"
+                cy="7"
+                r="4"
+            />
+
             <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+
             <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   FOLDER ICON
+================================================================ */
 
 function FolderIcon() {
     return (
@@ -684,6 +976,43 @@ function FolderIcon() {
     );
 }
 
+
+/* ================================================================
+   WALLET ICON
+================================================================ */
+
+function WalletIcon() {
+    return (
+        <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+
+            <path d="M3 7h16" />
+
+            <path d="M16 13h5" />
+
+            <circle
+                cx="16"
+                cy="13"
+                r="1"
+            />
+        </svg>
+    );
+}
+
+
+/* ================================================================
+   RADIO ICON
+================================================================ */
+
 function RadioIcon() {
     return (
         <svg
@@ -695,14 +1024,27 @@ function RadioIcon() {
             strokeWidth="1.8"
             strokeLinecap="round"
         >
-            <circle cx="12" cy="12" r="2" />
+            <circle
+                cx="12"
+                cy="12"
+                r="2"
+            />
+
             <path d="M7.8 7.8a6 6 0 0 0 0 8.4" />
+
             <path d="M16.2 7.8a6 6 0 0 1 0 8.4" />
+
             <path d="M4.9 4.9a10 10 0 0 0 0 14.2" />
+
             <path d="M19.1 4.9a10 10 0 0 1 0 14.2" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   AD ICON
+================================================================ */
 
 function AdIcon() {
     return (
@@ -717,11 +1059,18 @@ function AdIcon() {
             strokeLinejoin="round"
         >
             <path d="M4 5h16v14H4z" />
+
             <path d="M8 9h8" />
+
             <path d="M8 13h5" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   AUDIO ICON
+================================================================ */
 
 function AudioIcon() {
     return (
@@ -735,13 +1084,22 @@ function AudioIcon() {
             strokeLinecap="round"
         >
             <path d="M4 12h2" />
+
             <path d="M8 8v8" />
+
             <path d="M12 4v16" />
+
             <path d="M16 8v8" />
+
             <path d="M20 10v4" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   ARROW ICON
+================================================================ */
 
 function ArrowIcon() {
     return (
@@ -755,10 +1113,16 @@ function ArrowIcon() {
             strokeLinecap="round"
         >
             <path d="M5 12h14" />
+
             <path d="m13 6 6 6-6 6" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   MENU ICON
+================================================================ */
 
 function MenuIcon() {
     return (
@@ -771,11 +1135,18 @@ function MenuIcon() {
             strokeWidth="2"
         >
             <path d="M4 6h16" />
+
             <path d="M4 12h16" />
+
             <path d="M4 18h16" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   CLOSE ICON
+================================================================ */
 
 function CloseIcon() {
     return (
@@ -788,10 +1159,16 @@ function CloseIcon() {
             strokeWidth="2"
         >
             <path d="M6 6l12 12" />
+
             <path d="M18 6 6 18" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   REFRESH ICON
+================================================================ */
 
 function RefreshIcon() {
     return (
@@ -805,12 +1182,20 @@ function RefreshIcon() {
             strokeLinecap="round"
         >
             <path d="M20 11a8 8 0 0 0-15.5-2" />
+
             <path d="M4 4v5h5" />
+
             <path d="M4 13a8 8 0 0 0 15.5 2" />
+
             <path d="M20 20v-5h-5" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   LOGOUT ICON
+================================================================ */
 
 function LogoutIcon() {
     return (
@@ -824,11 +1209,18 @@ function LogoutIcon() {
             strokeLinecap="round"
         >
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+
             <path d="m16 17 5-5-5-5" />
+
             <path d="M21 12H9" />
         </svg>
     );
 }
+
+
+/* ================================================================
+   SPINNER
+================================================================ */
 
 function Spinner() {
     return (

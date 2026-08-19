@@ -8,7 +8,10 @@ interface Props {
   onComplete?: () => void;
 }
 
-export default function UploadPanel({ projectId, onComplete }: Props) {
+export default function UploadPanel({
+  projectId,
+  onComplete,
+}: Props) {
   const fileInputId = useId();
 
   const [file, setFile] = useState<File | null>(null);
@@ -16,14 +19,29 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
   const [sessionId, setSessionId] = useState("");
   const [status, setStatus] = useState<any>(null);
 
-  // Disable upload after submit
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleUpload() {
     if (!file || uploading) return;
 
     try {
       setUploading(true);
+      setError("");
+      setStatus(null);
+
+      /*
+       * The backend upload endpoint is responsible for:
+       *
+       * 1. Getting the logged-in user
+       * 2. Getting the current upload fee
+       * 3. Checking wallet balance
+       * 4. Deducting the upload fee
+       * 5. Creating the wallet transaction
+       * 6. Starting the upload
+       *
+       * Therefore, DO NOT call debitWallet() here.
+       */
 
       const result = await uploadAudio(
         projectId,
@@ -32,8 +50,18 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
       );
 
       setSessionId(result.session_id);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload failed:", error);
+
+      let message = "Upload failed.";
+
+      if (error?.response?.data?.detail) {
+        message = error.response.data.detail;
+      } else if (error?.message) {
+        message = error.message;
+      }
+
+      setError(message);
       setUploading(false);
     }
   }
@@ -45,6 +73,7 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
     const timer = setInterval(async () => {
       try {
         const data = await getUploadStatus(sessionId);
+
         setStatus(data);
 
         if (
@@ -57,6 +86,7 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
         }
       } catch (error) {
         console.error("Status check failed", error);
+
         clearInterval(timer);
         setUploading(false);
       }
@@ -67,16 +97,29 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Choose File */}
+
+      {/* ================= ERROR ================= */}
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+          <p className="text-sm font-medium text-red-700">
+            ⚠️ {error}
+          </p>
+        </div>
+      )}
+
+      {/* ================= CHOOSE FILE ================= */}
+
       <div>
         <input
           id={fileInputId}
           type="file"
           accept="audio/*"
           className="hidden"
-          onChange={(e) =>
-            setFile(e.target.files?.[0] || null)
-          }
+          onChange={(e) => {
+            setFile(e.target.files?.[0] || null);
+            setError("");
+          }}
         />
 
         <label
@@ -102,7 +145,8 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
         )}
       </div>
 
-      {/* Broadcast Time */}
+      {/* ================= BROADCAST TIME ================= */}
+
       <div>
         <label className="mb-2 block font-semibold text-gray-700">
           Broadcast Time
@@ -111,7 +155,8 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
         <select
           value={uploadTime}
           onChange={(e) => setUploadTime(e.target.value)}
-          className="w-48 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none"
+          disabled={uploading}
+          className="w-48 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100"
         >
           {Array.from({ length: 24 }, (_, index) => {
             const hour = String(index + 1).padStart(2, "0");
@@ -125,7 +170,8 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
         </select>
       </div>
 
-      {/* Upload Button */}
+      {/* ================= UPLOAD BUTTON ================= */}
+
       <button
         onClick={handleUpload}
         disabled={!file || uploading}
@@ -140,10 +186,13 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
           : "🚀 Upload Audio"}
       </button>
 
-      {/* Progress */}
+      {/* ================= PROGRESS ================= */}
+
       {status && (
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 shadow-sm">
+
           <div className="mb-4 flex items-center justify-between">
+
             <span className="font-semibold text-gray-700">
               Status
             </span>
@@ -154,14 +203,18 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
                   ? "bg-green-100 text-green-700"
                   : status.status === "processing"
                   ? "bg-blue-100 text-blue-700"
+                  : status.status === "error"
+                  ? "bg-red-100 text-red-700"
                   : "bg-yellow-100 text-yellow-700"
               }`}
             >
               {status.status}
             </span>
+
           </div>
 
           <div className="mb-2 flex justify-between text-sm text-gray-600">
+
             <span>
               Chunk {status.current_chunk} /{" "}
               {status.total_chunks}
@@ -170,18 +223,23 @@ export default function UploadPanel({ projectId, onComplete }: Props) {
             <span>
               {status.progress_percent || 0}%
             </span>
+
           </div>
 
           <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+
             <div
               className="h-3 rounded-full bg-blue-600 transition-all duration-500"
               style={{
                 width: `${status.progress_percent || 0}%`,
               }}
             />
+
           </div>
+
         </div>
       )}
+
     </div>
   );
 }
