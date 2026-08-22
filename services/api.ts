@@ -22,20 +22,11 @@ export interface Advertisement {
   start_time: string;
   end_time: string;
 
-  /*
-   * Normalized fields used by SelectedSegments.
-   */
   start?: string;
   end?: string;
 
   detection_key: string | null;
 
-  /*
-   * Advertisement status.
-   *
-   * NEW   = newly detected/reprocessed
-   * SAVED = already saved
-   */
   status: "NEW" | "SAVED";
 }
 
@@ -64,78 +55,53 @@ async function authFetch(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const headers = new Headers(
-    options.headers
-  );
+  const headers = new Headers(options.headers);
 
-  const authHeaders =
-    getAuthHeaders();
+  const authHeaders = getAuthHeaders();
 
-  Object.entries(
-    authHeaders
-  ).forEach(
+  Object.entries(authHeaders).forEach(
     ([key, value]) => {
       if (value) {
-        headers.set(
-          key,
-          value
-        );
+        headers.set(key, value);
       }
     }
   );
 
-  const response =
-    await fetch(url, {
-      ...options,
-      headers,
-    });
+  console.log(
+    "API REQUEST:",
+    options.method || "GET",
+    url
+  );
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  console.log(
+    "API RESPONSE:",
+    response.status,
+    url
+  );
 
   // ==========================================================
   // UNAUTHORIZED
   // ==========================================================
 
-  if (
-    response.status === 401
-  ) {
-    if (
-      typeof window !==
-      "undefined"
-    ) {
-      localStorage.removeItem(
-        "access_token"
-      );
+  if (response.status === 401) {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("token_type");
+      localStorage.removeItem("user_id");
+      localStorage.removeItem("username");
+      localStorage.removeItem("role");
+      localStorage.removeItem("user");
+      localStorage.removeItem("auth");
 
-      localStorage.removeItem(
-        "token_type"
-      );
-
-      localStorage.removeItem(
-        "user_id"
-      );
-
-      localStorage.removeItem(
-        "username"
-      );
-
-      localStorage.removeItem(
-        "role"
-      );
-
-      localStorage.removeItem(
-        "user"
-      );
-
-      localStorage.removeItem(
-        "auth"
-      );
-
-      window.location.href =
-        "/login";
+      window.location.href = "/login";
     }
 
-    throw new Error(
-      "Authentication required"
-    );
+    throw new Error("Authentication required");
   }
 
   return response;
@@ -143,20 +109,6 @@ async function authFetch(
 
 // ============================================================
 // NORMALIZE ADVERTISEMENT
-// ============================================================
-//
-// Backend:
-//
-// start_time
-// end_time
-//
-// SelectedSegments:
-//
-// start
-// end
-//
-// Keep backend fields AND provide frontend fields.
-//
 // ============================================================
 
 function normalizeAdvertisement(
@@ -176,8 +128,7 @@ function normalizeAdvertisement(
       "",
 
     status:
-      item.status ===
-      "SAVED"
+      item.status === "SAVED"
         ? "SAVED"
         : "NEW",
   };
@@ -194,9 +145,7 @@ function normalizeAdvertisements(
     return [];
   }
 
-  return data.map(
-    normalizeAdvertisement
-  );
+  return data.map(normalizeAdvertisement);
 }
 
 // ============================================================
@@ -204,18 +153,15 @@ function normalizeAdvertisements(
 // ============================================================
 
 export async function getProjects() {
-  const res =
-    await authFetch(
-      `${API_URL}/projects`
-    );
+  const res = await authFetch(
+    `${API_URL}/projects`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
-      error ||
-        "Failed to load projects"
+      error || "Failed to load projects"
     );
   }
 
@@ -229,18 +175,15 @@ export async function getProjects() {
 export async function getProject(
   projectId: number
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/projects/${projectId}`
-    );
+  const res = await authFetch(
+    `${API_URL}/projects/${projectId}`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
-      error ||
-        "Failed to load project"
+      error || "Failed to load project"
     );
   }
 
@@ -257,30 +200,24 @@ export async function createProject(
     broadcast_date: string;
   }
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/projects`,
-      {
-        method: "POST",
+  const res = await authFetch(
+    `${API_URL}/projects`,
+    {
+      method: "POST",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+      headers: {
+        "Content-Type": "application/json",
+      },
 
-        body: JSON.stringify(
-          data
-        ),
-      }
-    );
+      body: JSON.stringify(data),
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
-      error ||
-        "Failed to create project"
+      error || "Failed to create project"
     );
   }
 
@@ -294,21 +231,18 @@ export async function createProject(
 export async function deleteProject(
   projectId: number
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/projects/${projectId}`,
-      {
-        method: "DELETE",
-      }
-    );
+  const res = await authFetch(
+    `${API_URL}/projects/${projectId}`,
+    {
+      method: "DELETE",
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
-      error ||
-        "Delete project failed"
+      error || "Delete project failed"
     );
   }
 
@@ -323,30 +257,24 @@ export async function saveProject(
   projectId: number,
   payload: any
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/projects/${projectId}/save`,
-      {
-        method: "POST",
+  const res = await authFetch(
+    `${API_URL}/projects/${projectId}/save`,
+    {
+      method: "POST",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+      headers: {
+        "Content-Type": "application/json",
+      },
 
-        body: JSON.stringify(
-          payload
-        ),
-      }
-    );
+      body: JSON.stringify(payload),
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
-      error ||
-        "Failed to save project"
+      error || "Failed to save project"
     );
   }
 
@@ -364,14 +292,12 @@ export async function saveProject(
 export async function getAdvertisements(
   projectId: number
 ): Promise<Advertisement[]> {
-  const res =
-    await authFetch(
-      `${API_URL}/advertisements/${projectId}`
-    );
+  const res = await authFetch(
+    `${API_URL}/advertisements/${projectId}`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -379,12 +305,9 @@ export async function getAdvertisements(
     );
   }
 
-  const data =
-    await res.json();
+  const data = await res.json();
 
-  return normalizeAdvertisements(
-    data
-  );
+  return normalizeAdvertisements(data);
 }
 
 // ============================================================
@@ -395,14 +318,12 @@ export async function getAdvertisementsByProjectHour(
   projectId: number,
   hour: number
 ): Promise<Advertisement[]> {
-  const res =
-    await authFetch(
-      `${API_URL}/advertisements/project/${projectId}/hour/${hour}`
-    );
+  const res = await authFetch(
+    `${API_URL}/advertisements/project/${projectId}/hour/${hour}`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -410,12 +331,9 @@ export async function getAdvertisementsByProjectHour(
     );
   }
 
-  const data =
-    await res.json();
+  const data = await res.json();
 
-  return normalizeAdvertisements(
-    data
-  );
+  return normalizeAdvertisements(data);
 }
 
 // ============================================================
@@ -435,45 +353,46 @@ export async function createAdvertisement(
     end: string;
 
     detection_key: string;
+
     status: string;
   }
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/advertisements`,
-      {
-        method: "POST",
+  const res = await authFetch(
+    `${API_URL}/advertisements`,
+    {
+      method: "POST",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+      headers: {
+        "Content-Type": "application/json",
+      },
 
-        body: JSON.stringify({
-          project_id:
-            advertisement.project_id,
+      body: JSON.stringify({
+        project_id:
+          advertisement.project_id,
 
-          text:
-            advertisement.text,
+        text:
+          advertisement.text,
 
-          brand_name:
-            advertisement.brand_name,
+        brand_name:
+          advertisement.brand_name,
 
-          start_time:
-            advertisement.start,
+        start_time:
+          advertisement.start,
 
-          end_time:
-            advertisement.end,
+        end_time:
+          advertisement.end,
 
-          detection_key:
-            advertisement.detection_key,
-        }),
-      }
-    );
+        detection_key:
+          advertisement.detection_key,
+
+        status:
+          advertisement.status,
+      }),
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -486,17 +405,6 @@ export async function createAdvertisement(
 
 // ============================================================
 // UPDATE ADVERTISEMENT
-// ============================================================
-//
-// IMPORTANT:
-//
-// status is now included.
-//
-// NEW -> SAVED
-//
-// detection_key is intentionally NOT sent.
-// Backend preserves the original detection_key.
-//
 // ============================================================
 
 export async function updateAdvertisement(
@@ -513,46 +421,35 @@ export async function updateAdvertisement(
     status?: "NEW" | "SAVED";
   }
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/advertisements/${id}`,
-      {
-        method: "PUT",
+  const res = await authFetch(
+    `${API_URL}/advertisements/${id}`,
+    {
+      method: "PUT",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+      headers: {
+        "Content-Type": "application/json",
+      },
 
-        body: JSON.stringify({
-          text:
-            data.text,
+      body: JSON.stringify({
+        text: data.text,
 
-          brand_name:
-            data.brand_name,
+        brand_name:
+          data.brand_name,
 
-          start_time:
-            data.start,
+        start_time:
+          data.start,
 
-          end_time:
-            data.end,
+        end_time:
+          data.end,
 
-          /*
-           * IMPORTANT:
-           *
-           * This allows:
-           *
-           * NEW -> SAVED
-           */
-          status:
-            data.status,
-        }),
-      }
-    );
+        status:
+          data.status,
+      }),
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -564,29 +461,31 @@ export async function updateAdvertisement(
 }
 
 // ============================================================
-// DELETE ADVERTISEMENT
+// DELETE SINGLE ADVERTISEMENT
 // ============================================================
 //
-// MANUAL DELETE ONLY.
-//
-// Reprocess does NOT call this.
+// IMPORTANT:
+// This is the API used when deleting one SAVED advertisement.
 //
 // ============================================================
 
 export async function deleteAdvertisement(
   id: number
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/advertisements/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+  console.log(
+    "DELETE ADVERTISEMENT API:",
+    id
+  );
+
+  const res = await authFetch(
+    `${API_URL}/advertisements/${id}`,
+    {
+      method: "DELETE",
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -600,27 +499,19 @@ export async function deleteAdvertisement(
 // ============================================================
 // DELETE ALL ADS BY PROJECT
 // ============================================================
-//
-// MANUAL DELETE ONLY.
-//
-// Reprocess does NOT call this.
-//
-// ============================================================
 
 export async function deleteAdvertisementsByProject(
   projectId: number
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/advertisements/project/${projectId}`,
-      {
-        method: "DELETE",
-      }
-    );
+  const res = await authFetch(
+    `${API_URL}/advertisements/project/${projectId}`,
+    {
+      method: "DELETE",
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -634,28 +525,28 @@ export async function deleteAdvertisementsByProject(
 // ============================================================
 // DELETE ADS BY PROJECT + HOUR
 // ============================================================
-//
-// MANUAL DELETE ONLY.
-//
-// Reprocess does NOT call this.
-//
-// ============================================================
 
 export async function deleteAdvertisementsByProjectHour(
   projectId: number,
   hour: number
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/advertisements/project/${projectId}/hour/${hour}`,
-      {
-        method: "DELETE",
-      }
-    );
+  console.log(
+    "DELETE ADVERTISEMENTS BY HOUR API:",
+    {
+      projectId,
+      hour,
+    }
+  );
+
+  const res = await authFetch(
+    `${API_URL}/advertisements/project/${projectId}/hour/${hour}`,
+    {
+      method: "DELETE",
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -668,24 +559,6 @@ export async function deleteAdvertisementsByProjectHour(
 
 // ============================================================
 // REPROCESS ADVERTISEMENTS
-// ============================================================
-//
-// hour is OPTIONAL.
-//
-// reprocessAdvertisements(projectId)
-//
-//     -> Reprocess entire project
-//
-// reprocessAdvertisements(projectId, hour)
-//
-//     -> Reprocess only that hour
-//
-// IMPORTANT:
-//
-// Reprocess does NOT delete advertisements.
-//
-// Backend uses detection_key to avoid duplicates.
-//
 // ============================================================
 
 export async function reprocessAdvertisements(
@@ -700,17 +573,15 @@ export async function reprocessAdvertisements(
         : ""
     );
 
-  const res =
-    await authFetch(
-      url,
-      {
-        method: "POST",
-      }
-    );
+  const res = await authFetch(
+    url,
+    {
+      method: "POST",
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -732,18 +603,14 @@ export async function getLogs(
   let url =
     `${API_URL}/upload/logs/${projectId}`;
 
-  if (
-    hour !== undefined
-  ) {
+  if (hour !== undefined) {
     url += `?hour=${hour}`;
   }
 
-  const res =
-    await authFetch(url);
+  const res = await authFetch(url);
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -763,8 +630,7 @@ export async function uploadAudio(
   file: File,
   startHour: string
 ) {
-  const formData =
-    new FormData();
+  const formData = new FormData();
 
   formData.append(
     "project_id",
@@ -781,18 +647,16 @@ export async function uploadAudio(
     startHour
   );
 
-  const res =
-    await authFetch(
-      `${API_URL}/upload/`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
+  const res = await authFetch(
+    `${API_URL}/upload/`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
 
   if (!res.ok) {
-    let message =
-      "Upload failed";
+    let message = "Upload failed";
 
     const contentType =
       res.headers.get(
@@ -812,14 +676,12 @@ export async function uploadAudio(
           typeof data?.detail ===
           "string"
         ) {
-          message =
-            data.detail;
+          message = data.detail;
         } else if (
           typeof data?.message ===
           "string"
         ) {
-          message =
-            data.message;
+          message = data.message;
         }
       } else {
         const text =
@@ -830,7 +692,7 @@ export async function uploadAudio(
         }
       }
     } catch {
-      // Keep default error message.
+      // Keep default.
     }
 
     throw new Error(message);
@@ -846,14 +708,12 @@ export async function uploadAudio(
 export async function getUploadStatus(
   sessionId: string
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/upload/status/${sessionId}`
-    );
+  const res = await authFetch(
+    `${API_URL}/upload/status/${sessionId}`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -869,14 +729,12 @@ export async function getUploadStatus(
 // ============================================================
 
 export async function getBrands() {
-  const res =
-    await authFetch(
-      `${API_URL}/brands/`
-    );
+  const res = await authFetch(
+    `${API_URL}/brands/`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -894,14 +752,12 @@ export async function getBrands() {
 export async function getBrand(
   id: number
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/brands/${id}`
-    );
+  const res = await authFetch(
+    `${API_URL}/brands/${id}`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -919,22 +775,21 @@ export async function getBrand(
 export async function createBrand(
   name: string
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/brands/`,
-      {
-        method: "POST",
+  const res = await authFetch(
+    `${API_URL}/brands/`,
+    {
+      method: "POST",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
 
-        body: JSON.stringify({
-          name,
-        }),
-      }
-    );
+      body: JSON.stringify({
+        name,
+      }),
+    }
+  );
 
   if (!res.ok) {
     let message =
@@ -948,7 +803,7 @@ export async function createBrand(
         error?.detail ||
         message;
     } catch {
-      // Ignore JSON parsing error.
+      // Ignore.
     }
 
     throw new Error(message);
@@ -965,26 +820,24 @@ export async function updateBrand(
   id: number,
   name: string
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/brands/${id}`,
-      {
-        method: "PUT",
+  const res = await authFetch(
+    `${API_URL}/brands/${id}`,
+    {
+      method: "PUT",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
 
-        body: JSON.stringify({
-          name,
-        }),
-      }
-    );
+      body: JSON.stringify({
+        name,
+      }),
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -1002,17 +855,15 @@ export async function updateBrand(
 export async function deleteBrand(
   id: number
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/brands/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+  const res = await authFetch(
+    `${API_URL}/brands/${id}`,
+    {
+      method: "DELETE",
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -1028,14 +879,12 @@ export async function deleteBrand(
 // ============================================================
 
 export async function getKeywords() {
-  const res =
-    await authFetch(
-      `${API_URL}/keywords/`
-    );
+  const res = await authFetch(
+    `${API_URL}/keywords/`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -1053,14 +902,12 @@ export async function getKeywords() {
 export async function getKeywordsByBrand(
   brandId: number
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/keywords/brand/${brandId}`
-    );
+  const res = await authFetch(
+    `${API_URL}/keywords/brand/${brandId}`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -1082,26 +929,22 @@ export async function createKeyword(
     duration?: number | null;
   }
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/keywords/`,
-      {
-        method: "POST",
+  const res = await authFetch(
+    `${API_URL}/keywords/`,
+    {
+      method: "POST",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
 
-        body: JSON.stringify(
-          data
-        ),
-      }
-    );
+      body: JSON.stringify(data),
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -1124,26 +967,22 @@ export async function updateKeyword(
     duration?: number | null;
   }
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/keywords/${id}`,
-      {
-        method: "PUT",
+  const res = await authFetch(
+    `${API_URL}/keywords/${id}`,
+    {
+      method: "PUT",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
 
-        body: JSON.stringify(
-          data
-        ),
-      }
-    );
+      body: JSON.stringify(data),
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -1161,17 +1000,15 @@ export async function updateKeyword(
 export async function deleteKeyword(
   id: number
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/keywords/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+  const res = await authFetch(
+    `${API_URL}/keywords/${id}`,
+    {
+      method: "DELETE",
+    }
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -1187,14 +1024,12 @@ export async function deleteKeyword(
 // ============================================================
 
 export async function getSegments() {
-  const res =
-    await authFetch(
-      `${API_URL}/segments/`
-    );
+  const res = await authFetch(
+    `${API_URL}/segments/`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -1212,14 +1047,12 @@ export async function getSegments() {
 export async function getSegmentsByProject(
   projectId: number
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/segments/project/${projectId}`
-    );
+  const res = await authFetch(
+    `${API_URL}/segments/project/${projectId}`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||
@@ -1237,14 +1070,12 @@ export async function getSegmentsByProject(
 export async function getSegmentHours(
   projectId: number
 ) {
-  const res =
-    await authFetch(
-      `${API_URL}/segments/hours/${projectId}`
-    );
+  const res = await authFetch(
+    `${API_URL}/segments/hours/${projectId}`
+  );
 
   if (!res.ok) {
-    const error =
-      await res.text();
+    const error = await res.text();
 
     throw new Error(
       error ||

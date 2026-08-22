@@ -55,10 +55,23 @@ interface Props {
     }
   ) => void;
 
-  onRemove?: (
+  /*
+   * REQUIRED
+   *
+   * This MUST delete the Advertisement record
+   * from the backend/database.
+   *
+   * Example:
+   *
+   * DELETE /advertisements/300
+   */
+  onRemove: (
     id: number
+  ) => void | Promise<void>;
+
+  onDownload: (
+    segment: any
   ) => void;
-  onDownload: (segment: any) => void;
 
   onSave?: (
     segments: Segment[]
@@ -119,6 +132,9 @@ export default function SelectedSegments({
 
   const [saving, setSaving] =
     useState(false);
+
+  const [deletingId, setDeletingId] =
+    useState<number | null>(null);
 
   const durationDropdownRef =
     useRef<HTMLDivElement | null>(null);
@@ -248,14 +264,6 @@ export default function SelectedSegments({
    * ============================================================
    * SYNC SEGMENTS
    * ============================================================
-   *
-   * Backend status is authoritative.
-   *
-   * NEW  = newly detected / not saved
-   * SAVED = already saved
-   *
-   * If status is missing, preserve the local status.
-   * Otherwise default to NEW.
    */
 
   useEffect(() => {
@@ -706,7 +714,6 @@ export default function SelectedSegments({
             text-sm
             font-semibold
             shadow-sm
-
             ${
               overlapping
                 ? "border-red-500 bg-red-50 text-red-700"
@@ -813,7 +820,6 @@ export default function SelectedSegments({
                       py-2.5
                       text-left
                       text-sm
-
                       ${
                         value ===
                         duration
@@ -875,7 +881,9 @@ export default function SelectedSegments({
    * ============================================================
    */
 
-  function edit(row: Segment) {
+  function edit(
+    row: Segment
+  ) {
     setEditingId(row.id);
     setBrandOpenId(null);
 
@@ -1034,48 +1042,186 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * DELETE
+   * DELETE FROM DATABASE
    * ============================================================
    */
 
-  function deleteSegment(
+  async function deleteSegment(
     id: number
   ) {
-    setSegmentList(
-      (previous) =>
-        previous.filter(
-          (item) =>
-            item.id !== id
-        )
+    if (
+      deletingId !== null
+    ) {
+      return;
+    }
+
+    const row =
+      segmentList.find(
+        (item) =>
+          item.id === id
+      );
+
+    if (!row) {
+      console.error(
+        "Advertisement not found:",
+        id
+      );
+
+      return;
+    }
+
+    console.log(
+      "================================="
     );
 
-    if (
-      selectedResultId === id
-    ) {
-      setSelectedResultId(null);
+    console.log(
+      "DELETE ADVERTISEMENT"
+    );
+
+    console.log(
+      "Advertisement ID:",
+      id
+    );
+
+    console.log(
+      "Row:",
+      row
+    );
+
+    console.log(
+      "================================="
+    );
+
+    const confirmed =
+      window.confirm(
+        `Delete this advertisement?\n\nAdvertisement ID: ${id}\n\nThis will permanently delete the database record.`
+      );
+
+    if (!confirmed) {
+      return;
     }
 
-    if (
-      editingId === id
-    ) {
-      setEditingId(null);
+    try {
+      setDeletingId(id);
+
+      /*
+       * ========================================================
+       * IMPORTANT
+       * ========================================================
+       *
+       * This calls the parent.
+       *
+       * The parent MUST call:
+       *
+       * DELETE /advertisements/{id}
+       *
+       * and MUST throw an error if the API fails.
+       *
+       * We DO NOT remove the UI row until this succeeds.
+       */
+
+      console.log(
+        "Calling onRemove with Advertisement ID:",
+        id
+      );
+
+      await onRemove(id);
+
+      console.log(
+        "Database deletion successful:",
+        id
+      );
+
+      /*
+       * ========================================================
+       * REMOVE FROM LOCAL STATE
+       * ========================================================
+       */
+
+      setSegmentList(
+        (previous) =>
+          previous.filter(
+            (item) =>
+              item.id !== id
+          )
+      );
+
+      /*
+       * Clear selected row.
+       */
+
+      if (
+        selectedResultId === id
+      ) {
+        setSelectedResultId(
+          null
+        );
+      }
+
+      /*
+       * Clear edit state.
+       */
+
+      if (
+        editingId === id
+      ) {
+        setEditingId(null);
+      }
+
+      /*
+       * Clear brand dropdown.
+       */
+
+      if (
+        brandOpenId === id
+      ) {
+        setBrandOpenId(null);
+      }
+
+      /*
+       * Clear duration dropdown.
+       */
+
+      if (
+        durationOpenId === id
+      ) {
+        setDurationOpenId(null);
+      }
+
+      setDurationSearch("");
+
+      /*
+       * Remove custom duration.
+       */
+
+      setCustomDurations(
+        (previous) => {
+          const next = {
+            ...previous,
+          };
+
+          delete next[id];
+
+          return next;
+        }
+      );
+
+      console.log(
+        "Advertisement removed from UI:",
+        id
+      );
+    } catch (error) {
+      console.error(
+        "DATABASE DELETE FAILED:",
+        error
+      );
+
+      alert(
+        "Failed to delete advertisement from the database. The advertisement was NOT removed."
+      );
+    } finally {
+      setDeletingId(null);
     }
-
-    if (
-      brandOpenId === id
-    ) {
-      setBrandOpenId(null);
-    }
-
-    if (
-      durationOpenId === id
-    ) {
-      setDurationOpenId(null);
-    }
-
-    setDurationSearch("");
-
-    onRemove?.(id);
   }
 
   function cancelEdit() {
@@ -1087,6 +1233,12 @@ export default function SelectedSegments({
     setEditEnd("");
     setEditBrand("");
   }
+
+  /*
+   * ============================================================
+   * TIME INPUT
+   * ============================================================
+   */
 
   function TimeInput({
     value,
@@ -1325,6 +1477,10 @@ export default function SelectedSegments({
             row.status ===
             "SAVED";
 
+          const isDeleting =
+            deletingId ===
+            row.id;
+
           const duration =
             getDuration(
               row.start,
@@ -1401,6 +1557,11 @@ export default function SelectedSegments({
                 shadow-sm
                 transition-all
                 ${cardClass}
+                ${
+                  isDeleting
+                    ? "pointer-events-none opacity-50"
+                    : ""
+                }
               `}
             >
               {overlapping && (
@@ -1441,22 +1602,22 @@ export default function SelectedSegments({
 
               {isSaved &&
                 !overlapping && (
-                <div className="mb-4 flex items-center gap-3 rounded-xl border border-green-300 bg-green-100 px-4 py-3 text-green-700">
-                  <span className="text-xl">
-                    💾
-                  </span>
+                  <div className="mb-4 flex items-center gap-3 rounded-xl border border-green-300 bg-green-100 px-4 py-3 text-green-700">
+                    <span className="text-xl">
+                      💾
+                    </span>
 
-                  <div>
-                    <div className="font-bold">
-                      SAVED ADVERTISEMENT
-                    </div>
+                    <div>
+                      <div className="font-bold">
+                        SAVED ADVERTISEMENT
+                      </div>
 
-                    <div className="text-xs">
-                      This advertisement has already been saved.
+                      <div className="text-xs">
+                        This advertisement has already been saved.
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
               <div className="flex items-start justify-between gap-4">
                 <div className="flex flex-1 gap-4">
@@ -1484,7 +1645,8 @@ export default function SelectedSegments({
                         </h3>
 
                         <p className="text-xs text-gray-500">
-                          Detected Segment
+                          ID:{" "}
+                          {row.id}
                         </p>
                       </div>
 
@@ -1626,6 +1788,9 @@ export default function SelectedSegments({
 
                   <button
                     type="button"
+                    disabled={
+                      isDeleting
+                    }
                     onClick={(e) => {
                       e.stopPropagation();
 
@@ -1633,9 +1798,12 @@ export default function SelectedSegments({
                         row.id
                       );
                     }}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 hover:bg-red-100"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    title={`Delete advertisement ${row.id}`}
                   >
-                    🗑
+                    {isDeleting
+                      ? "..."
+                      : "🗑"}
                   </button>
                 </div>
               </div>
@@ -1715,17 +1883,17 @@ export default function SelectedSegments({
 
                   {isNew &&
                     !overlapping && (
-                    <div className="text-xs font-bold text-orange-600">
-                      ✨ NEW TIME RANGE
-                    </div>
-                  )}
+                      <div className="text-xs font-bold text-orange-600">
+                        ✨ NEW TIME RANGE
+                      </div>
+                    )}
 
                   {isSaved &&
                     !overlapping && (
-                    <div className="text-xs font-bold text-green-600">
-                      ✓ SAVED TIME RANGE
-                    </div>
-                  )}
+                      <div className="text-xs font-bold text-green-600">
+                        ✓ SAVED TIME RANGE
+                      </div>
+                    )}
                 </div>
 
                 {editingId ===
@@ -1762,7 +1930,8 @@ export default function SelectedSegments({
                         onChange={(e) =>
                           changeEditDuration(
                             Number(
-                              e.target.value
+                              e.target
+                                .value
                             )
                           )
                         }
