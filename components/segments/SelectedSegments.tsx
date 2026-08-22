@@ -8,24 +8,41 @@ import {
 
 import BrandCombobox from "@/components/BrandCombobox";
 
+export type AdvertisementStatus =
+  | "NEW"
+  | "SAVED";
+
 interface Segment {
   id: number;
+
   start?: string;
   end?: string;
+
   text: string;
+
   segment_type?: string;
-  brand_name?: string;
-  status?: "pending" | "completed";
+
+  brand_name?: string | null;
+
+  status?: AdvertisementStatus;
+
+  detection_key?: string | null;
 }
 
 interface Props {
   segments: Segment[];
+
   transcriptSegments?: Segment[];
 
   selectedResultId: number | null;
-  setSelectedResultId: (id: number | null) => void;
 
-  onPlay: (row: Segment) => void;
+  setSelectedResultId: (
+    id: number | null
+  ) => void;
+
+  onPlay: (
+    row: Segment
+  ) => void;
 
   onUpdate?: (
     id: number,
@@ -34,15 +51,18 @@ interface Props {
       start: string;
       end: string;
       brand_name: string;
-      status: "pending" | "completed";
+      status: AdvertisementStatus;
     }
   ) => void;
 
-  onRemove?: (id: number) => void;
+  onRemove?: (
+    id: number
+  ) => void;
+  onDownload: (segment: any) => void;
 
-  onSave?: (segments: Segment[]) => void;
-
-  onDownload?: (segment: Segment) => void;
+  onSave?: (
+    segments: Segment[]
+  ) => void | Promise<void>;
 }
 
 const DURATION_OPTIONS = [
@@ -68,7 +88,7 @@ export default function SelectedSegments({
   onSave,
 }: Props) {
   const [segmentList, setSegmentList] =
-    useState<Segment[]>(segments);
+    useState<Segment[]>([]);
 
   const [editingId, setEditingId] =
     useState<number | null>(null);
@@ -97,6 +117,9 @@ export default function SelectedSegments({
   const [durationSearch, setDurationSearch] =
     useState("");
 
+  const [saving, setSaving] =
+    useState(false);
+
   const durationDropdownRef =
     useRef<HTMLDivElement | null>(null);
 
@@ -106,25 +129,37 @@ export default function SelectedSegments({
    * ============================================================
    */
 
-  function toSeconds(time?: string): number {
-    if (!time) return 0;
+  function toSeconds(
+    time?: string
+  ): number {
+    if (!time) {
+      return 0;
+    }
 
-    const value = String(time).trim();
+    const value =
+      String(time).trim();
 
-    if (!value) return 0;
+    if (!value) {
+      return 0;
+    }
 
-    const parts = value
-      .split(":")
-      .map(Number);
+    const parts =
+      value
+        .split(":")
+        .map(Number);
 
     if (
       parts.length === 3 &&
       parts.every(
-        (value) => !Number.isNaN(value)
+        (value) =>
+          !Number.isNaN(value)
       )
     ) {
-      const [hours, minutes, seconds] =
-        parts;
+      const [
+        hours,
+        minutes,
+        seconds,
+      ] = parts;
 
       return (
         hours * 3600 +
@@ -136,11 +171,14 @@ export default function SelectedSegments({
     if (
       parts.length === 2 &&
       parts.every(
-        (value) => !Number.isNaN(value)
+        (value) =>
+          !Number.isNaN(value)
       )
     ) {
-      const [minutes, seconds] =
-        parts;
+      const [
+        minutes,
+        seconds,
+      ] = parts;
 
       return (
         minutes * 60 +
@@ -161,18 +199,21 @@ export default function SelectedSegments({
   function secondsToTime(
     totalSeconds: number
   ): string {
-    totalSeconds = Math.max(
-      0,
-      Math.floor(totalSeconds)
-    );
+    totalSeconds =
+      Math.max(
+        0,
+        Math.floor(totalSeconds)
+      );
 
-    const hours = Math.floor(
-      totalSeconds / 3600
-    );
+    const hours =
+      Math.floor(
+        totalSeconds / 3600
+      );
 
-    const minutes = Math.floor(
-      (totalSeconds % 3600) / 60
-    );
+    const minutes =
+      Math.floor(
+        (totalSeconds % 3600) / 60
+      );
 
     const seconds =
       totalSeconds % 60;
@@ -206,36 +247,40 @@ export default function SelectedSegments({
   /*
    * ============================================================
    * SYNC SEGMENTS
-   *
-   * IMPORTANT:
-   * Dependency array is FIXED:
-   *
-   * [segments]
-   *
    * ============================================================
+   *
+   * Backend status is authoritative.
+   *
+   * NEW  = newly detected / not saved
+   * SAVED = already saved
+   *
+   * If status is missing, preserve the local status.
+   * Otherwise default to NEW.
    */
 
   useEffect(() => {
-    setSegmentList((previous) => {
-      return segments.map(
-        (incoming) => {
-          const local =
-            previous.find(
-              (item) =>
-                item.id ===
-                incoming.id
-            );
+    setSegmentList(
+      (previous) => {
+        return segments.map(
+          (incoming) => {
+            const local =
+              previous.find(
+                (item) =>
+                  item.id ===
+                  incoming.id
+              );
 
-          return {
-            ...incoming,
-            status:
-              incoming.status ??
-              local?.status ??
-              "completed",
-          };
-        }
-      );
-    });
+            return {
+              ...incoming,
+              status:
+                incoming.status ??
+                local?.status ??
+                "NEW",
+            };
+          }
+        );
+      }
+    );
 
     setCustomDurations(
       (previous) => {
@@ -281,12 +326,7 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * CLOSE DURATION DROPDOWN
-   *
-   * IMPORTANT:
-   * Dependency array is FIXED:
-   *
-   * []
+   * CLOSE DROPDOWN
    * ============================================================
    */
 
@@ -373,31 +413,33 @@ export default function SelectedSegments({
 
     const matching =
       transcriptSegments
-        .filter((segment) => {
-          if (
-            !segment.start ||
-            !segment.end
-          ) {
-            return false;
+        .filter(
+          (segment) => {
+            if (
+              !segment.start ||
+              !segment.end
+            ) {
+              return false;
+            }
+
+            const segmentStart =
+              toSeconds(
+                segment.start
+              );
+
+            const segmentEnd =
+              toSeconds(
+                segment.end
+              );
+
+            return (
+              segmentStart <
+                endSeconds &&
+              segmentEnd >
+                startSeconds
+            );
           }
-
-          const segmentStart =
-            toSeconds(
-              segment.start
-            );
-
-          const segmentEnd =
-            toSeconds(
-              segment.end
-            );
-
-          return (
-            segmentStart <
-              endSeconds &&
-            segmentEnd >
-              startSeconds
-          );
-        })
+        )
         .sort(
           (a, b) =>
             toSeconds(a.start) -
@@ -538,7 +580,8 @@ export default function SelectedSegments({
                   end: newEnd,
                   text: newText,
                   status:
-                    "completed",
+                    item.status ??
+                    "NEW",
                 }
               : item
         )
@@ -554,7 +597,8 @@ export default function SelectedSegments({
           row.brand_name ||
           "",
         status:
-          "completed",
+          row.status ??
+          "NEW",
       }
     );
 
@@ -597,10 +641,12 @@ export default function SelectedSegments({
     row,
     duration,
     overlapping,
+    isNew,
   }: {
     row: Segment;
     duration: number;
     overlapping: boolean;
+    isNew: boolean;
   }) {
     const open =
       durationOpenId === row.id;
@@ -656,7 +702,6 @@ export default function SelectedSegments({
             justify-between
             rounded-lg
             border
-            bg-white
             px-3
             text-sm
             font-semibold
@@ -665,22 +710,25 @@ export default function SelectedSegments({
             ${
               overlapping
                 ? "border-red-500 bg-red-50 text-red-700"
-                : "border-gray-300 hover:border-blue-400"
+                : isNew
+                  ? "border-orange-400 bg-orange-50 text-orange-700"
+                  : "border-gray-300 bg-white hover:border-blue-400"
             }
           `}
         >
           <span className="flex items-center gap-2">
-
             {overlapping && (
-              <span>
-                ⚠
-              </span>
+              <span>⚠</span>
             )}
+
+            {!overlapping &&
+              isNew && (
+                <span>✨</span>
+              )}
 
             <span>
               {duration} seconds
             </span>
-
           </span>
 
           <span
@@ -696,11 +744,8 @@ export default function SelectedSegments({
 
         {open && (
           <div className="absolute left-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border bg-white shadow-xl">
-
             <div className="border-b p-2">
-
               <div className="relative">
-
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                   🔍
                 </span>
@@ -743,13 +788,10 @@ export default function SelectedSegments({
                   placeholder="Type duration..."
                   className="h-10 w-full rounded-lg border bg-gray-50 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
                 />
-
               </div>
-
             </div>
 
             <div className="max-h-72 overflow-y-auto p-1">
-
               {filtered.map(
                 (value) => (
                   <button
@@ -800,11 +842,9 @@ export default function SelectedSegments({
                   No preset duration found.
                 </div>
               )}
-
             </div>
 
             <div className="border-t p-2">
-
               <button
                 type="button"
                 disabled={
@@ -822,9 +862,7 @@ export default function SelectedSegments({
               >
                 ✏ Custom duration
               </button>
-
             </div>
-
           </div>
         )}
       </div>
@@ -861,12 +899,6 @@ export default function SelectedSegments({
     );
   }
 
-  /*
-   * ============================================================
-   * EDIT DURATION
-   * ============================================================
-   */
-
   function changeEditDuration(
     duration: number
   ) {
@@ -890,12 +922,6 @@ export default function SelectedSegments({
     setEditEnd(newEnd);
     setEditText(newText);
   }
-
-  /*
-   * ============================================================
-   * EDIT START
-   * ============================================================
-   */
 
   function changeEditStart(
     value: string
@@ -944,7 +970,8 @@ export default function SelectedSegments({
       end: editEnd,
       brand_name: editBrand,
       status:
-        "completed" as const,
+        row.status ??
+        "NEW",
     };
 
     setSegmentList(
@@ -1008,10 +1035,6 @@ export default function SelectedSegments({
   /*
    * ============================================================
    * DELETE
-   *
-   * NO TOAST HERE.
-   *
-   * onRemove is called exactly once.
    * ============================================================
    */
 
@@ -1029,9 +1052,7 @@ export default function SelectedSegments({
     if (
       selectedResultId === id
     ) {
-      setSelectedResultId(
-        null
-      );
+      setSelectedResultId(null);
     }
 
     if (
@@ -1054,17 +1075,8 @@ export default function SelectedSegments({
 
     setDurationSearch("");
 
-    /*
-     * ONE CALLBACK ONLY
-     */
     onRemove?.(id);
   }
-
-  /*
-   * ============================================================
-   * CANCEL
-   * ============================================================
-   */
 
   function cancelEdit() {
     setEditingId(null);
@@ -1076,17 +1088,12 @@ export default function SelectedSegments({
     setEditBrand("");
   }
 
-  /*
-   * ============================================================
-   * TIME INPUT
-   * ============================================================
-   */
-
   function TimeInput({
     value,
     onChange,
   }: {
     value: string;
+
     onChange: (
       value: string
     ) => void;
@@ -1112,27 +1119,70 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * SAVE ALL
+   * SAVE ALL NEW ADS
    * ============================================================
    */
 
-  function saveAll() {
-    const completed =
-      segmentList.map(
-        (item) => ({
-          ...item,
-          status:
-            "completed" as const,
-        })
+  async function saveAll() {
+    if (saving) {
+      return;
+    }
+
+    const newAdvertisements =
+      segmentList.filter(
+        (item) =>
+          item.status ===
+          "NEW"
       );
 
-    setSegmentList(
-      completed
-    );
+    if (
+      newAdvertisements.length ===
+      0
+    ) {
+      return;
+    }
 
-    onSave?.(
-      completed
-    );
+    if (!onSave) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      await onSave(
+        newAdvertisements
+      );
+
+      const savedIds =
+        new Set(
+          newAdvertisements.map(
+            (item) => item.id
+          )
+        );
+
+      setSegmentList(
+        (previous) =>
+          previous.map(
+            (item) =>
+              savedIds.has(
+                item.id
+              )
+                ? {
+                    ...item,
+                    status:
+                      "SAVED",
+                  }
+                : item
+          )
+      );
+    } catch (error) {
+      console.error(
+        "Failed to save advertisements:",
+        error
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   /*
@@ -1147,7 +1197,7 @@ export default function SelectedSegments({
         ...item,
         status:
           item.status ??
-          "pending",
+          "NEW",
       }))
       .sort(
         (a, b) =>
@@ -1155,16 +1205,24 @@ export default function SelectedSegments({
           toSeconds(b.start)
       );
 
-  /*
-   * ============================================================
-   * OVERLAPPING IDS
-   * ============================================================
-   */
-
   const overlappingIds =
     getOverlappingIds(
       sortedSegments
     );
+
+  const newDetectedCount =
+    sortedSegments.filter(
+      (item) =>
+        item.status ===
+        "NEW"
+    ).length;
+
+  const savedCount =
+    sortedSegments.filter(
+      (item) =>
+        item.status ===
+        "SAVED"
+    ).length;
 
   /*
    * ============================================================
@@ -1174,11 +1232,7 @@ export default function SelectedSegments({
 
   return (
     <div className="space-y-4">
-
-      {/* HEADER */}
-
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4 shadow-sm">
-
         <div>
           <h2 className="text-lg font-bold">
             📢 Selected Advertisements
@@ -1189,15 +1243,30 @@ export default function SelectedSegments({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {newDetectedCount >
+            0 && (
+            <div className="rounded-lg border border-orange-300 bg-orange-100 px-3 py-2 text-xs font-bold text-orange-700">
+              ✨{" "}
+              {newDetectedCount}{" "}
+              new detected
+            </div>
+          )}
+
+          {savedCount >
+            0 && (
+            <div className="rounded-lg border border-green-300 bg-green-100 px-3 py-2 text-xs font-bold text-green-700">
+              ✓{" "}
+              {savedCount}{" "}
+              saved
+            </div>
+          )}
 
           {overlappingIds.size >
             0 && (
             <div className="rounded-lg border border-red-300 bg-red-100 px-3 py-2 text-xs font-bold text-red-700">
               ⚠{" "}
-              {
-                overlappingIds.size
-              }{" "}
+              {overlappingIds.size}{" "}
               overlapping
             </div>
           )}
@@ -1205,21 +1274,28 @@ export default function SelectedSegments({
           <button
             type="button"
             onClick={saveAll}
-            className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700"
+            disabled={
+              newDetectedCount ===
+                0 ||
+              saving
+            }
+            className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Save All
+            {saving
+              ? "💾 Saving..."
+              : `💾 Save ${
+                  newDetectedCount >
+                  0
+                    ? `(${newDetectedCount})`
+                    : "All"
+                }`}
           </button>
-
         </div>
-
       </div>
-
-      {/* EMPTY */}
 
       {sortedSegments.length ===
         0 && (
         <div className="rounded-2xl border border-dashed bg-white p-10 text-center">
-
           <div className="text-4xl">
             📭
           </div>
@@ -1227,15 +1303,11 @@ export default function SelectedSegments({
           <h3 className="mt-3 font-semibold text-gray-700">
             No selected advertisements
           </h3>
-
         </div>
       )}
 
-      {/* SEGMENTS */}
-
       {sortedSegments.map(
         (row, index) => {
-
           const selected =
             selectedResultId ===
             row.id;
@@ -1244,6 +1316,14 @@ export default function SelectedSegments({
             overlappingIds.has(
               row.id
             );
+
+          const isNew =
+            row.status ===
+            "NEW";
+
+          const isSaved =
+            row.status ===
+            "SAVED";
 
           const duration =
             getDuration(
@@ -1257,9 +1337,32 @@ export default function SelectedSegments({
               editEnd
             );
 
+          const cardClass =
+            overlapping
+              ? "border-red-500 bg-red-50 ring-2 ring-red-300"
+              : isNew
+                ? "border-orange-400 bg-orange-50 ring-2 ring-orange-300"
+                : isSaved
+                  ? "border-green-400 bg-green-50"
+                  : selected
+                    ? "border-blue-300 bg-blue-50 ring-2 ring-blue-300"
+                    : "border-gray-200 bg-white";
+
+          const numberClass =
+            overlapping
+              ? "bg-red-600 text-white"
+              : isNew
+                ? "bg-orange-500 text-white"
+                : isSaved
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-100";
+
           return (
             <div
-              key={row.id}
+              key={
+                row.detection_key ||
+                row.id
+              }
               id={`segment-${row.id}`}
               onClick={(e) => {
                 const target =
@@ -1296,22 +1399,12 @@ export default function SelectedSegments({
                 border
                 p-5
                 shadow-sm
-
-                ${
-                  overlapping
-                    ? "border-red-500 bg-red-50 ring-2 ring-red-300"
-                    : selected
-                      ? "border-blue-300 bg-blue-50 ring-2 ring-blue-300"
-                      : "border-gray-200 bg-white"
-                }
+                transition-all
+                ${cardClass}
               `}
             >
-
-              {/* OVERLAP */}
-
               {overlapping && (
                 <div className="mb-4 flex items-center gap-3 rounded-xl border border-red-300 bg-red-100 px-4 py-3 text-red-700">
-
                   <span className="text-xl">
                     ⚠
                   </span>
@@ -1325,16 +1418,48 @@ export default function SelectedSegments({
                       This advertisement overlaps another selected advertisement.
                     </div>
                   </div>
-
                 </div>
               )}
 
-              {/* TOP */}
+              {isNew && (
+                <div className="mb-4 flex items-center gap-3 rounded-xl border border-orange-300 bg-orange-100 px-4 py-3 text-orange-700">
+                  <span className="text-xl">
+                    ✨
+                  </span>
+
+                  <div>
+                    <div className="font-bold">
+                      NEW DETECTED ADVERTISEMENT
+                    </div>
+
+                    <div className="text-xs">
+                      This advertisement was detected during the latest processing and has not been saved yet.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isSaved &&
+                !overlapping && (
+                <div className="mb-4 flex items-center gap-3 rounded-xl border border-green-300 bg-green-100 px-4 py-3 text-green-700">
+                  <span className="text-xl">
+                    💾
+                  </span>
+
+                  <div>
+                    <div className="font-bold">
+                      SAVED ADVERTISEMENT
+                    </div>
+
+                    <div className="text-xs">
+                      This advertisement has already been saved.
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-start justify-between gap-4">
-
                 <div className="flex flex-1 gap-4">
-
                   <div
                     className={`
                       flex
@@ -1345,21 +1470,14 @@ export default function SelectedSegments({
                       justify-center
                       rounded-full
                       font-bold
-
-                      ${
-                        overlapping
-                          ? "bg-red-600 text-white"
-                          : "bg-gray-100"
-                      }
+                      ${numberClass}
                     `}
                   >
                     {index + 1}
                   </div>
 
                   <div className="min-w-0 flex-1">
-
                     <div className="flex items-center justify-between gap-2">
-
                       <div>
                         <h3 className="font-bold">
                           Advertisement
@@ -1371,32 +1489,25 @@ export default function SelectedSegments({
                       </div>
 
                       <div className="flex flex-wrap items-center justify-end gap-2">
-
                         {overlapping && (
                           <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
                             ⚠ OVERLAPPING
                           </span>
                         )}
 
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            row.status ===
-                            "completed"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}
-                        >
-                          {row.status ===
-                          "completed"
-                            ? "🟢 Completed"
-                            : "● Pending"}
-                        </span>
+                        {isNew && (
+                          <span className="animate-pulse rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white">
+                            ✨ NEW DETECTED
+                          </span>
+                        )}
 
+                        {isSaved && (
+                          <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white">
+                            ✓ SAVED
+                          </span>
+                        )}
                       </div>
-
                     </div>
-
-                    {/* BRAND */}
 
                     <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Brand
@@ -1404,14 +1515,12 @@ export default function SelectedSegments({
 
                     {editingId ===
                     row.id ? (
-
                       <div
                         className="brand-combobox w-full"
                         onClick={(e) =>
                           e.stopPropagation()
                         }
                       >
-
                         <BrandCombobox
                           value={
                             editBrand
@@ -1442,11 +1551,8 @@ export default function SelectedSegments({
                             );
                           }}
                         />
-
                       </div>
-
                     ) : (
-
                       <div
                         className={`
                           min-h-11
@@ -1455,17 +1561,18 @@ export default function SelectedSegments({
                           border
                           px-4
                           py-2
-
                           ${
                             overlapping
                               ? "border-red-300 bg-red-100"
-                              : "border-yellow-300 bg-yellow-50"
+                              : isNew
+                                ? "border-orange-300 bg-orange-100"
+                                : isSaved
+                                  ? "border-green-300 bg-green-100"
+                                  : "border-gray-300 bg-gray-50"
                           }
                         `}
                       >
-
                         <div className="flex items-start gap-2">
-
                           <span className="text-lg">
                             🏷
                           </span>
@@ -1474,21 +1581,13 @@ export default function SelectedSegments({
                             {row.brand_name ||
                               "No brand selected"}
                           </span>
-
                         </div>
-
                       </div>
-
                     )}
-
                   </div>
-
                 </div>
 
-                {/* ACTIONS */}
-
                 <div className="flex shrink-0 items-center gap-2">
-
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1502,7 +1601,6 @@ export default function SelectedSegments({
 
                   {editingId ===
                   row.id ? (
-
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1513,9 +1611,7 @@ export default function SelectedSegments({
                     >
                       💾 Save
                     </button>
-
                   ) : (
-
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1526,15 +1622,13 @@ export default function SelectedSegments({
                     >
                       ✏️
                     </button>
-
                   )}
-
-                  {/* DELETE */}
 
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
+
                       deleteSegment(
                         row.id
                       );
@@ -1543,24 +1637,31 @@ export default function SelectedSegments({
                   >
                     🗑
                   </button>
-
                 </div>
-
               </div>
 
-              {/* TRANSCRIPT */}
-
               <div className="mt-5">
-
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Transcript
                 </label>
 
-                <div className="rounded-xl bg-gray-50 p-4">
-
+                <div
+                  className={`
+                    rounded-xl
+                    p-4
+                    ${
+                      overlapping
+                        ? "bg-red-100"
+                        : isNew
+                          ? "bg-orange-100"
+                          : isSaved
+                            ? "bg-green-100"
+                            : "bg-gray-50"
+                    }
+                  `}
+                >
                   {editingId ===
                   row.id ? (
-
                     <textarea
                       value={
                         editText
@@ -1576,20 +1677,13 @@ export default function SelectedSegments({
                       }
                       className="w-full rounded-lg border p-3 outline-none focus:border-blue-400"
                     />
-
                   ) : (
-
                     <p className="whitespace-pre-wrap leading-7">
                       {row.text}
                     </p>
-
                   )}
-
                 </div>
-
               </div>
-
-              {/* TIME */}
 
               <div
                 className={`
@@ -1597,17 +1691,18 @@ export default function SelectedSegments({
                   rounded-xl
                   border
                   p-4
-
                   ${
                     overlapping
                       ? "border-red-300 bg-red-100"
-                      : "border-gray-200 bg-gray-50"
+                      : isNew
+                        ? "border-orange-300 bg-orange-100"
+                        : isSaved
+                          ? "border-green-300 bg-green-100"
+                          : "border-gray-200 bg-gray-50"
                   }
                 `}
               >
-
                 <div className="mb-3 flex items-center justify-between">
-
                   <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                     ⏱ Time
                   </div>
@@ -1618,15 +1713,25 @@ export default function SelectedSegments({
                     </div>
                   )}
 
+                  {isNew &&
+                    !overlapping && (
+                    <div className="text-xs font-bold text-orange-600">
+                      ✨ NEW TIME RANGE
+                    </div>
+                  )}
+
+                  {isSaved &&
+                    !overlapping && (
+                    <div className="text-xs font-bold text-green-600">
+                      ✓ SAVED TIME RANGE
+                    </div>
+                  )}
                 </div>
 
                 {editingId ===
                 row.id ? (
-
                   <div className="flex flex-wrap items-center gap-3">
-
                     <div className="flex flex-col gap-1">
-
                       <span className="text-xs text-gray-500">
                         Start
                       </span>
@@ -1639,7 +1744,6 @@ export default function SelectedSegments({
                           changeEditStart
                         }
                       />
-
                     </div>
 
                     <span className="mt-5 text-gray-400">
@@ -1647,7 +1751,6 @@ export default function SelectedSegments({
                     </span>
 
                     <div className="flex flex-col gap-1">
-
                       <span className="text-xs text-gray-500">
                         Duration
                       </span>
@@ -1686,7 +1789,6 @@ export default function SelectedSegments({
                           )
                         )}
                       </select>
-
                     </div>
 
                     <span className="mt-5 text-gray-400">
@@ -1694,7 +1796,6 @@ export default function SelectedSegments({
                     </span>
 
                     <div className="flex flex-col gap-1">
-
                       <span className="text-xs text-gray-500">
                         End
                       </span>
@@ -1707,19 +1808,11 @@ export default function SelectedSegments({
                           setEditEnd
                         }
                       />
-
                     </div>
-
                   </div>
-
                 ) : (
-
                   <div className="flex flex-wrap items-center gap-3">
-
-                    {/* START */}
-
                     <div className="flex flex-col gap-1">
-
                       <span className="text-xs text-gray-500">
                         Start
                       </span>
@@ -1731,28 +1824,27 @@ export default function SelectedSegments({
                           px-3
                           py-2
                           font-semibold
-
                           ${
                             overlapping
                               ? "border-red-300 bg-white text-red-700"
-                              : "bg-white"
+                              : isNew
+                                ? "border-orange-300 bg-white text-orange-700"
+                                : isSaved
+                                  ? "border-green-300 bg-white text-green-700"
+                                  : "bg-white"
                           }
                         `}
                       >
                         {row.start ||
                           "00:00:00"}
                       </span>
-
                     </div>
 
                     <span className="mt-5 text-gray-400">
                       →
                     </span>
 
-                    {/* DURATION */}
-
                     <div className="flex flex-col gap-1">
-
                       <span className="text-xs text-gray-500">
                         Duration
                       </span>
@@ -1765,18 +1857,17 @@ export default function SelectedSegments({
                         overlapping={
                           overlapping
                         }
+                        isNew={
+                          isNew
+                        }
                       />
-
                     </div>
 
                     <span className="mt-5 text-gray-400">
                       →
                     </span>
 
-                    {/* END */}
-
                     <div className="flex flex-col gap-1">
-
                       <span className="text-xs text-gray-500">
                         End
                       </span>
@@ -1788,31 +1879,28 @@ export default function SelectedSegments({
                           px-3
                           py-2
                           font-semibold
-
                           ${
                             overlapping
                               ? "border-red-300 bg-white text-red-700"
-                              : "bg-white"
+                              : isNew
+                                ? "border-orange-300 bg-white text-orange-700"
+                                : isSaved
+                                  ? "border-green-300 bg-white text-green-700"
+                                  : "bg-white"
                           }
                         `}
                       >
                         {row.end ||
                           "00:00:00"}
                       </span>
-
                     </div>
-
                   </div>
-
                 )}
-
               </div>
-
             </div>
           );
         }
       )}
-
     </div>
   );
 }
