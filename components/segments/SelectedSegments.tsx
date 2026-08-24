@@ -27,6 +27,10 @@ interface Segment {
   status?: AdvertisementStatus;
 
   detection_key?: string | null;
+
+  project_id?: number;
+
+  segment_ids?: number[];
 }
 
 interface Props {
@@ -52,19 +56,10 @@ interface Props {
       end: string;
       brand_name: string;
       status: AdvertisementStatus;
+      detection_key?: string | null;
     }
   ) => void;
 
-  /*
-   * REQUIRED
-   *
-   * This MUST delete the Advertisement record
-   * from the backend/database.
-   *
-   * Example:
-   *
-   * DELETE /advertisements/300
-   */
   onRemove: (
     id: number
   ) => void | Promise<void>;
@@ -98,6 +93,7 @@ export default function SelectedSegments({
   onPlay,
   onUpdate,
   onRemove,
+  onDownload,
   onSave,
 }: Props) {
   const [segmentList, setSegmentList] =
@@ -262,7 +258,421 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * SYNC SEGMENTS
+   * DETECTION KEY
+   * ============================================================
+   */
+
+  function parseDetectionKey(
+    detectionKey?: string | null
+  ): {
+    projectId: number;
+    startSegmentId: number;
+    endSegmentId: number;
+  } | null {
+    if (!detectionKey) {
+      return null;
+    }
+
+    const match =
+      detectionKey.match(
+        /^project-(\d+)-segments-(\d+)-(\d+)$/
+      );
+
+    if (!match) {
+      return null;
+    }
+
+    return {
+      projectId: Number(match[1]),
+      startSegmentId: Number(match[2]),
+      endSegmentId: Number(match[3]),
+    };
+  }
+
+  function makeDetectionKey(
+    projectId: number,
+    startSegmentId: number,
+    endSegmentId: number
+  ): string {
+    return (
+      `project-${projectId}-` +
+      `segments-${startSegmentId}-` +
+      `${endSegmentId}`
+    );
+  }
+
+  function getProjectIdFromRow(
+    row: Segment
+  ): number | null {
+    if (
+      typeof row.project_id ===
+      "number"
+    ) {
+      return row.project_id;
+    }
+
+    const parsed =
+      parseDetectionKey(
+        row.detection_key
+      );
+
+    if (parsed) {
+      return parsed.projectId;
+    }
+
+    return null;
+  }
+
+  /*
+   * ============================================================
+   * FIND SOURCE START SEGMENT
+   * ============================================================
+   */
+
+  function findSourceStartSegment(
+    row: Segment,
+    start: string
+  ): Segment | null {
+    const parsed =
+      parseDetectionKey(
+        row.detection_key
+      );
+
+    if (parsed) {
+      const sourceById =
+        transcriptSegments.find(
+          (segment) =>
+            segment.id ===
+            parsed.startSegmentId
+        );
+
+      if (sourceById) {
+        return sourceById;
+      }
+    }
+
+    const startSeconds =
+      toSeconds(start);
+
+    const exact =
+      transcriptSegments.find(
+        (segment) =>
+          toSeconds(
+            segment.start
+          ) === startSeconds
+      );
+
+    if (exact) {
+      return exact;
+    }
+
+    const containing =
+      transcriptSegments.find(
+        (segment) => {
+          if (
+            !segment.start ||
+            !segment.end
+          ) {
+            return false;
+          }
+
+          const segmentStart =
+            toSeconds(
+              segment.start
+            );
+
+          const segmentEnd =
+            toSeconds(
+              segment.end
+            );
+
+          return (
+            segmentStart <=
+              startSeconds &&
+            segmentEnd >
+              startSeconds
+          );
+        }
+      );
+
+    return containing || null;
+  }
+
+  /*
+   * ============================================================
+   * TRANSCRIPT RANGE
+   * ============================================================
+   */
+
+  function getTranscriptForRange(
+    start: string,
+    duration: number,
+    fallbackText: string
+  ): string {
+    if (
+      transcriptSegments.length ===
+      0
+    ) {
+      return fallbackText;
+    }
+
+    const startSeconds =
+      toSeconds(start);
+
+    const endSeconds =
+      startSeconds + duration;
+
+    const matching =
+      transcriptSegments
+        .filter(
+          (segment) => {
+            if (
+              !segment.start ||
+              !segment.end
+            ) {
+              return false;
+            }
+
+            const segmentStart =
+              toSeconds(
+                segment.start
+              );
+
+            const segmentEnd =
+              toSeconds(
+                segment.end
+              );
+
+            return (
+              segmentStart <
+                endSeconds &&
+              segmentEnd >
+                startSeconds
+            );
+          }
+        )
+        .sort(
+          (a, b) =>
+            toSeconds(a.start) -
+            toSeconds(b.start)
+        );
+
+    const text =
+      matching
+        .map(
+          (segment) =>
+            segment.text?.trim()
+        )
+        .filter(Boolean)
+        .join(" ");
+
+    return (
+      text || fallbackText
+    );
+  }
+
+  /*
+   * ============================================================
+   * BACKEND-STYLE MERGE
+   * ============================================================
+   */
+
+  function mergeTranscriptLikeBackend(
+    row: Segment,
+    start: string,
+    duration: number
+  ): {
+    text: string;
+    startTime: string;
+    endTime: string;
+    startSegmentId: number | null;
+    endSegmentId: number | null;
+  } {
+    if (
+      transcriptSegments.length ===
+      0
+    ) {
+      return {
+        text: row.text,
+        startTime: start,
+        endTime: secondsToTime(
+          toSeconds(start) +
+            duration
+        ),
+        startSegmentId: null,
+        endSegmentId: null,
+      };
+    }
+
+    const sorted =
+      [...transcriptSegments]
+        .filter(
+          (segment) =>
+            segment.start &&
+            segment.end
+        )
+        .sort(
+          (a, b) =>
+            toSeconds(a.start) -
+            toSeconds(b.start)
+        );
+
+    const sourceStart =
+      findSourceStartSegment(
+        row,
+        start
+      );
+
+    if (!sourceStart) {
+      return {
+        text:
+          getTranscriptForRange(
+            start,
+            duration,
+            row.text
+          ),
+        startTime: start,
+        endTime: secondsToTime(
+          toSeconds(start) +
+            duration
+        ),
+        startSegmentId: null,
+        endSegmentId: null,
+      };
+    }
+
+    const sourceIndex =
+      sorted.findIndex(
+        (segment) =>
+          segment.id ===
+          sourceStart.id
+      );
+
+    if (sourceIndex < 0) {
+      return {
+        text:
+          getTranscriptForRange(
+            start,
+            duration,
+            row.text
+          ),
+        startTime: start,
+        endTime: secondsToTime(
+          toSeconds(start) +
+            duration
+        ),
+        startSegmentId:
+          sourceStart.id,
+        endSegmentId:
+          sourceStart.id,
+      };
+    }
+
+    const actualStart =
+      sorted[sourceIndex];
+
+    const startSeconds =
+      toSeconds(
+        actualStart.start
+      );
+
+    const targetEndSeconds =
+      startSeconds +
+      duration;
+
+    const mergedText: string[] =
+      [];
+
+    let lastSegmentId =
+      actualStart.id;
+
+    for (
+      let i = sourceIndex;
+      i < sorted.length;
+      i++
+    ) {
+      const segment =
+        sorted[i];
+
+      const segmentStart =
+        toSeconds(
+          segment.start
+        );
+
+      const segmentEnd =
+        toSeconds(
+          segment.end
+        );
+
+      if (
+        segmentStart >=
+        targetEndSeconds
+      ) {
+        break;
+      }
+
+      if (
+        segmentEnd >
+        targetEndSeconds
+      ) {
+        break;
+      }
+
+      if (
+        segment.text
+      ) {
+        mergedText.push(
+          segment.text
+        );
+      }
+
+      lastSegmentId =
+        segment.id;
+    }
+
+    if (
+      mergedText.length === 0
+    ) {
+      lastSegmentId =
+        actualStart.id;
+    }
+
+    return {
+      text:
+        mergedText
+          .join(" ")
+          .trim() ||
+        row.text,
+
+      startTime:
+        actualStart.start ||
+        start,
+
+      endTime:
+        secondsToTime(
+          targetEndSeconds
+        ),
+
+      startSegmentId:
+        actualStart.id,
+
+      endSegmentId:
+        lastSegmentId,
+    };
+  }
+
+  /*
+   * ============================================================
+   * SYNC FROM PARENT
+   * ============================================================
+   *
+   * IMPORTANT:
+   *
+   * If the parent sends NEW again after save,
+   * do NOT overwrite our local SAVED state.
+   *
+   * SAVED has priority over incoming NEW.
+   *
    * ============================================================
    */
 
@@ -278,12 +688,43 @@ export default function SelectedSegments({
                   incoming.id
               );
 
-            return {
-              ...incoming,
-              status:
+            let status:
+              | AdvertisementStatus;
+
+            /*
+             * Backend SAVED always wins.
+             */
+            if (
+              incoming.status ===
+              "SAVED"
+            ) {
+              status = "SAVED";
+            }
+
+            /*
+             * If local state is already SAVED,
+             * don't allow incoming NEW to reset it.
+             */
+            else if (
+              local?.status ===
+              "SAVED"
+            ) {
+              status = "SAVED";
+            }
+
+            /*
+             * Otherwise use incoming status.
+             */
+            else {
+              status =
                 incoming.status ??
                 local?.status ??
-                "NEW",
+                "NEW";
+            }
+
+            return {
+              ...incoming,
+              status,
             };
           }
         );
@@ -397,147 +838,6 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * TRANSCRIPT RANGE
-   * ============================================================
-   */
-
-  function getTranscriptForRange(
-    start: string,
-    duration: number,
-    fallbackText: string
-  ): string {
-    if (
-      transcriptSegments.length ===
-      0
-    ) {
-      return fallbackText;
-    }
-
-    const startSeconds =
-      toSeconds(start);
-
-    const endSeconds =
-      startSeconds + duration;
-
-    const matching =
-      transcriptSegments
-        .filter(
-          (segment) => {
-            if (
-              !segment.start ||
-              !segment.end
-            ) {
-              return false;
-            }
-
-            const segmentStart =
-              toSeconds(
-                segment.start
-              );
-
-            const segmentEnd =
-              toSeconds(
-                segment.end
-              );
-
-            return (
-              segmentStart <
-                endSeconds &&
-              segmentEnd >
-                startSeconds
-            );
-          }
-        )
-        .sort(
-          (a, b) =>
-            toSeconds(a.start) -
-            toSeconds(b.start)
-        );
-
-    const text =
-      matching
-        .map(
-          (segment) =>
-            segment.text?.trim()
-        )
-        .filter(Boolean)
-        .join(" ");
-
-    return (
-      text || fallbackText
-    );
-  }
-
-  /*
-   * ============================================================
-   * OVERLAP
-   * ============================================================
-   */
-
-  function segmentsOverlap(
-    a: Segment,
-    b: Segment
-  ): boolean {
-    if (
-      !a.start ||
-      !a.end ||
-      !b.start ||
-      !b.end
-    ) {
-      return false;
-    }
-
-    const aStart =
-      toSeconds(a.start);
-
-    const aEnd =
-      toSeconds(a.end);
-
-    const bStart =
-      toSeconds(b.start);
-
-    const bEnd =
-      toSeconds(b.end);
-
-    return (
-      aStart < bEnd &&
-      aEnd > bStart
-    );
-  }
-
-  function getOverlappingIds(
-    list: Segment[]
-  ): Set<number> {
-    const ids =
-      new Set<number>();
-
-    for (
-      let i = 0;
-      i < list.length;
-      i++
-    ) {
-      for (
-        let j = i + 1;
-        j < list.length;
-        j++
-      ) {
-        if (
-          segmentsOverlap(
-            list[i],
-            list[j]
-          )
-        ) {
-          ids.add(list[i].id);
-          ids.add(list[j].id);
-        }
-      }
-    }
-
-    return ids;
-  }
-
-  /*
-   * ============================================================
    * CHANGE DURATION
    * ============================================================
    */
@@ -553,22 +853,38 @@ export default function SelectedSegments({
       return;
     }
 
-    const start =
+    const originalStart =
       row.start ||
       "00:00:00";
 
-    const newEnd =
-      secondsToTime(
-        toSeconds(start) +
-          duration
+    const merged =
+      mergeTranscriptLikeBackend(
+        row,
+        originalStart,
+        duration
       );
 
-    const newText =
-      getTranscriptForRange(
-        start,
-        duration,
-        row.text
-      );
+    let detectionKey =
+      row.detection_key ||
+      null;
+
+    const projectId =
+      getProjectIdFromRow(row);
+
+    if (
+      projectId !== null &&
+      merged.startSegmentId !==
+        null &&
+      merged.endSegmentId !==
+        null
+    ) {
+      detectionKey =
+        makeDetectionKey(
+          projectId,
+          merged.startSegmentId,
+          merged.endSegmentId
+        );
+    }
 
     setCustomDurations(
       (previous) => ({
@@ -584,11 +900,17 @@ export default function SelectedSegments({
             item.id === row.id
               ? {
                   ...item,
-                  start,
-                  end: newEnd,
-                  text: newText,
+                  start:
+                    merged.startTime,
+                  end:
+                    merged.endTime,
+                  text:
+                    merged.text,
+                  detection_key:
+                    detectionKey,
                   status:
                     item.status ??
+                    row.status ??
                     "NEW",
                 }
               : item
@@ -598,15 +920,25 @@ export default function SelectedSegments({
     onUpdate?.(
       row.id,
       {
-        text: newText,
-        start,
-        end: newEnd,
+        text:
+          merged.text,
+
+        start:
+          merged.startTime,
+
+        end:
+          merged.endTime,
+
         brand_name:
           row.brand_name ||
           "",
+
         status:
           row.status ??
           "NEW",
+
+        detection_key:
+          detectionKey,
       }
     );
 
@@ -665,17 +997,15 @@ export default function SelectedSegments({
         .toLowerCase();
 
     const options =
-      getDurationOptions(
-        row.id
-      );
+      getDurationOptions(row.id);
 
     const filtered =
       search
         ? options.filter(
             (value) =>
-              String(
-                value
-              ).includes(search)
+              String(value).includes(
+                search
+              )
           )
         : options;
 
@@ -907,6 +1237,12 @@ export default function SelectedSegments({
     );
   }
 
+  /*
+   * ============================================================
+   * EDIT DURATION
+   * ============================================================
+   */
+
   function changeEditDuration(
     duration: number
   ) {
@@ -930,6 +1266,12 @@ export default function SelectedSegments({
     setEditEnd(newEnd);
     setEditText(newText);
   }
+
+  /*
+   * ============================================================
+   * EDIT START
+   * ============================================================
+   */
 
   function changeEditStart(
     value: string
@@ -972,26 +1314,79 @@ export default function SelectedSegments({
   function saveEdit(
     row: Segment
   ) {
+    const duration =
+      getDuration(
+        editStart,
+        editEnd
+      );
+
+    const merged =
+      mergeTranscriptLikeBackend(
+        row,
+        editStart,
+        duration
+      );
+
+    let detectionKey =
+      row.detection_key ||
+      null;
+
+    const projectId =
+      getProjectIdFromRow(row);
+
+    if (
+      projectId !== null &&
+      merged.startSegmentId !==
+        null &&
+      merged.endSegmentId !==
+        null
+    ) {
+      detectionKey =
+        makeDetectionKey(
+          projectId,
+          merged.startSegmentId,
+          merged.endSegmentId
+        );
+    }
+
     const data = {
-      text: editText,
-      start: editStart,
-      end: editEnd,
-      brand_name: editBrand,
+      text:
+        merged.text ||
+        editText,
+
+      start:
+        editStart,
+
+      end:
+        editEnd,
+
+      brand_name:
+        editBrand,
+
+      /*
+       * IMPORTANT:
+       * Preserve SAVED if this advertisement
+       * was already saved.
+       */
       status:
         row.status ??
         "NEW",
+
+      detection_key:
+        detectionKey,
     };
 
     setSegmentList(
       (previous) =>
         previous
-          .map((item) =>
-            item.id === row.id
-              ? {
-                  ...item,
-                  ...data,
-                }
-              : item
+          .map(
+            (item) =>
+              item.id === row.id
+                ? {
+                    ...item,
+                    ...data,
+                  }
+                : item
           )
           .sort(
             (a, b) =>
@@ -1042,7 +1437,7 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * DELETE FROM DATABASE
+   * DELETE
    * ============================================================
    */
 
@@ -1062,20 +1457,23 @@ export default function SelectedSegments({
       );
 
     if (!row) {
-      console.error(
-        "Advertisement not found:",
+      console.warn(
+        "DELETE: row not found:",
         id
       );
 
       return;
     }
 
+    const status =
+      row.status ?? "NEW";
+
     console.log(
-      "================================="
+      "========================================"
     );
 
     console.log(
-      "DELETE ADVERTISEMENT"
+      "REMOVE ADVERTISEMENT"
     );
 
     console.log(
@@ -1084,17 +1482,25 @@ export default function SelectedSegments({
     );
 
     console.log(
-      "Row:",
-      row
+      "STATUS:",
+      status
     );
 
     console.log(
-      "================================="
+      "Detection Key:",
+      row.detection_key
+    );
+
+    console.log(
+      "========================================"
     );
 
     const confirmed =
       window.confirm(
-        `Delete this advertisement?\n\nAdvertisement ID: ${id}\n\nThis will permanently delete the database record.`
+        `Delete this advertisement?\n\n` +
+        `Advertisement ID: ${id}\n` +
+        `Status: ${status}\n\n` +
+        `This will permanently delete the advertisement from the database.`
       );
 
     if (!confirmed) {
@@ -1105,39 +1511,18 @@ export default function SelectedSegments({
       setDeletingId(id);
 
       /*
-       * ========================================================
-       * IMPORTANT
-       * ========================================================
+       * IMPORTANT:
        *
-       * This calls the parent.
+       * Always call onRemove.
        *
-       * The parent MUST call:
-       *
-       * DELETE /advertisements/{id}
-       *
-       * and MUST throw an error if the API fails.
-       *
-       * We DO NOT remove the UI row until this succeeds.
+       * NEW and SAVED advertisements can both
+       * already exist in the database.
        */
-
-      console.log(
-        "Calling onRemove with Advertisement ID:",
-        id
-      );
-
       await onRemove(id);
 
-      console.log(
-        "Database deletion successful:",
-        id
-      );
-
       /*
-       * ========================================================
-       * REMOVE FROM LOCAL STATE
-       * ========================================================
+       * Only remove from UI after backend success.
        */
-
       setSegmentList(
         (previous) =>
           previous.filter(
@@ -1145,10 +1530,6 @@ export default function SelectedSegments({
               item.id !== id
           )
       );
-
-      /*
-       * Clear selected row.
-       */
 
       if (
         selectedResultId === id
@@ -1158,29 +1539,17 @@ export default function SelectedSegments({
         );
       }
 
-      /*
-       * Clear edit state.
-       */
-
       if (
         editingId === id
       ) {
         setEditingId(null);
       }
 
-      /*
-       * Clear brand dropdown.
-       */
-
       if (
         brandOpenId === id
       ) {
         setBrandOpenId(null);
       }
-
-      /*
-       * Clear duration dropdown.
-       */
 
       if (
         durationOpenId === id
@@ -1189,10 +1558,6 @@ export default function SelectedSegments({
       }
 
       setDurationSearch("");
-
-      /*
-       * Remove custom duration.
-       */
 
       setCustomDurations(
         (previous) => {
@@ -1207,7 +1572,7 @@ export default function SelectedSegments({
       );
 
       console.log(
-        "Advertisement removed from UI:",
+        "DELETE COMPLETE:",
         id
       );
     } catch (error) {
@@ -1223,6 +1588,12 @@ export default function SelectedSegments({
       setDeletingId(null);
     }
   }
+
+  /*
+   * ============================================================
+   * CANCEL EDIT
+   * ============================================================
+   */
 
   function cancelEdit() {
     setEditingId(null);
@@ -1271,7 +1642,25 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * SAVE ALL NEW ADS
+   * SAVE ALL
+   * ============================================================
+   *
+   * THIS IS THE MAIN FIX.
+   *
+   * Flow:
+   *
+   * NEW
+   *   ↓
+   * onSave()
+   *   ↓
+   * backend succeeds
+   *   ↓
+   * NEW -> SAVED
+   *
+   * If backend fails:
+   *
+   * NEW remains NEW
+   *
    * ============================================================
    */
 
@@ -1291,19 +1680,64 @@ export default function SelectedSegments({
       newAdvertisements.length ===
       0
     ) {
+      console.log(
+        "SAVE ALL: nothing to save"
+      );
+
       return;
     }
 
     if (!onSave) {
+      console.warn(
+        "SAVE ALL: onSave is not provided"
+      );
+
       return;
     }
 
     try {
       setSaving(true);
 
+      console.log(
+        "========================================"
+      );
+
+      console.log(
+        "SAVE ALL ADVERTISEMENTS"
+      );
+
+      console.log(
+        "NEW advertisements:",
+        newAdvertisements.length
+      );
+
+      console.log(
+        "IDs:",
+        newAdvertisements.map(
+          (item) => item.id
+        )
+      );
+
+      /*
+       * --------------------------------------------------------
+       * CALL PARENT / BACKEND
+       * --------------------------------------------------------
+       *
+       * If onSave throws an error, execution jumps
+       * to catch and the status remains NEW.
+       */
       await onSave(
         newAdvertisements
       );
+
+      /*
+       * --------------------------------------------------------
+       * BACKEND SUCCESS
+       * --------------------------------------------------------
+       *
+       * NOW change NEW -> SAVED.
+       * --------------------------------------------------------
+       */
 
       const savedIds =
         new Set(
@@ -1321,16 +1755,48 @@ export default function SelectedSegments({
               )
                 ? {
                     ...item,
+
+                    /*
+                     * THE IMPORTANT LINE
+                     */
                     status:
                       "SAVED",
                   }
                 : item
           )
       );
+
+      console.log(
+        "SAVE SUCCESS"
+      );
+
+      console.log(
+        "Changed NEW -> SAVED:",
+        [...savedIds]
+      );
+
+      console.log(
+        "========================================"
+      );
     } catch (error) {
+      /*
+       * IMPORTANT:
+       *
+       * Do NOT change NEW -> SAVED here.
+       *
+       * Backend failed.
+       */
       console.error(
-        "Failed to save advertisements:",
+        "SAVE ALL FAILED:",
         error
+      );
+
+      console.error(
+        "Advertisements remain NEW."
+      );
+
+      alert(
+        "Failed to save advertisements. They will remain NEW."
       );
     } finally {
       setSaving(false);
@@ -1339,7 +1805,80 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * SORT
+   * OVERLAP
+   * ============================================================
+   */
+
+  function segmentsOverlap(
+    a: Segment,
+    b: Segment
+  ): boolean {
+    if (
+      !a.start ||
+      !a.end ||
+      !b.start ||
+      !b.end
+    ) {
+      return false;
+    }
+
+    const aStart =
+      toSeconds(a.start);
+
+    const aEnd =
+      toSeconds(a.end);
+
+    const bStart =
+      toSeconds(b.start);
+
+    const bEnd =
+      toSeconds(b.end);
+
+    return (
+      aStart < bEnd &&
+      aEnd > bStart
+    );
+  }
+
+  function getOverlappingIds(
+    list: Segment[]
+  ): Set<number> {
+    const ids =
+      new Set<number>();
+
+    for (
+      let i = 0;
+      i < list.length;
+      i++
+    ) {
+      for (
+        let j = i + 1;
+        j < list.length;
+        j++
+      ) {
+        if (
+          segmentsOverlap(
+            list[i],
+            list[j]
+          )
+        ) {
+          ids.add(
+            list[i].id
+          );
+
+          ids.add(
+            list[j].id
+          );
+        }
+      }
+    }
+
+    return ids;
+  }
+
+  /*
+   * ============================================================
+   * SORT / COUNTS
    * ============================================================
    */
 
@@ -1648,6 +2187,15 @@ export default function SelectedSegments({
                           ID:{" "}
                           {row.id}
                         </p>
+
+                        {row.detection_key && (
+                          <p className="mt-1 break-all font-mono text-[11px] text-gray-400">
+                            detection_key:{" "}
+                            {
+                              row.detection_key
+                            }
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1794,12 +2342,14 @@ export default function SelectedSegments({
                     onClick={(e) => {
                       e.stopPropagation();
 
-                      deleteSegment(
+                      void deleteSegment(
                         row.id
                       );
                     }}
                     className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    title={`Delete advertisement ${row.id}`}
+                    title={
+                      `Delete advertisement ${row.id}`
+                    }
                   >
                     {isDeleting
                       ? "..."
@@ -1943,7 +2493,9 @@ export default function SelectedSegments({
                         {getDurationOptions(
                           row.id
                         ).map(
-                          (value) => (
+                          (
+                            value
+                          ) => (
                             <option
                               key={
                                 value
@@ -1952,7 +2504,9 @@ export default function SelectedSegments({
                                 value
                               }
                             >
-                              {value}{" "}
+                              {
+                                value
+                              }{" "}
                               seconds
                             </option>
                           )

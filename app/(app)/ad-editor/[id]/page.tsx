@@ -21,7 +21,6 @@ import {
 import {
   getLogs,
 
-  // IMPORTANT
   deleteAdvertisement,
 
   deleteAdvertisementsByProject,
@@ -39,6 +38,7 @@ import {
   reprocessAdvertisements,
 
   getSegmentHours,
+  updateAdvertisement
 } from "@/services/api";
 
 import {
@@ -228,12 +228,17 @@ export default function AdEditorPage() {
                     );
 
                   return {
+                    // =================================================
+                    // IMPORTANT
+                    // This is the Advertisement DATABASE ID.
+                    // =================================================
                     id: ad.id,
 
                     project_id:
                       ad.project_id,
 
-                    text: ad.text,
+                    text:
+                      ad.text,
 
                     start:
                       ad.start_time,
@@ -254,6 +259,16 @@ export default function AdEditorPage() {
                         ad.status
                       ),
 
+                    // =================================================
+                    // IMPORTANT
+                    //
+                    // This advertisement definitely exists
+                    // in the database, regardless of whether
+                    // its status is NEW or SAVED.
+                    // =================================================
+                    persisted:
+                      true,
+
                     advertisement:
                       true,
 
@@ -269,7 +284,9 @@ export default function AdEditorPage() {
                 }
               );
 
-            setResults(loaded);
+            setResults(
+              loaded
+            );
 
             setDisabledLogs(
               loaded.flatMap(
@@ -1377,6 +1394,13 @@ export default function AdEditorPage() {
           (x) => x.id
         );
 
+      // ========================================================
+      // IMPORTANT
+      //
+      // Temporary frontend ID.
+      // This is NOT an Advertisement database ID.
+      // ========================================================
+
       const newId =
         Date.now();
 
@@ -1411,6 +1435,9 @@ export default function AdEditorPage() {
 
           status: "NEW",
 
+          // IMPORTANT
+          persisted: false,
+
           segment_type:
             "new",
 
@@ -1426,7 +1453,7 @@ export default function AdEditorPage() {
               [row.id];
 
             return !rowIds.some(
-              (id: string) =>
+              (id: number) =>
                 ids.includes(id)
             );
           }
@@ -1543,18 +1570,36 @@ export default function AdEditorPage() {
 
             status:
               "SAVED",
+
+            persisted:
+              segment.persisted,
           }
         );
 
+        // ======================================================
         // IMPORTANT:
-        // Only create NEW advertisements.
-        // Existing SAVED DB records must not be
-        // created again.
+        //
+        // If this item already exists in DB, do not create
+        // another Advertisement record.
+        // ======================================================
 
-        if (
-          segment.status ===
-          "SAVED"
+       if (
+          segment.persisted === true
         ) {
+          await updateAdvertisement(
+            segment.id,
+            {              
+              text: segment.text,
+              start: segment.start,
+              end: segment.end,
+              brand_name:
+                segment.brand_name || "",
+              detection_key:
+                detectionKey,
+              status: "SAVED",
+            }
+          );
+
           continue;
         }
 
@@ -1587,6 +1632,20 @@ export default function AdEditorPage() {
         "✅ Advertisements saved successfully"
       );
 
+      // ========================================================
+      // Reload from database.
+      //
+      // This converts newly created items from:
+      //
+      // persisted: false
+      //
+      // to:
+      //
+      // persisted: true
+      //
+      // and gives them the real Advertisement DB ID.
+      // ========================================================
+
       await loadLogs({
         silent: true,
       });
@@ -1609,144 +1668,165 @@ export default function AdEditorPage() {
   // REMOVE / DELETE SINGLE
   // ============================================================
 
-  const handleRemove =
-    async (
-      id: number
-    ) => {
-      const item =
-        results.find(
-          (r) =>
-            r.id === id
-        );
 
-      if (!item) {
-        console.warn(
-          "DELETE: item not found",
-          id
-        );
+const handleRemove = async (id: number) => {
+  const item = results.find(
+    (r) => r.id === id
+  );
 
-        return;
-      }
+  if (!item) {
+    console.warn(
+      "DELETE: item not found:",
+      id
+    );
 
-      console.log(
-        "REMOVE REQUEST:",
-        {
-          id,
-          status:
-            item.status,
-          item,
-        }
-      );
+    return;
+  }
 
-      // ========================================================
-      // NEW = NOT IN DATABASE
-      // ========================================================
+  console.log(
+    "========================================"
+  );
 
-      if (
-        normalizeStatus(
-          item.status
-        ) === "NEW"
-      ) {
-        console.log(
-          "NEW advertisement - UI removal only:",
-          id
-        );
+  console.log(
+    "DELETE ADVERTISEMENT"
+  );
 
-        setResults(
-          (prev) =>
-            prev.filter(
-              (r) =>
-                r.id !== id
-            )
-        );
+  console.log(
+    "Advertisement ID:",
+    id
+  );
 
-        setDisabledLogs(
-          (prev) =>
-            prev.filter(
-              (logId) =>
-                !(
-                  item.segmentIds ??
-                  [item.id]
-                ).includes(
-                  logId
-                )
-            )
-        );
+  console.log(
+    "Status:",
+    item.status
+  );
 
-        toast.success(
-          "Removed from selection"
-        );
+  console.log(
+    "Detection Key:",
+    item.detection_key
+  );
 
-        return;
-      }
+  console.log(
+    "Project ID:",
+    item.project_id
+  );
 
-      // ========================================================
-      // SAVED = DELETE FROM DATABASE
-      // ========================================================
+  console.log(
+    "Item:",
+    item
+  );
 
-      try {
-        console.log(
-          "CALLING DELETE API:",
-          id
-        );
+  console.log(
+    "========================================"
+  );
 
-        await deleteAdvertisement(
-          id
-        );
+  /*
+   * IMPORTANT
+   *
+   * DO NOT use status to determine whether the
+   * advertisement exists in the database.
+   *
+   * A database advertisement can have status = NEW.
+   *
+   * If the item has a real database ID, delete it
+   * through the backend.
+   */
 
-        console.log(
-          "DELETE API SUCCESS:",
-          id
-        );
+  try {
+    console.log(
+      "CALLING DELETE API:",
+      id
+    );
 
-        setResults(
-          (prev) =>
-            prev.filter(
-              (r) =>
-                r.id !== id
-            )
-        );
+    await deleteAdvertisement(id);
 
-        setDisabledLogs(
-          (prev) =>
-            prev.filter(
-              (logId) =>
-                !(
-                  item.segmentIds ??
-                  [item.id]
-                ).includes(
-                  logId
-                )
-            )
-        );
+    console.log(
+      "DELETE API SUCCESS:",
+      id
+    );
 
-        if (
-          selectedResultId ===
-          id
-        ) {
-          setSelectedResultId(
-            null
-          );
-        }
+    // ----------------------------------------------------------
+    // Remove from UI
+    // ----------------------------------------------------------
 
-        toast.success(
-          "🗑 Advertisement deleted"
-        );
-      } catch (
-        error: any
-      ) {
-        console.error(
-          "DELETE ADVERTISEMENT ERROR:",
-          error
-        );
+    setResults((prev) =>
+      prev.filter(
+        (r) => r.id !== id
+      )
+    );
 
-        toast.error(
-          error?.message ||
-            "Failed to delete advertisement"
-        );
-      }
-    };
+    // ----------------------------------------------------------
+    // Re-enable transcript segments
+    // ----------------------------------------------------------
 
+    const itemSegmentIds =
+      item.segmentIds ?? [item.id];
+
+    setDisabledLogs((prev) =>
+      prev.filter(
+        (logId) =>
+          !itemSegmentIds.includes(
+            logId
+          )
+      )
+    );
+
+    // ----------------------------------------------------------
+    // Clear selected result
+    // ----------------------------------------------------------
+
+    if (
+      selectedResultId === id
+    ) {
+      setSelectedResultId(null);
+    }
+
+    if (
+      lastSavedId === id
+    ) {
+      setLastSavedId(null);
+    }
+
+    toast.success(
+      `🗑 Advertisement ${id} deleted`
+    );
+
+    console.log(
+      "========================================"
+    );
+    console.log(
+      "ADVERTISEMENT DELETED COMPLETELY:",
+      id
+    );
+    console.log(
+      "========================================"
+    );
+
+  } catch (error: any) {
+    console.error(
+      "========================================"
+    );
+
+    console.error(
+      "DELETE ADVERTISEMENT ERROR:",
+      error
+    );
+
+    console.error(
+      "Advertisement ID:",
+      id
+    );
+
+    console.error(
+      "========================================"
+    );
+
+    toast.error(
+      error?.message ||
+        "Failed to delete advertisement"
+    );
+  }
+};
   // ============================================================
   // EDIT TIME
   // ============================================================
@@ -1899,9 +1979,27 @@ export default function AdEditorPage() {
 
   const handleAddSingle =
     (row: any) => {
+      // ========================================================
+      // IMPORTANT:
+      //
+      // Do NOT use row.id as the advertisement ID.
+      //
+      // row.id is the Segment database ID.
+      //
+      // This item is not yet an Advertisement DB record.
+      // ========================================================
+
+      const temporaryId =
+        Date.now();
+
       const newSegment =
         {
-          id: row.id,
+          // Temporary frontend ID
+          id: temporaryId,
+
+          // Original transcript Segment ID
+          sourceSegmentId:
+            row.id,
 
           text:
             row.text ||
@@ -1925,7 +2023,17 @@ export default function AdEditorPage() {
             row.brand_name ||
             "",
 
-          status: "NEW",
+          status:
+            "NEW",
+
+          // ====================================================
+          // IMPORTANT
+          //
+          // This is NOT in Advertisement table yet.
+          // ====================================================
+
+          persisted:
+            false,
 
           segment_type:
             "advertisement",
@@ -1941,7 +2049,8 @@ export default function AdEditorPage() {
             item.segmentIds?.includes(
               row.id
             ) ||
-            item.id === row.id
+            item.sourceSegmentId ===
+              row.id
         );
 
       if (exists) {
@@ -1971,6 +2080,10 @@ export default function AdEditorPage() {
             )
           ),
         ]
+      );
+
+      setLastSavedId(
+        temporaryId
       );
 
       toast.success(
