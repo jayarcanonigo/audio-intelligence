@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -21,7 +22,6 @@ import {
 import {
   getLogs,
   deleteAdvertisement,
-  saveProject,
   deleteAdvertisementsByProjectHour,
   getAdvertisementsByProjectHour,
   createAdvertisement,
@@ -35,8 +35,6 @@ import {
   Save,
   Trash2,
   Plus,
-  Search,
-  X,
   RefreshCw,
   MoreVertical,
 } from "lucide-react";
@@ -85,9 +83,13 @@ export default function AdEditorPage() {
   const [phrase2, setPhrase2] =
     useState("");
 
-  const [search, setSearch] =
-    useState("");
-
+  /*
+   * MOBILE ONLY TAB
+   *
+   * This is now controlled by the
+   * Logs / Segments button in the
+   * mobile footer.
+   */
   const [mobileTab, setMobileTab] =
     useState<"logs" | "segments">(
       "logs"
@@ -158,17 +160,6 @@ export default function AdEditorPage() {
   // DETECTION KEY
   // ============================================================
 
-  /**
-   * Generates the detection key ONLY from source segment IDs.
-   *
-   * Examples:
-   *
-   * [98]
-   * => project-4-segments-98-98
-   *
-   * [98, 99, 100]
-   * => project-4-segments-98-100
-   */
   const makeDetectionKey = useCallback(
     (
       segmentIds: number[]
@@ -213,18 +204,6 @@ export default function AdEditorPage() {
   // PARSE DETECTION KEY
   // ============================================================
 
-  /**
-   * Converts:
-   *
-   * project-4-segments-98-100
-   *
-   * into:
-   *
-   * {
-   *   startId: 98,
-   *   endId: 100
-   * }
-   */
   const parseDetectionKey = useCallback(
     (
       detectionKey?: string | null
@@ -277,24 +256,6 @@ export default function AdEditorPage() {
   // RECOVER SEGMENT IDS FROM DETECTION KEY
   // ============================================================
 
-  /**
-   * IMPORTANT:
-   *
-   * detection_key is the source of truth for an existing
-   * advertisement.
-   *
-   * Example:
-   *
-   * detection_key:
-   * project-4-segments-98-100
-   *
-   * The function returns:
-   *
-   * [98, 99, 100]
-   *
-   * It does NOT look at advertisement start/end first.
-   */
-
   const getSegmentIdsFromDetectionKey =
     useCallback(
       (
@@ -318,10 +279,6 @@ export default function AdEditorPage() {
           endId,
         } = parsed;
 
-        // ======================================================
-        // Get actual transcript IDs from logs.
-        // ======================================================
-
         const logIds =
           sourceLogs
             .map(
@@ -338,27 +295,11 @@ export default function AdEditorPage() {
               (a, b) => a - b
             );
 
-        // ======================================================
-        // If logs contain the source IDs, use them.
-        // ======================================================
-
         if (
           logIds.length > 0
         ) {
           return logIds;
         }
-
-        // ======================================================
-        // Fallback:
-        //
-        // Build the complete range directly from detection_key.
-        //
-        // Example:
-        //
-        // 98-100
-        //
-        // => [98,99,100]
-        // ======================================================
 
         const ids: number[] =
           [];
@@ -413,15 +354,7 @@ export default function AdEditorPage() {
             ? data
             : data.logs || [];
 
-        // ======================================================
-        // FIRST SAVE THE LOGS
-        // ======================================================
-
         setLogs(list);
-
-        // ======================================================
-        // LOAD DATABASE ADS
-        // ======================================================
 
         if (
           broadcastHour !==
@@ -442,25 +375,11 @@ export default function AdEditorPage() {
             const loaded =
               ads.map(
                 (ad: any) => {
-                  // ==================================================
-                  // IMPORTANT
-                  //
-                  // DO NOT calculate source segments from
-                  // advertisement start/end.
-                  //
-                  // detection_key is the source of truth.
-                  // ==================================================
-
                   let segmentIds =
                     getSegmentIdsFromDetectionKey(
                       ad.detection_key,
                       list
                     );
-
-                  // ==================================================
-                  // ONLY if detection_key is missing/invalid,
-                  // fallback to exact start/end matching.
-                  // ==================================================
 
                   if (
                     segmentIds.length ===
@@ -483,11 +402,6 @@ export default function AdEditorPage() {
                           )
                       );
                   }
-
-                  // ==================================================
-                  // ALWAYS regenerate the normalized key from
-                  // source segment IDs when available.
-                  // ==================================================
 
                   const generatedDetectionKey =
                     makeDetectionKey(
@@ -542,10 +456,6 @@ export default function AdEditorPage() {
                   );
 
                   return {
-                    // =================================================
-                    // Advertisement DATABASE ID.
-                    // =================================================
-
                     id:
                       ad.id,
 
@@ -565,21 +475,8 @@ export default function AdEditorPage() {
                       ad.brand_name ||
                       "",
 
-                    // =================================================
-                    // Correct detection key.
-                    // =================================================
-
                     detection_key:
                       finalDetectionKey,
-
-                    // =================================================
-                    // IMPORTANT:
-                    //
-                    // Source transcript IDs.
-                    //
-                    // These are independent from editable
-                    // advertisement start/end times.
-                    // =================================================
 
                     segmentIds:
                       segmentIds,
@@ -588,10 +485,6 @@ export default function AdEditorPage() {
                       normalizeStatus(
                         ad.status
                       ),
-
-                    // =================================================
-                    // This is already in DB.
-                    // =================================================
 
                     persisted:
                       true,
@@ -662,8 +555,7 @@ export default function AdEditorPage() {
     const checkScreen =
       () =>
         setIsMobile(
-          window.innerWidth <
-            768
+          window.innerWidth < 768
         );
 
     checkScreen();
@@ -910,9 +802,7 @@ export default function AdEditorPage() {
     }
 
     const [hh] =
-      String(time).split(
-        ":"
-      );
+      String(time).split(":");
 
     return hh
       ? `${hh.padStart(
@@ -1323,207 +1213,170 @@ export default function AdEditorPage() {
   // UPDATE SEGMENT
   // ============================================================
 
-// ============================================================
-// UPDATE SEGMENT
-// ============================================================
-
-function handleUpdateSegment(
-  id: number,
-  data: {
-    text: string;
-    start: string;
-    end: string;
-    brand_name: string;
-    status: "NEW" | "SAVED";
-  }
-) {
-  console.log(
-    "========================================"
-  );
-
-  console.log(
-    "UPDATE SEGMENT"
-  );
-
-  console.log(
-    "Advertisement ID:",
-    id
-  );
-
-  console.log(
-    "New Start:",
-    data.start
-  );
-
-  console.log(
-    "New End:",
-    data.end
-  );
-
-  // ==========================================================
-  // FIND ALL TRANSCRIPT SEGMENTS COVERED BY THE NEW RANGE
-  //
-  // This is the important fix.
-  //
-  // Example:
-  //
-  // 98 = 00:01:16 - 00:01:46
-  // 99 = 00:01:46 - 00:02:01
-  // 100 = 00:02:01 - 00:02:16
-  //
-  // If edited advertisement is:
-  //
-  // 00:01:16 - 00:02:16
-  //
-  // segmentIds becomes:
-  //
-  // [98, 99, 100]
-  // ==========================================================
-
-  const newStartSeconds =
-    parseTime(data.start);
-
-  const newEndSeconds =
-    parseTime(data.end);
-
-  const newSegmentIds =
-    logs
-      .filter((log: any) => {
-        const segmentStart =
-          parseTime(
-            log.start_time ||
-              log.start ||
-              "00:00:00"
-          );
-
-        const segmentEnd =
-          parseTime(
-            log.end_time ||
-              log.end ||
-              "00:00:00"
-          );
-
-        if (
-          segmentEnd <=
-          newStartSeconds
-        ) {
-          return false;
-        }
-
-        if (
-          segmentStart >=
-          newEndSeconds
-        ) {
-          return false;
-        }
-
-        return true;
-      })
-      .map(
-        (log: any) =>
-          Number(log.id)
-      );
-
-  console.log(
-    "========================================"
-  );
-
-  console.log(
-    "CALCULATED SEGMENT IDS:",
-    newSegmentIds
-  );
-
-  // ==========================================================
-  // DETECTION KEY
-  //
-  // ALWAYS generate this from the NEW segmentIds.
-  // ==========================================================
-
-  let detectionKey: string | null =
-    null;
-
-  if (
-    newSegmentIds.length > 0
-  ) {
-    const startSegmentId =
-      newSegmentIds[0];
-
-    const endSegmentId =
-      newSegmentIds[
-        newSegmentIds.length - 1
-      ];
-
-    detectionKey =
-      `project-${projectId}-segments-${startSegmentId}-${endSegmentId}`;
-  }
-
-  console.log(
-    "NEW DETECTION KEY:",
-    detectionKey
-  );
-
-  console.log(
-    "========================================"
-  );
-
-  // ==========================================================
-  // UPDATE RESULT
-  // ==========================================================
-
-  setResults((prev) =>
-    prev.map((item) =>
-      item.id === id
-        ? {
-            ...item,
-
-            text:
-              data.text,
-
-            start:
-              data.start,
-
-            end:
-              data.end,
-
-            brand_name:
-              data.brand_name,
-
-            status:
-              data.status,
-
-            // IMPORTANT
-            // Replace old segmentIds.
-            segmentIds:
-              newSegmentIds,
-
-            // IMPORTANT
-            // Replace old detection_key.
-            detection_key:
-              detectionKey,
-          }
-        : item
-    )
-  );
-
-  setLastSavedId(id);
-
-  console.log(
-    "RESULT UPDATED:",
-    {
-      id,
-      start: data.start,
-      end: data.end,
-      segmentIds:
-        newSegmentIds,
-      detection_key:
-        detectionKey,
+  function handleUpdateSegment(
+    id: number,
+    data: {
+      text: string;
+      start: string;
+      end: string;
+      brand_name: string;
+      status: "NEW" | "SAVED";
     }
-  );
+  ) {
+    console.log(
+      "========================================"
+    );
 
-  console.log(
-    "========================================"
-  );
-}
+    console.log(
+      "UPDATE SEGMENT"
+    );
+
+    console.log(
+      "Advertisement ID:",
+      id
+    );
+
+    console.log(
+      "New Start:",
+      data.start
+    );
+
+    console.log(
+      "New End:",
+      data.end
+    );
+
+    const newStartSeconds =
+      parseTime(data.start);
+
+    const newEndSeconds =
+      parseTime(data.end);
+
+    const newSegmentIds =
+      logs
+        .filter((log: any) => {
+          const segmentStart =
+            parseTime(
+              log.start_time ||
+                log.start ||
+                "00:00:00"
+            );
+
+          const segmentEnd =
+            parseTime(
+              log.end_time ||
+                log.end ||
+                "00:00:00"
+            );
+
+          if (
+            segmentEnd <=
+            newStartSeconds
+          ) {
+            return false;
+          }
+
+          if (
+            segmentStart >=
+            newEndSeconds
+          ) {
+            return false;
+          }
+
+          return true;
+        })
+        .map(
+          (log: any) =>
+            Number(log.id)
+        );
+
+    console.log(
+      "========================================"
+    );
+
+    console.log(
+      "CALCULATED SEGMENT IDS:",
+      newSegmentIds
+    );
+
+    let detectionKey: string | null =
+      null;
+
+    if (
+      newSegmentIds.length > 0
+    ) {
+      const startSegmentId =
+        newSegmentIds[0];
+
+      const endSegmentId =
+        newSegmentIds[
+          newSegmentIds.length - 1
+        ];
+
+      detectionKey =
+        `project-${projectId}-segments-${startSegmentId}-${endSegmentId}`;
+    }
+
+    console.log(
+      "NEW DETECTION KEY:",
+      detectionKey
+    );
+
+    console.log(
+      "========================================"
+    );
+
+    setResults((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+
+              text:
+                data.text,
+
+              start:
+                data.start,
+
+              end:
+                data.end,
+
+              brand_name:
+                data.brand_name,
+
+              status:
+                data.status,
+
+              segmentIds:
+                newSegmentIds,
+
+              detection_key:
+                detectionKey,
+            }
+          : item
+      )
+    );
+
+    setLastSavedId(id);
+
+    console.log(
+      "RESULT UPDATED:",
+      {
+        id,
+        start: data.start,
+        end: data.end,
+        segmentIds:
+          newSegmentIds,
+        detection_key:
+          detectionKey,
+      }
+    );
+
+    console.log(
+      "========================================"
+    );
+  }
+
   // ============================================================
   // TIME HELPERS
   // ============================================================
@@ -1613,63 +1466,6 @@ function handleUpdateSegment(
 
       return 0;
     };
-
-  // ============================================================
-  // FILTER LOGS
-  // ============================================================
-
-  const filteredLogs =
-    useMemo(() => {
-      const q =
-        search.toLowerCase();
-
-      return logs.filter(
-        (log) => {
-          const matchesSearch =
-            (
-              log.text ||
-              log.message ||
-              ""
-            )
-              .toLowerCase()
-              .includes(q);
-
-          if (
-            !matchesSearch
-          ) {
-            return false;
-          }
-
-          if (
-            broadcastHour ===
-            "all"
-          ) {
-            return true;
-          }
-
-          const hour =
-            getHour(log);
-
-          if (!hour) {
-            return false;
-          }
-
-          const key =
-            `${hour}|${getFileName(
-              log
-            )}`;
-
-          return (
-            key ===
-            broadcastHour
-          );
-        }
-      );
-    }, [
-      logs,
-      search,
-      broadcastHour,
-    ]);
 
   // ============================================================
   // PLAY SEGMENT
@@ -1915,16 +1711,8 @@ function handleUpdateSegment(
         return;
       }
 
-      // ========================================================
-      // TEMPORARY FRONTEND ID
-      // ========================================================
-
       const newId =
         Date.now();
-
-      // ========================================================
-      // DETECTION KEY FROM SOURCE IDS
-      // ========================================================
 
       const detectionKey =
         makeDetectionKey(
@@ -1952,10 +1740,6 @@ function handleUpdateSegment(
             range[
               range.length - 1
             ].end_time,
-
-          // ====================================================
-          // SOURCE OF TRUTH
-          // ====================================================
 
           segmentIds:
             ids,
@@ -2009,8 +1793,7 @@ function handleUpdateSegment(
           ...new Set(
             updated.flatMap(
               (x) =>
-                x.segmentIds ??
-                []
+                x.segmentIds ?? []
             )
           ),
         ]
@@ -2042,197 +1825,264 @@ function handleUpdateSegment(
     };
 
   // ============================================================
-// SAVE ALL
-// ============================================================
+  // SAVE ALL
+  // ============================================================
 
-async function handleSaveAllSegments() {
-  try {
-    if (results.length === 0) {
-      toast.warning(
-        "No advertisements to save"
-      );
-
-      return;
-    }
-
-    console.log(
-      "========================================"
-    );
-
-    console.log(
-      "SAVE ALL ADVERTISEMENTS"
-    );
-
-    console.log(
-      "Project ID:",
-      projectId
-    );
-
-    console.log(
-      "Results before save:",
-      results
-    );
-
-    console.log(
-      "========================================"
-    );
-
-    for (const segment of results) {
-      // ========================================================
-      // ALWAYS USE CURRENT segmentIds
-      // ========================================================
-
-      const segmentIds =
-        Array.isArray(
-          segment.segmentIds
-        )
-          ? segment.segmentIds
-              .map(Number)
-              .filter(
-                (id: number) =>
-                  Number.isFinite(id)
-              )
-          : [];
-
-      // ========================================================
-      // DO NOT silently use the old detection_key.
-      //
-      // The current segmentIds are the source of truth.
-      // ========================================================
-
-      if (
-        segmentIds.length === 0
-      ) {
-        console.error(
-          "SAVE ERROR: segmentIds is empty",
-          {
-            advertisementId:
-              segment.id,
-
-            oldDetectionKey:
-              segment.detection_key,
-
-            segment,
-          }
+  async function handleSaveAllSegments() {
+    try {
+      if (results.length === 0) {
+        toast.warning(
+          "No advertisements to save"
         );
 
-        throw new Error(
-          `Cannot save advertisement ${segment.id}: segmentIds is empty`
-        );
+        return;
       }
 
-      // ========================================================
-      // GENERATE DETECTION KEY
-      // ========================================================
-
-      const startSegmentId =
-        segmentIds[0];
-
-      const endSegmentId =
-        segmentIds[
-          segmentIds.length - 1
-        ];
-
-      const detectionKey =
-        `project-${projectId}-segments-${startSegmentId}-${endSegmentId}`;
-
       console.log(
         "========================================"
       );
 
       console.log(
-        "SAVING ADVERTISEMENT"
+        "SAVE ALL ADVERTISEMENTS"
       );
 
       console.log(
-        "Advertisement ID:",
-        segment.id
+        "Project ID:",
+        projectId
       );
 
       console.log(
-        "Persisted:",
-        segment.persisted
-      );
-
-      console.log(
-        "Segment IDs:",
-        segmentIds
-      );
-
-      console.log(
-        "Old detection_key:",
-        segment.detection_key
-      );
-
-      console.log(
-        "NEW detection_key:",
-        detectionKey
-      );
-
-      console.log(
-        "Start:",
-        segment.start
-      );
-
-      console.log(
-        "End:",
-        segment.end
-      );
-
-      console.log(
-        "Status:",
-        "SAVED"
+        "Results before save:",
+        results
       );
 
       console.log(
         "========================================"
       );
 
-      // ========================================================
-      // EXISTING DATABASE ADVERTISEMENT
-      // ========================================================
-
-      if (
-        segment.persisted === true
+      for (
+        const segment of results
       ) {
-        console.log(
-          "UPDATING EXISTING ADVERTISEMENT:",
-          segment.id
-        );
+        const segmentIds =
+          Array.isArray(
+            segment.segmentIds
+          )
+            ? segment.segmentIds
+                .map(Number)
+                .filter(
+                  (id: number) =>
+                    Number.isFinite(id)
+                )
+            : [];
 
-        const updated =
-          await updateAdvertisement(
-            segment.id,
+        if (
+          segmentIds.length === 0
+        ) {
+          console.error(
+            "SAVE ERROR: segmentIds is empty",
             {
-              text:
-                segment.text,
+              advertisementId:
+                segment.id,
 
-              start:
-                segment.start,
+              oldDetectionKey:
+                segment.detection_key,
 
-              end:
-                segment.end,
-
-              brand_name:
-                segment.brand_name ||
-                "",
-
-              detection_key:
-                detectionKey,
-
-              status:
-                "SAVED",
+              segment,
             }
           );
 
+          throw new Error(
+            `Cannot save advertisement ${segment.id}: segmentIds is empty`
+          );
+        }
+
+        const startSegmentId =
+          segmentIds[0];
+
+        const endSegmentId =
+          segmentIds[
+            segmentIds.length - 1
+          ];
+
+        const detectionKey =
+          `project-${projectId}-segments-${startSegmentId}-${endSegmentId}`;
+
         console.log(
-          "UPDATE SUCCESS:",
-          updated
+          "========================================"
         );
 
-        // ======================================================
-        // UPDATE FRONTEND STATE
-        // ======================================================
+        console.log(
+          "SAVING ADVERTISEMENT"
+        );
+
+        console.log(
+          "Advertisement ID:",
+          segment.id
+        );
+
+        console.log(
+          "Persisted:",
+          segment.persisted
+        );
+
+        console.log(
+          "Segment IDs:",
+          segmentIds
+        );
+
+        console.log(
+          "Old detection_key:",
+          segment.detection_key
+        );
+
+        console.log(
+          "NEW detection_key:",
+          detectionKey
+        );
+
+        console.log(
+          "Start:",
+          segment.start
+        );
+
+        console.log(
+          "End:",
+          segment.end
+        );
+
+        console.log(
+          "Status:",
+          "SAVED"
+        );
+
+        console.log(
+          "========================================"
+        );
+
+        if (
+          segment.persisted === true
+        ) {
+          console.log(
+            "UPDATING EXISTING ADVERTISEMENT:",
+            segment.id
+          );
+
+          const updated =
+            await updateAdvertisement(
+              segment.id,
+              {
+                text:
+                  segment.text,
+
+                start:
+                  segment.start,
+
+                end:
+                  segment.end,
+
+                brand_name:
+                  segment.brand_name ||
+                  "",
+
+                detection_key:
+                  detectionKey,
+
+                status:
+                  "SAVED",
+              }
+            );
+
+          console.log(
+            "UPDATE SUCCESS:",
+            updated
+          );
+
+          setResults((prev) =>
+            prev.map((item) =>
+              item.id ===
+              segment.id
+                ? {
+                    ...item,
+
+                    text:
+                      segment.text,
+
+                    start:
+                      segment.start,
+
+                    end:
+                      segment.end,
+
+                    brand_name:
+                      segment.brand_name ||
+                      "",
+
+                    segmentIds:
+                      segmentIds,
+
+                    detection_key:
+                      detectionKey,
+
+                    status:
+                      "SAVED",
+
+                    persisted:
+                      true,
+                  }
+                : item
+            )
+          );
+
+          setLastSavedId(
+            segment.id
+          );
+
+          continue;
+        }
+
+        console.log(
+          "CREATING NEW ADVERTISEMENT"
+        );
+
+        const created =
+          await createAdvertisement({
+            project_id:
+              projectId,
+
+            text:
+              segment.text,
+
+            start:
+              segment.start,
+
+            end:
+              segment.end,
+
+            brand_name:
+              segment.brand_name ||
+              "",
+
+            detection_key:
+              detectionKey,
+
+            status:
+              "SAVED",
+          });
+
+        console.log(
+          "CREATE SUCCESS:",
+          created
+        );
+
+        const createdAd =
+          created?.data ??
+          created?.advertisement ??
+          created;
+
+        const realAdvertisementId =
+          createdAd?.id ??
+          createdAd?.advertisement_id ??
+          null;
 
         setResults((prev) =>
           prev.map((item) =>
@@ -2240,6 +2090,10 @@ async function handleSaveAllSegments() {
             segment.id
               ? {
                   ...item,
+
+                  id:
+                    realAdvertisementId ??
+                    item.id,
 
                   text:
                     segment.text,
@@ -2265,169 +2119,56 @@ async function handleSaveAllSegments() {
 
                   persisted:
                     true,
-                }
+              }
               : item
           )
         );
 
         setLastSavedId(
+          realAdvertisementId ??
           segment.id
         );
-
-        continue;
       }
 
-      // ========================================================
-      // NEW FRONTEND ADVERTISEMENT
-      // ========================================================
+      console.log(
+        "========================================"
+      );
 
       console.log(
-        "CREATING NEW ADVERTISEMENT"
+        "ALL ADVERTISEMENTS SAVED"
       );
-
-      const created =
-        await createAdvertisement({
-          project_id:
-            projectId,
-
-          text:
-            segment.text,
-
-          start:
-            segment.start,
-
-          end:
-            segment.end,
-
-          brand_name:
-            segment.brand_name ||
-            "",
-
-          // IMPORTANT:
-          // Use detectionKey, NOT segment.detectionKey
-          detection_key:
-            detectionKey,
-
-          status:
-            "SAVED",
-        });
 
       console.log(
-        "CREATE SUCCESS:",
-        created
+        "========================================"
       );
 
-      // ========================================================
-      // GET REAL DATABASE ID
-      // ========================================================
-
-      const createdAd =
-        created?.data ??
-        created?.advertisement ??
-        created;
-
-      const realAdvertisementId =
-        createdAd?.id ??
-        createdAd?.advertisement_id ??
-        null;
-
-      // ========================================================
-      // UPDATE FRONTEND STATE
-      // ========================================================
-
-      setResults((prev) =>
-        prev.map((item) =>
-          item.id ===
-          segment.id
-            ? {
-                ...item,
-
-                id:
-                  realAdvertisementId ??
-                  item.id,
-
-                text:
-                  segment.text,
-
-                start:
-                  segment.start,
-
-                end:
-                  segment.end,
-
-                brand_name:
-                  segment.brand_name ||
-                  "",
-
-                segmentIds:
-                  segmentIds,
-
-                detection_key:
-                  detectionKey,
-
-                status:
-                  "SAVED",
-
-                persisted:
-                  true,
-              }
-            : item
-        )
+      toast.success(
+        "✅ Advertisements saved successfully"
       );
 
-      setLastSavedId(
-        realAdvertisementId ??
-        segment.id
+      await loadLogs({
+        silent: true,
+      });
+    } catch (error: any) {
+      console.error(
+        "========================================"
+      );
+
+      console.error(
+        "SAVE ERROR:",
+        error
+      );
+
+      console.error(
+        "========================================"
+      );
+
+      toast.error(
+        error?.message ||
+          "Save failed"
       );
     }
-
-    // ==========================================================
-    // SAVE COMPLETE
-    // ==========================================================
-
-    console.log(
-      "========================================"
-    );
-
-    console.log(
-      "ALL ADVERTISEMENTS SAVED"
-    );
-
-    console.log(
-      "========================================"
-    );
-
-    toast.success(
-      "✅ Advertisements saved successfully"
-    );
-
-    // ==========================================================
-    // RELOAD DATABASE
-    // ==========================================================
-
-    await loadLogs({
-      silent: true,
-    });
-  } catch (error: any) {
-    console.error(
-      "========================================"
-    );
-
-    console.error(
-      "SAVE ERROR:",
-      error
-    );
-
-    console.error(
-      "========================================"
-    );
-
-    toast.error(
-      error?.message ||
-        "Save failed"
-    );
   }
-}
 
   // ============================================================
   // REMOVE / DELETE SINGLE
@@ -2509,10 +2250,6 @@ async function handleSaveAllSegments() {
           id
         );
 
-        // ======================================================
-        // Remove from UI.
-        // ======================================================
-
         setResults(
           (prev) =>
             prev.filter(
@@ -2520,10 +2257,6 @@ async function handleSaveAllSegments() {
                 r.id !== id
             )
         );
-
-        // ======================================================
-        // Re-enable transcript segments.
-        // ======================================================
 
         const itemSegmentIds =
           item.segmentIds ??
@@ -2651,12 +2384,6 @@ async function handleSaveAllSegments() {
                 [field]:
                   `00:${minute}:${second}`,
 
-                // =================================================
-                // IMPORTANT:
-                //
-                // Changing time DOES NOT change segmentIds.
-                // =================================================
-
                 segmentIds:
                   r.segmentIds,
 
@@ -2672,6 +2399,10 @@ async function handleSaveAllSegments() {
           )
       );
     };
+
+  // ============================================================
+  // DISPLAY TIME
+  // ============================================================
 
   const displayTime =
     (
@@ -2703,6 +2434,17 @@ async function handleSaveAllSegments() {
       setSelectedResultId(
         lastSavedId
       );
+
+      /*
+       * When pressing Last on mobile,
+       * automatically switch to Segments
+       * so the recently saved item is visible.
+       */
+      if (isMobile) {
+        setMobileTab(
+          "segments"
+        );
+      }
 
       setTimeout(() => {
         const element =
@@ -2754,14 +2496,6 @@ async function handleSaveAllSegments() {
     (
       row: any
     ) => {
-      // ========================================================
-      // IMPORTANT:
-      //
-      // row.id = transcript Segment ID
-      //
-      // It is NOT Advertisement ID.
-      // ========================================================
-
       const temporaryId =
         Date.now();
 
@@ -2780,17 +2514,9 @@ async function handleSaveAllSegments() {
         return;
       }
 
-      // ========================================================
-      // SOURCE SEGMENT IDS
-      // ========================================================
-
       const segmentIds = [
         sourceSegmentId,
       ];
-
-      // ========================================================
-      // DETECTION KEY
-      // ========================================================
 
       const detectionKey =
         makeDetectionKey(
@@ -2814,10 +2540,6 @@ async function handleSaveAllSegments() {
 
           end:
             row.end_time,
-
-          // ====================================================
-          // SOURCE OF TRUTH
-          // ====================================================
 
           segmentIds:
             segmentIds,
@@ -2886,8 +2608,7 @@ async function handleSaveAllSegments() {
               (
                 item: any
               ) =>
-                item.segmentIds ??
-                []
+                item.segmentIds ?? []
             )
           ),
         ]
@@ -2982,38 +2703,71 @@ async function handleSaveAllSegments() {
   ]);
 
   // ============================================================
+  // MOBILE TAB TOGGLE
+  // ============================================================
+
+  const toggleMobileTab =
+    () => {
+      setMobileTab(
+        (prev) =>
+          prev === "logs"
+            ? "segments"
+            : "logs"
+      );
+
+      /*
+       * Close the More menu if it is open.
+       */
+      setShowMenu(false);
+    };
+
+  // ============================================================
   // RENDER
   // ============================================================
 
   return (
-    <div className="p-3 md:p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50 p-3 md:p-6">
+
       <ToastContainer
         position="top-right"
         autoClose={2000}
       />
 
-      {/* HEADER */}
+      {/* ========================================================
+          HEADER
+      ======================================================== */}
 
-      <div className="bg-white rounded-xl shadow p-4 md:p-5">
+      <div className="rounded-xl bg-white p-4 shadow-sm md:p-5">
+
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-800">
+
+            <h1 className="text-xl font-bold text-gray-800 md:text-2xl">
               🎧 Ad Editor
             </h1>
 
-            <p className="mt-1 text-sm text-gray-500 break-words">
+            <p className="mt-1 break-words text-sm text-gray-500">
+
               Project:{" "}
+
               <span className="font-medium text-gray-700">
                 {projectName ||
                   `Project #${projectId}`}
               </span>
+
             </p>
+
           </div>
 
-          {/* BROADCAST HOUR */}
+          {/* ====================================================
+              BROADCAST HOUR
+          ==================================================== */}
 
           <div className="w-full md:w-auto">
+
             <div className="block md:hidden">
+
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Broadcast Hour
               </label>
@@ -3027,8 +2781,9 @@ async function handleSaveAllSegments() {
                     e.target.value
                   )
                 }
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               >
+
                 {hours.map(
                   (
                     hour
@@ -3049,15 +2804,19 @@ async function handleSaveAllSegments() {
                     </option>
                   )
                 )}
+
               </select>
+
             </div>
 
             <div className="hidden md:block">
+
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Broadcast Hour
               </div>
 
-              <div className="flex max-w-[700px] gap-2 overflow-x-auto rounded-xl border bg-gray-50 p-2">
+              <div className="flex max-w-[700px] gap-2 overflow-x-auto rounded-xl border border-gray-200 bg-gray-50 p-2">
+
                 {hours.map(
                   (
                     hour
@@ -3080,6 +2839,7 @@ async function handleSaveAllSegments() {
                           : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
                       }`}
                     >
+
                       {String(
                         hour
                       ).padStart(
@@ -3087,63 +2847,46 @@ async function handleSaveAllSegments() {
                         "0"
                       )}
                       :00
+
                     </button>
                   )
                 )}
+
               </div>
+
             </div>
+
           </div>
+
         </div>
+
       </div>
 
-      {/* CONTENT */}
+      {/* ========================================================
+          CONTENT
+      ======================================================== */}
 
       {isMobile ? (
-        <div className="pb-40">
-          <div className="sticky top-0 z-30 bg-gray-100 pb-3">
-            <div className="flex gap-2">
-              <button
-                onClick={() =>
-                  setMobileTab(
-                    "logs"
-                  )
-                }
-                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                  mobileTab ===
-                  "logs"
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-600 border"
-                }`}
-              >
-                Live Logs
-              </button>
 
-              <button
-                onClick={() =>
-                  setMobileTab(
-                    "segments"
-                  )
-                }
-                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                  mobileTab ===
-                  "segments"
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-600 border"
-                }`}
-              >
-                Segments (
-                {
-                  results.length
-                }
-                )
-              </button>
-            </div>
-          </div>
+        /*
+         * ======================================================
+         * MOBILE CONTENT
+         *
+         * IMPORTANT:
+         * No top Logs / Segments tabs anymore.
+         *
+         * The footer button controls this view.
+         * ======================================================
+         */
+
+        <div className="pb-48">
 
           {mobileTab ===
           "logs" ? (
-            <div className="bg-white rounded-xl shadow p-4">
-              <h2 className="mb-4 font-semibold">
+
+            <div className="rounded-xl bg-white p-4 shadow-sm">
+
+              <h2 className="mb-4 font-semibold text-gray-800">
                 Live Logs
               </h2>
 
@@ -3189,20 +2932,29 @@ async function handleSaveAllSegments() {
                   handleAddSingle
                 }
               />
+
             </div>
+
           ) : (
-            <div className="bg-white rounded-xl shadow p-4">
+
+            <div className="rounded-xl bg-white p-4 shadow-sm">
+
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-semibold">
+
+                <h2 className="font-semibold text-gray-800">
                   Selected Segments
                 </h2>
 
-                <span className="text-sm text-gray-500">
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
+
                   {
                     results.length
                   }{" "}
+
                   Selected
+
                 </span>
+
               </div>
 
               <SelectedSegments
@@ -3234,17 +2986,31 @@ async function handleSaveAllSegments() {
                   handleSaveAllSegments
                 }
               />
+
             </div>
+
           )}
+
         </div>
+
       ) : (
-        <div className="grid grid-cols-12 gap-6 pb-40">
+
+        /* ======================================================
+           DESKTOP CONTENT
+           
+           DESKTOP REMAINS UNCHANGED.
+           Both panels are visible.
+        ====================================================== */
+
+        <div className="grid grid-cols-12 gap-6 pb-48 pt-6">
 
           {/* LOGS */}
 
           <div className="col-span-5">
-            <div className="bg-white rounded-xl shadow p-5">
-              <h2 className="font-semibold mb-4">
+
+            <div className="rounded-xl bg-white p-5 shadow-sm">
+
+              <h2 className="mb-4 font-semibold text-gray-800">
                 Live Logs
               </h2>
 
@@ -3290,24 +3056,33 @@ async function handleSaveAllSegments() {
                   handleAddSingle
                 }
               />
+
             </div>
+
           </div>
 
           {/* SEGMENTS */}
 
           <div className="col-span-7">
-            <div className="bg-white rounded-xl shadow p-5">
-              <div className="flex justify-between mb-4">
-                <h2 className="font-semibold">
+
+            <div className="rounded-xl bg-white p-5 shadow-sm">
+
+              <div className="mb-4 flex items-center justify-between">
+
+                <h2 className="font-semibold text-gray-800">
                   Selected Segments
                 </h2>
 
-                <span className="text-sm text-gray-500">
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
+
                   {
                     results.length
                   }{" "}
+
                   Selected
+
                 </span>
+
               </div>
 
               <SelectedSegments
@@ -3339,79 +3114,121 @@ async function handleSaveAllSegments() {
                   handleSaveAllSegments
                 }
               />
+
             </div>
+
           </div>
+
         </div>
+
       )}
 
-      {/* FOOTER */}
+      {/* ========================================================
+          PROFESSIONAL FOOTER
+      ======================================================== */}
 
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white shadow-lg">
-        <div className="px-3 py-2">
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur">
+
+        <div className="mx-auto w-full max-w-[1800px] px-3 py-2 md:px-5 md:py-3">
+
+          {/* ====================================================
+              MOBILE FOOTER
+          ==================================================== */}
 
           {isMobile ? (
-            <>
-              <div className="mb-3 flex rounded-xl bg-gray-100 p-1">
-                <button
-                  onClick={() =>
-                    setMobileTab(
-                      "logs"
-                    )
-                  }
-                  className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                    mobileTab ===
-                    "logs"
-                      ? "bg-blue-600 text-white shadow"
-                      : "text-gray-600"
-                  }`}
-                >
-                  📝 Logs
-                </button>
 
-                <button
-                  onClick={() =>
-                    setMobileTab(
-                      "segments"
-                    )
-                  }
-                  className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                    mobileTab ===
-                    "segments"
-                      ? "bg-blue-600 text-white shadow"
-                      : "text-gray-600"
-                  }`}
-                >
-                  🎧 Segments (
-                  {
-                    results.length
-                  }
-                  )
-                </button>
-              </div>
+            <div className="space-y-2">
 
-              <div className="flex items-center justify-between">
+              {/* MOBILE ACTIONS */}
+
+              <div className="flex items-center gap-2">
+
+                {/* =================================================
+                    LOGS / SEGMENTS TOGGLE
+                    MOBILE ONLY
+                ================================================= */}
+
                 <button
                   onClick={
-                    handleReprocessAds
+                    toggleMobileTab
                   }
-                  className="flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white"
+                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-700 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-800 active:scale-[0.98]"
+                  aria-label={
+                    mobileTab ===
+                    "logs"
+                      ? "Switch to Segments"
+                      : "Switch to Logs"
+                  }
                 >
-                  <RefreshCw
-                    size={15}
-                  />
-                  Reprocess
+
+                  <span>
+                    {mobileTab ===
+                    "logs"
+                      ? "📝"
+                      : "🎧"}
+                  </span>
+
+                  <span>
+                    {mobileTab ===
+                    "logs"
+                      ? "Logs"
+                      : "Segments"}
+                  </span>
+
+                  <span className="text-[10px] opacity-70">
+                    ⇄
+                  </span>
+
                 </button>
+
+                {/* =================================================
+                    LAST
+                ================================================= */}
 
                 <button
                   onClick={
                     handleCenterLastCompleted
                   }
-                  className="flex h-9 items-center gap-2 rounded-lg bg-purple-600 px-4 text-xs font-semibold text-white"
+                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700 active:scale-[0.98]"
                 >
-                  🎯 Last
+
+                  <span>
+                    🎯
+                  </span>
+
+                  <span>
+                    Last
+                  </span>
+
                 </button>
 
+                {/* =================================================
+                    REPROCESS
+                ================================================= */}
+
+                <button
+                  onClick={
+                    handleReprocessAds
+                  }
+                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+                >
+
+                  <RefreshCw
+                    size={15}
+                  />
+
+                  <span>
+                    Reprocess
+                  </span>
+
+                </button>
+
+                {/* =================================================
+                    MORE
+                ================================================= */}
+
                 <div className="relative">
+
                   <button
                     onClick={() =>
                       setShowMenu(
@@ -3421,15 +3238,21 @@ async function handleSaveAllSegments() {
                           !prev
                       )
                     }
-                    className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-700 transition hover:bg-gray-100"
+                    aria-label="More actions"
                   >
+
                     <MoreVertical
                       size={18}
                     />
+
                   </button>
 
                   {showMenu && (
-                    <div className="absolute bottom-11 right-0 w-56 overflow-hidden rounded-xl border bg-white shadow-xl">
+
+                    <div className="absolute bottom-11 right-0 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+
+                      {/* ADD */}
 
                       <button
                         onClick={() => {
@@ -3445,13 +3268,18 @@ async function handleSaveAllSegments() {
                           selectedP2Id ===
                             null
                         }
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
+
                         <Plus
                           size={16}
                         />
+
                         Add Segment
+
                       </button>
+
+                      {/* SAVE */}
 
                       <button
                         onClick={() => {
@@ -3465,13 +3293,18 @@ async function handleSaveAllSegments() {
                           results.length ===
                           0
                         }
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
+
                         <Save
                           size={16}
                         />
+
                         Save
+
                       </button>
+
+                      {/* DOWNLOAD */}
 
                       <button
                         onClick={() => {
@@ -3485,13 +3318,20 @@ async function handleSaveAllSegments() {
                           results.length ===
                           0
                         }
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
+
                         <Download
                           size={16}
                         />
+
                         Download Excel
+
                       </button>
+
+                      {/* DELETE */}
+
+                      <div className="border-t border-gray-100" />
 
                       <button
                         onClick={() => {
@@ -3505,98 +3345,61 @@ async function handleSaveAllSegments() {
                           results.length ===
                           0
                         }
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
+
                         <Trash2
                           size={16}
                         />
+
                         Delete All
+
                       </button>
 
-                      <div className="border-t" />
-
-                      <button
-                        onClick={() => {
-                          setSearch(
-                            ""
-                          );
-
-                          setPhrase1(
-                            ""
-                          );
-
-                          setPhrase2(
-                            ""
-                          );
-
-                          setSelectedP1Id(
-                            null
-                          );
-
-                          setSelectedP2Id(
-                            null
-                          );
-
-                          setShowMenu(
-                            false
-                          );
-                        }}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50"
-                      >
-                        <X
-                          size={16}
-                        />
-                        Clear
-                      </button>
                     </div>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
 
-                <div className="flex items-center gap-1.5 flex-wrap">
+                  )}
+
+                </div>
+
+              </div>
+
+            </div>
+
+          ) : (
+
+            /* ==================================================
+               DESKTOP FOOTER
+            ================================================== */
+
+            <div className="space-y-2">
+
+              <div className="flex items-center justify-between gap-4">
+
+                {/* LEFT ACTION GROUP */}
+
+                <div className="flex items-center gap-2">
+
+                  {/* LAST */}
 
                   <button
                     onClick={
                       handleCenterLastCompleted
                     }
-                    className="flex h-8 items-center gap-1 rounded-md bg-purple-600 px-3 text-[11px] font-semibold text-white hover:bg-purple-700"
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700 active:scale-[0.98]"
                   >
-                    🎯 Last
+
+                    <span>
+                      🎯
+                    </span>
+
+                    <span>
+                      Last
+                    </span>
+
                   </button>
 
-                  <button
-                    onClick={() => {
-                      setSearch(
-                        ""
-                      );
-
-                      setPhrase1(
-                        ""
-                      );
-
-                      setPhrase2(
-                        ""
-                      );
-
-                      setSelectedP1Id(
-                        null
-                      );
-
-                      setSelectedP2Id(
-                        null
-                      );
-                    }}
-                    className="flex h-8 items-center gap-1 rounded-md bg-gray-100 px-3 text-[11px] font-medium hover:bg-gray-200"
-                  >
-                    <X
-                      size={13}
-                    />
-                    Clear
-                  </button>
+                  {/* ADD */}
 
                   <button
                     onClick={
@@ -3608,61 +3411,48 @@ async function handleSaveAllSegments() {
                       selectedP2Id ===
                         null
                     }
-                    className={`flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-semibold transition ${
+                    className={`flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-sm transition active:scale-[0.98] ${
                       selectedP1Id !==
                         null &&
                       selectedP2Id !==
                         null
                         ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "cursor-not-allowed bg-gray-300 text-gray-500"
+                        : "cursor-not-allowed bg-gray-200 text-gray-400"
                     }`}
                   >
+
                     <Plus
-                      size={13}
+                      size={14}
                     />
+
                     Add
+
                   </button>
+
                 </div>
 
-                <div className="hidden h-6 w-px bg-gray-300 lg:block" />
+                {/* RIGHT ACTION GROUP */}
 
-                <div className="relative flex-1 min-w-[220px]">
+                <div className="flex items-center gap-2">
 
-                  <Search
-                    size={14}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Search transcript..."
-                    value={
-                      search
-                    }
-                    onChange={(e) =>
-                      setSearch(
-                        e.target.value
-                      )
-                    }
-                    className="w-full rounded-md border py-1.5 pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="hidden h-6 w-px bg-gray-300 lg:block" />
-
-                <div className="flex items-center gap-2 flex-wrap">
+                  {/* REPROCESS */}
 
                   <button
                     onClick={
                       handleReprocessAds
                     }
-                    className="flex h-8 items-center gap-1 rounded-md bg-blue-600 px-3 text-[11px] font-semibold text-white"
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
                   >
+
                     <RefreshCw
-                      size={13}
+                      size={14}
                     />
+
                     Reprocess
+
                   </button>
+
+                  {/* SAVE */}
 
                   <button
                     onClick={
@@ -3672,13 +3462,18 @@ async function handleSaveAllSegments() {
                       results.length ===
                       0
                     }
-                    className="flex h-8 items-center gap-1 rounded-md bg-green-600 px-3 text-[11px] font-semibold text-white disabled:bg-gray-300"
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-green-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                   >
+
                     <Save
-                      size={13}
+                      size={14}
                     />
+
                     Save
+
                   </button>
+
+                  {/* DOWNLOAD */}
 
                   <button
                     onClick={
@@ -3688,13 +3483,18 @@ async function handleSaveAllSegments() {
                       results.length ===
                       0
                     }
-                    className="flex h-8 items-center gap-1 rounded-md bg-emerald-600 px-3 text-[11px] font-semibold text-white disabled:bg-gray-300"
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                   >
+
                     <Download
-                      size={13}
+                      size={14}
                     />
+
                     Download
+
                   </button>
+
+                  {/* DELETE */}
 
                   <button
                     onClick={
@@ -3704,21 +3504,31 @@ async function handleSaveAllSegments() {
                       results.length ===
                       0
                     }
-                    className="flex h-8 items-center gap-1 rounded-md bg-red-600 px-3 text-[11px] font-semibold text-white disabled:bg-gray-300"
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                   >
+
                     <Trash2
-                      size={13}
+                      size={14}
                     />
+
                     Delete
+
                   </button>
+
                 </div>
+
               </div>
-            </>
+
+            </div>
+
           )}
 
-          {/* AUDIO PLAYER */}
+          {/* ====================================================
+              AUDIO PLAYER
+          ==================================================== */}
 
-          <div className="mt-2 border-t pt-2">
+          <div className="mt-2 border-t border-gray-100 pt-2">
+
             <AudioPlayer
               file={file}
               setFile={setFile}
@@ -3735,9 +3545,13 @@ async function handleSaveAllSegments() {
                 handleTimeUpdate
               }
             />
+
           </div>
+
         </div>
+
       </div>
+
     </div>
   );
 }

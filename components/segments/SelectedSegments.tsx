@@ -30,19 +30,6 @@ interface Segment {
 
   project_id?: number;
 
-  /*
-   * IMPORTANT:
-   *
-   * Contains the transcript segment IDs
-   * used by this advertisement.
-   *
-   * Example:
-   *
-   * 98 -> 100
-   *
-   * segment_ids:
-   * [98, 99, 100]
-   */
   segment_ids?: number[];
 }
 
@@ -339,162 +326,6 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * GET SEGMENT IDS BETWEEN START AND END
-   * ============================================================
-   *
-   * Example:
-   *
-   * startSegment = 98
-   * endSegment   = 100
-   *
-   * returns:
-   *
-   * [98, 99, 100]
-   *
-   * ============================================================
-   */
-
-  function getSegmentIdsBetween(
-    startSegmentId: number | null,
-    endSegmentId: number | null
-  ): number[] {
-    if (
-      startSegmentId === null ||
-      endSegmentId === null
-    ) {
-      return [];
-    }
-
-    const startId =
-      Math.min(
-        startSegmentId,
-        endSegmentId
-      );
-
-    const endId =
-      Math.max(
-        startSegmentId,
-        endSegmentId
-      );
-
-    const ids: number[] = [];
-
-    /*
-     * Prefer actual transcript segment IDs.
-     *
-     * This prevents us from inventing IDs when
-     * the database IDs are not sequential.
-     */
-    const matching =
-      transcriptSegments
-        .filter(
-          (segment) =>
-            segment.id >= startId &&
-            segment.id <= endId
-        )
-        .sort(
-          (a, b) =>
-            a.id - b.id
-        );
-
-    if (matching.length > 0) {
-      return matching.map(
-        (segment) =>
-          segment.id
-      );
-    }
-
-    /*
-     * Fallback.
-     */
-    for (
-      let id = startId;
-      id <= endId;
-      id++
-    ) {
-      ids.push(id);
-    }
-
-    return ids;
-  }
-
-  /*
-   * ============================================================
-   * FIND SOURCE START SEGMENT
-   * ============================================================
-   */
-
-  function findSourceStartSegment(
-    row: Segment,
-    start: string
-  ): Segment | null {
-    const parsed =
-      parseDetectionKey(
-        row.detection_key
-      );
-
-    if (parsed) {
-      const sourceById =
-        transcriptSegments.find(
-          (segment) =>
-            segment.id ===
-            parsed.startSegmentId
-        );
-
-      if (sourceById) {
-        return sourceById;
-      }
-    }
-
-    const startSeconds =
-      toSeconds(start);
-
-    const exact =
-      transcriptSegments.find(
-        (segment) =>
-          toSeconds(
-            segment.start
-          ) === startSeconds
-      );
-
-    if (exact) {
-      return exact;
-    }
-
-    const containing =
-      transcriptSegments.find(
-        (segment) => {
-          if (
-            !segment.start ||
-            !segment.end
-          ) {
-            return false;
-          }
-
-          const segmentStart =
-            toSeconds(
-              segment.start
-            );
-
-          const segmentEnd =
-            toSeconds(
-              segment.end
-            );
-
-          return (
-            segmentStart <=
-              startSeconds &&
-            segmentEnd >
-              startSeconds
-          );
-        }
-      );
-
-    return containing || null;
-  }
-
-  /*
-   * ============================================================
    * TRANSCRIPT RANGE
    * ============================================================
    */
@@ -568,7 +399,7 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * BACKEND-STYLE MERGE
+   * BACKEND STYLE MERGE
    * ============================================================
    */
 
@@ -615,9 +446,7 @@ export default function SelectedSegments({
       startSeconds + duration;
 
     /*
-     * ==========================================================
      * FIND START SEGMENT
-     * ==========================================================
      */
 
     const startSegment =
@@ -664,9 +493,7 @@ export default function SelectedSegments({
       null;
 
     /*
-     * ==========================================================
      * FIND END SEGMENT
-     * ==========================================================
      */
 
     const endSegment =
@@ -731,9 +558,7 @@ export default function SelectedSegments({
       null;
 
     /*
-     * ==========================================================
      * MERGE TEXT
-     * ==========================================================
      */
 
     const matchingSegments =
@@ -780,12 +605,6 @@ export default function SelectedSegments({
         .filter(Boolean)
         .join(" ");
 
-    /*
-     * ==========================================================
-     * IDS
-     * ==========================================================
-     */
-
     const startSegmentId =
       actualStart?.id ??
       null;
@@ -794,24 +613,11 @@ export default function SelectedSegments({
       actualEnd?.id ??
       startSegmentId;
 
-    /*
-     * IMPORTANT:
-     *
-     * Get ALL transcript segment IDs
-     * inside the selected range.
-     */
-
     const segmentIds =
       matchingSegments.map(
         (segment) =>
           segment.id
       );
-
-    /*
-     * Make sure start/end IDs are
-     * included even if text filtering
-     * did not return them.
-     */
 
     if (
       startSegmentId !== null &&
@@ -841,101 +647,11 @@ export default function SelectedSegments({
           (a, b) => a - b
         );
 
-    /*
-     * ==========================================================
-     * DEBUG
-     * ==========================================================
-     */
-
-    const projectId =
-      getProjectIdFromRow(row);
-
-    console.log(
-      "========================================"
-    );
-
-    console.log(
-      "MERGE SEGMENT RANGE"
-    );
-
-    console.log(
-      "Advertisement ID:",
-      row.id
-    );
-
-    console.log(
-      "Start time:",
-      start
-    );
-
-    console.log(
-      "Duration:",
-      duration
-    );
-
-    console.log(
-      "Target end:",
-      secondsToTime(
-        targetEndSeconds
-      )
-    );
-
-    console.log(
-      "Start segment ID:",
-      startSegmentId
-    );
-
-    console.log(
-      "End segment ID:",
-      endSegmentId
-    );
-
-    console.log(
-      "Segment IDs:",
-      uniqueSegmentIds
-    );
-
-    console.log(
-      "Old detection_key:",
-      row.detection_key
-    );
-
-    if (
-      projectId !== null &&
-      startSegmentId !== null &&
-      endSegmentId !== null
-    ) {
-      console.log(
-        "New detection_key:",
-        makeDetectionKey(
-          projectId,
-          startSegmentId,
-          endSegmentId
-        )
-      );
-    }
-
-    console.log(
-      "========================================"
-    );
-
-    /*
-     * ==========================================================
-     * RETURN
-     * ==========================================================
-     */
-
     return {
       text:
         mergedText ||
         row.text,
 
-      /*
-       * Keep the requested start time.
-       *
-       * This is important when the user changes
-       * the start time manually.
-       */
       startTime:
         start,
 
@@ -974,42 +690,22 @@ export default function SelectedSegments({
             let status:
               AdvertisementStatus;
 
-            /*
-             * Backend SAVED always wins.
-             */
-
             if (
               incoming.status ===
               "SAVED"
             ) {
               status = "SAVED";
-            }
-
-            /*
-             * Local SAVED stays SAVED.
-             */
-
-            else if (
+            } else if (
               local?.status ===
               "SAVED"
             ) {
               status = "SAVED";
-            }
-
-            /*
-             * Otherwise use incoming.
-             */
-
-            else {
+            } else {
               status =
                 incoming.status ??
                 local?.status ??
                 "NEW";
             }
-
-            /*
-             * Preserve locally modified data.
-             */
 
             if (local) {
               return {
@@ -1034,13 +730,6 @@ export default function SelectedSegments({
                 detection_key:
                   local.detection_key ??
                   incoming.detection_key,
-
-                /*
-                 * IMPORTANT:
-                 *
-                 * Preserve locally updated
-                 * segment IDs.
-                 */
 
                 segment_ids:
                   local.segment_ids ??
@@ -1223,12 +912,6 @@ export default function SelectedSegments({
         );
     }
 
-    /*
-     * IMPORTANT:
-     *
-     * Save the actual transcript segment IDs.
-     */
-
     const segmentIds =
       merged.segmentIds;
 
@@ -1259,9 +942,6 @@ export default function SelectedSegments({
                   detection_key:
                     detectionKey,
 
-                  /*
-                   * IMPORTANT
-                   */
                   segment_ids:
                     segmentIds,
 
@@ -1297,11 +977,6 @@ export default function SelectedSegments({
         detection_key:
           detectionKey,
 
-        /*
-         * IMPORTANT:
-         * Send updated segment IDs
-         * to the parent.
-         */
         segment_ids:
           segmentIds,
       }
@@ -1383,7 +1058,7 @@ export default function SelectedSegments({
 
     return (
       <div
-        className="relative"
+        className="relative w-full sm:w-auto"
         ref={
           open
             ? durationDropdownRef
@@ -1409,7 +1084,9 @@ export default function SelectedSegments({
           className={`
             flex
             h-10
-            min-w-36
+            w-full
+            min-w-0
+            sm:min-w-36
             items-center
             justify-between
             rounded-lg
@@ -1427,7 +1104,7 @@ export default function SelectedSegments({
             }
           `}
         >
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2">
             {overlapping && (
               <span>⚠</span>
             )}
@@ -1437,7 +1114,7 @@ export default function SelectedSegments({
                 <span>✨</span>
               )}
 
-            <span>
+            <span className="truncate">
               {duration} seconds
             </span>
           </span>
@@ -1454,7 +1131,7 @@ export default function SelectedSegments({
         </button>
 
         {open && (
-          <div className="absolute left-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border bg-white shadow-xl">
+          <div className="absolute left-0 right-0 z-50 mt-2 w-full min-w-56 overflow-hidden rounded-xl border bg-white shadow-xl sm:right-auto sm:w-64">
             <div className="border-b p-2">
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -1739,12 +1416,6 @@ export default function SelectedSegments({
         );
     }
 
-    /*
-     * IMPORTANT:
-     *
-     * Use the merged transcript segment IDs.
-     */
-
     const segmentIds =
       merged.segmentIds;
 
@@ -1769,16 +1440,9 @@ export default function SelectedSegments({
       detection_key:
         detectionKey,
 
-      /*
-       * IMPORTANT
-       */
       segment_ids:
         segmentIds,
     };
-
-    /*
-     * Update local state immediately.
-     */
 
     setSegmentList(
       (previous) =>
@@ -1791,10 +1455,6 @@ export default function SelectedSegments({
 
                     ...data,
 
-                    /*
-                     * Make sure these remain
-                     * available on the local row.
-                     */
                     segment_ids:
                       segmentIds,
 
@@ -1821,10 +1481,6 @@ export default function SelectedSegments({
     setBrandOpenId(
       null
     );
-
-    /*
-     * Send update to parent.
-     */
 
     onUpdate?.(
       row.id,
@@ -1884,48 +1540,11 @@ export default function SelectedSegments({
       );
 
     if (!row) {
-      console.warn(
-        "DELETE: row not found:",
-        id
-      );
-
       return;
     }
 
     const status =
       row.status ?? "NEW";
-
-    console.log(
-      "========================================"
-    );
-
-    console.log(
-      "REMOVE ADVERTISEMENT"
-    );
-
-    console.log(
-      "Advertisement ID:",
-      id
-    );
-
-    console.log(
-      "STATUS:",
-      status
-    );
-
-    console.log(
-      "Detection Key:",
-      row.detection_key
-    );
-
-    console.log(
-      "Segment IDs:",
-      row.segment_ids
-    );
-
-    console.log(
-      "========================================"
-    );
 
     const confirmed =
       window.confirm(
@@ -1998,11 +1617,6 @@ export default function SelectedSegments({
 
           return next;
         }
-      );
-
-      console.log(
-        "DELETE COMPLETE:",
-        id
       );
     } catch (error) {
       console.error(
@@ -2082,7 +1696,17 @@ export default function SelectedSegments({
             e.target.value
           )
         }
-        className="w-24 rounded-lg border px-2 py-1 text-center"
+        className="
+          h-10
+          w-full
+          rounded-lg
+          border
+          px-2
+          text-center
+          text-sm
+          font-semibold
+          sm:w-24
+        "
       />
     );
   }
@@ -2109,82 +1733,19 @@ export default function SelectedSegments({
       newAdvertisements.length ===
       0
     ) {
-      console.log(
-        "SAVE ALL: nothing to save"
-      );
-
       return;
     }
 
     if (!onSave) {
-      console.warn(
-        "SAVE ALL: onSave is not provided"
-      );
-
       return;
     }
 
     try {
       setSaving(true);
 
-      console.log(
-        "========================================"
-      );
-
-      console.log(
-        "SAVE ALL ADVERTISEMENTS"
-      );
-
-      console.log(
-        "NEW advertisements:",
-        newAdvertisements.length
-      );
-
-      console.log(
-        "IDs:",
-        newAdvertisements.map(
-          (item) =>
-            item.id
-        )
-      );
-
-      /*
-       * IMPORTANT DEBUG
-       */
-
-      console.log(
-        "Advertisements being saved:"
-      );
-
-      newAdvertisements.forEach(
-        (item) => {
-          console.log({
-            id: item.id,
-
-            start: item.start,
-
-            end: item.end,
-
-            detection_key:
-              item.detection_key,
-
-            segment_ids:
-              item.segment_ids,
-          });
-        }
-      );
-
-      /*
-       * CALL PARENT / BACKEND
-       */
-
       await onSave(
         newAdvertisements
       );
-
-      /*
-       * BACKEND SUCCESS
-       */
 
       const savedIds =
         new Set(
@@ -2210,27 +1771,10 @@ export default function SelectedSegments({
                 : item
           )
       );
-
-      console.log(
-        "SAVE SUCCESS"
-      );
-
-      console.log(
-        "Changed NEW -> SAVED:",
-        [...savedIds]
-      );
-
-      console.log(
-        "========================================"
-      );
     } catch (error) {
       console.error(
         "SAVE ALL FAILED:",
         error
-      );
-
-      console.error(
-        "Advertisements remain NEW."
       );
 
       alert(
@@ -2363,75 +1907,114 @@ export default function SelectedSegments({
   return (
     <div className="space-y-4">
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4 shadow-sm">
+      {/* ========================================================
+          HEADER
+          ======================================================== */}
 
-        <div>
-          <h2 className="text-lg font-bold">
-            📢 Selected Advertisements
-          </h2>
+      <div
+        className="
+          rounded-xl
+          border
+          bg-white
+          p-3
+          shadow-sm
+          sm:p-4
+        "
+      >
+        <div
+          className="
+            flex
+            flex-col
+            gap-4
+            lg:flex-row
+            lg:items-center
+            lg:justify-between
+          "
+        >
+          <div className="min-w-0">
+            <h2 className="text-base font-bold sm:text-lg">
+              📢 Selected Advertisements
+            </h2>
 
-          <p className="text-sm text-gray-500">
-            Review detected advertisements before saving.
-          </p>
-        </div>
+            <p className="mt-1 text-xs text-gray-500 sm:text-sm">
+              Review detected advertisements before saving.
+            </p>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-
-          {newDetectedCount >
-            0 && (
-            <div className="rounded-lg border border-orange-300 bg-orange-100 px-3 py-2 text-xs font-bold text-orange-700">
-              ✨{" "}
-              {newDetectedCount}{" "}
-              new detected
-            </div>
-          )}
-
-          {savedCount >
-            0 && (
-            <div className="rounded-lg border border-green-300 bg-green-100 px-3 py-2 text-xs font-bold text-green-700">
-              ✓{" "}
-              {savedCount}{" "}
-              saved
-            </div>
-          )}
-
-          {overlappingIds.size >
-            0 && (
-            <div className="rounded-lg border border-red-300 bg-red-100 px-3 py-2 text-xs font-bold text-red-700">
-              ⚠{" "}
-              {overlappingIds.size}{" "}
-              overlapping
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={
-              saveAll
-            }
-            disabled={
-              newDetectedCount ===
-                0 ||
-              saving
-            }
-            className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          <div
+            className="
+              grid
+              grid-cols-2
+              gap-2
+              sm:flex
+              sm:flex-wrap
+              sm:items-center
+            "
           >
-            {saving
-              ? "💾 Saving..."
-              : `💾 Save ${
-                  newDetectedCount >
-                  0
-                    ? `(${newDetectedCount})`
-                    : "All"
-                }`}
-          </button>
+            {newDetectedCount >
+              0 && (
+              <div className="rounded-lg border border-orange-300 bg-orange-100 px-3 py-2 text-center text-xs font-bold text-orange-700">
+                ✨ {newDetectedCount} new
+              </div>
+            )}
+
+            {savedCount >
+              0 && (
+              <div className="rounded-lg border border-green-300 bg-green-100 px-3 py-2 text-center text-xs font-bold text-green-700">
+                ✓ {savedCount} saved
+              </div>
+            )}
+
+            {overlappingIds.size >
+              0 && (
+              <div className="rounded-lg border border-red-300 bg-red-100 px-3 py-2 text-center text-xs font-bold text-red-700">
+                ⚠ {overlappingIds.size} overlapping
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={saveAll}
+              disabled={
+                newDetectedCount ===
+                  0 ||
+                saving
+              }
+              className="
+                col-span-2
+                h-10
+                rounded-lg
+                bg-blue-600
+                px-5
+                text-sm
+                font-semibold
+                text-white
+                hover:bg-blue-700
+                disabled:cursor-not-allowed
+                disabled:opacity-50
+                sm:col-span-1
+              "
+            >
+              {saving
+                ? "💾 Saving..."
+                : `💾 Save ${
+                    newDetectedCount >
+                    0
+                      ? `(${newDetectedCount})`
+                      : "All"
+                  }`}
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* ========================================================
+          EMPTY
+          ======================================================== */}
+
       {sortedSegments.length ===
         0 && (
-        <div className="rounded-2xl border border-dashed bg-white p-10 text-center">
-
+        <div className="rounded-2xl border border-dashed bg-white p-8 text-center sm:p-10">
           <div className="text-4xl">
             📭
           </div>
@@ -2439,9 +2022,12 @@ export default function SelectedSegments({
           <h3 className="mt-3 font-semibold text-gray-700">
             No selected advertisements
           </h3>
-
         </div>
       )}
+
+      {/* ========================================================
+          ADVERTISEMENT LIST
+          ======================================================== */}
 
       {sortedSegments.map(
         (row, index) => {
@@ -2538,9 +2124,10 @@ export default function SelectedSegments({
                 overflow-visible
                 rounded-2xl
                 border
-                p-5
+                p-3
                 shadow-sm
                 transition-all
+                sm:p-5
                 ${cardClass}
                 ${
                   isDeleting
@@ -2550,18 +2137,22 @@ export default function SelectedSegments({
               `}
             >
 
+              {/* ==================================================
+                  STATUS MESSAGE
+                  ================================================== */}
+
               {overlapping && (
-                <div className="mb-4 flex items-center gap-3 rounded-xl border border-red-300 bg-red-100 px-4 py-3 text-red-700">
-                  <span className="text-xl">
+                <div className="mb-3 flex items-start gap-3 rounded-xl border border-red-300 bg-red-100 px-3 py-3 text-red-700 sm:mb-4 sm:px-4">
+                  <span className="text-lg sm:text-xl">
                     ⚠
                   </span>
 
-                  <div>
-                    <div className="font-bold">
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold sm:text-base">
                       OVERLAPPING ADVERTISEMENT
                     </div>
 
-                    <div className="text-xs">
+                    <div className="mt-1 text-xs">
                       This advertisement overlaps another selected advertisement.
                     </div>
                   </div>
@@ -2569,129 +2160,145 @@ export default function SelectedSegments({
               )}
 
               {isNew && (
-                <div className="mb-4 flex items-center gap-3 rounded-xl border border-orange-300 bg-orange-100 px-4 py-3 text-orange-700">
-
-                  <span className="text-xl">
+                <div className="mb-3 flex items-start gap-3 rounded-xl border border-orange-300 bg-orange-100 px-3 py-3 text-orange-700 sm:mb-4 sm:px-4">
+                  <span className="text-lg sm:text-xl">
                     ✨
                   </span>
 
-                  <div>
-                    <div className="font-bold">
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold sm:text-base">
                       NEW DETECTED ADVERTISEMENT
                     </div>
 
-                    <div className="text-xs">
+                    <div className="mt-1 text-xs">
                       This advertisement was detected during the latest processing and has not been saved yet.
                     </div>
                   </div>
-
                 </div>
               )}
 
               {isSaved &&
                 !overlapping && (
-                  <div className="mb-4 flex items-center gap-3 rounded-xl border border-green-300 bg-green-100 px-4 py-3 text-green-700">
-
-                    <span className="text-xl">
+                  <div className="mb-3 flex items-start gap-3 rounded-xl border border-green-300 bg-green-100 px-3 py-3 text-green-700 sm:mb-4 sm:px-4">
+                    <span className="text-lg sm:text-xl">
                       💾
                     </span>
 
-                    <div>
-                      <div className="font-bold">
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold sm:text-base">
                         SAVED ADVERTISEMENT
                       </div>
 
-                      <div className="text-xs">
+                      <div className="mt-1 text-xs">
                         This advertisement has already been saved.
                       </div>
                     </div>
-
                   </div>
                 )}
 
-              <div className="flex items-start justify-between gap-4">
+              {/* ==================================================
+                  TOP SECTION
+                  ================================================== */}
 
-                <div className="flex flex-1 gap-4">
+              <div
+                className="
+                  flex
+                  flex-col
+                  gap-4
+                  lg:flex-row
+                  lg:items-start
+                  lg:justify-between
+                "
+              >
+
+                {/* ------------------------------------------------
+                    LEFT / INFORMATION
+                    ------------------------------------------------ */}
+
+                <div
+                  className="
+                    flex
+                    min-w-0
+                    flex-1
+                    gap-3
+                    sm:gap-4
+                  "
+                >
+
+                  {/* NUMBER */}
 
                   <div
                     className={`
                       flex
-                      h-10
-                      w-10
+                      h-9
+                      w-9
                       shrink-0
                       items-center
                       justify-center
                       rounded-full
+                      text-sm
                       font-bold
+                      sm:h-10
+                      sm:w-10
+                      sm:text-base
                       ${numberClass}
                     `}
                   >
                     {index + 1}
                   </div>
 
+                  {/* INFORMATION */}
+
                   <div className="min-w-0 flex-1">
 
-                    <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h3 className="font-bold">
+                        Advertisement
+                      </h3>
 
-                      <div>
+                      <p className="text-xs text-gray-500">
+                        ID: {row.id}
+                      </p>
 
-                        <h3 className="font-bold">
-                          Advertisement
-                        </h3>
-
-                        <p className="text-xs text-gray-500">
-                          ID:{" "}
-                          {row.id}
-                        </p>
-
-                        {row.detection_key && (
+                      {row.segment_ids &&
+                        row.segment_ids.length > 0 && (
                           <p className="mt-1 break-all font-mono text-[11px] text-gray-400">
-                            detection_key:{" "}
-                            {
-                              row.detection_key
-                            }
+                            segment_ids: [{row.segment_ids.join(", ")}]
                           </p>
                         )}
-
-                        {row.segment_ids &&
-                          row.segment_ids.length >
-                            0 && (
-                            <p className="mt-1 break-all font-mono text-[11px] text-gray-400">
-                              segment_ids:{" "}
-                              [
-                              {
-                                row.segment_ids.join(
-                                  ", "
-                                )
-                              }
-                              ]
-                            </p>
-                          )}
-
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-
-                        {overlapping && (
-                          <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
-                            ⚠ OVERLAPPING
-                          </span>
-                        )}
-
-                        {isNew && (
-                          <span className="animate-pulse rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white">
-                            ✨ NEW DETECTED
-                          </span>
-                        )}
-
-                        {isSaved && (
-                          <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white">
-                            ✓ SAVED
-                          </span>
-                        )}
-
-                      </div>
                     </div>
+
+                    {/* MOBILE STATUS BADGES */}
+
+                    <div
+                      className="
+                        mt-3
+                        flex
+                        flex-wrap
+                        gap-2
+                        lg:hidden
+                      "
+                    >
+                      {overlapping && (
+                        <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-bold text-white">
+                          ⚠ OVERLAPPING
+                        </span>
+                      )}
+
+                      {isNew && (
+                        <span className="rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-bold text-white">
+                          ✨ NEW DETECTED
+                        </span>
+                      )}
+
+                      {isSaved && (
+                        <span className="rounded-full bg-green-600 px-2.5 py-1 text-[10px] font-bold text-white">
+                          ✓ SAVED
+                        </span>
+                      )}
+                    </div>
+
+                    {/* BRAND */}
 
                     <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Brand
@@ -2743,8 +2350,9 @@ export default function SelectedSegments({
                           w-full
                           rounded-xl
                           border
-                          px-4
+                          px-3
                           py-2
+                          sm:px-4
                           ${
                             overlapping
                               ? "border-red-300 bg-red-100"
@@ -2756,9 +2364,8 @@ export default function SelectedSegments({
                           }
                         `}
                       >
-                        <div className="flex items-start gap-2">
-
-                          <span className="text-lg">
+                        <div className="flex min-w-0 items-start gap-2">
+                          <span className="shrink-0 text-lg">
                             🏷
                           </span>
 
@@ -2766,7 +2373,6 @@ export default function SelectedSegments({
                             {row.brand_name ||
                               "No brand selected"}
                           </span>
-
                         </div>
                       </div>
                     )}
@@ -2774,7 +2380,26 @@ export default function SelectedSegments({
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2">
+                {/* ==================================================
+                    ACTION BUTTONS
+                    ================================================== */}
+
+                <div
+                  className="
+                    flex
+                    w-full
+                    shrink-0
+                    items-center
+                    gap-2
+                    border-t
+                    pt-3
+                    lg:w-auto
+                    lg:border-0
+                    lg:pt-0
+                  "
+                >
+
+                  {/* PLAY */}
 
                   <button
                     type="button"
@@ -2782,10 +2407,28 @@ export default function SelectedSegments({
                       e.stopPropagation();
                       onPlay(row);
                     }}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600"
+                    className="
+                      flex
+                      h-10
+                      flex-1
+                      items-center
+                      justify-center
+                      rounded-lg
+                      bg-green-500
+                      text-white
+                      hover:bg-green-600
+                      lg:w-10
+                      lg:flex-none
+                    "
+                    title="Play advertisement"
                   >
                     ▶
+                    <span className="ml-2 text-xs font-semibold lg:hidden">
+                      Play
+                    </span>
                   </button>
+
+                  {/* EDIT */}
 
                   {editingId ===
                   row.id ? (
@@ -2798,9 +2441,27 @@ export default function SelectedSegments({
                           row
                         );
                       }}
-                      className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+                      className="
+                        flex
+                        h-10
+                        flex-1
+                        items-center
+                        justify-center
+                        gap-1
+                        rounded-lg
+                        bg-blue-600
+                        px-3
+                        text-sm
+                        font-semibold
+                        text-white
+                        hover:bg-blue-700
+                        lg:flex-none
+                      "
                     >
-                      💾 Save
+                      💾
+                      <span className="lg:hidden">
+                        Save
+                      </span>
                     </button>
                   ) : (
                     <button
@@ -2810,11 +2471,29 @@ export default function SelectedSegments({
 
                         edit(row);
                       }}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200"
+                      className="
+                        flex
+                        h-10
+                        flex-1
+                        items-center
+                        justify-center
+                        gap-1
+                        rounded-lg
+                        bg-gray-100
+                        hover:bg-gray-200
+                        lg:w-10
+                        lg:flex-none
+                      "
+                      title="Edit advertisement"
                     >
                       ✏️
+                      <span className="text-xs font-semibold lg:hidden">
+                        Edit
+                      </span>
                     </button>
                   )}
+
+                  {/* DELETE */}
 
                   <button
                     type="button"
@@ -2828,20 +2507,73 @@ export default function SelectedSegments({
                         row.id
                       );
                     }}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    title={
-                      `Delete advertisement ${row.id}`
-                    }
+                    className="
+                      flex
+                      h-10
+                      flex-1
+                      items-center
+                      justify-center
+                      gap-1
+                      rounded-lg
+                      bg-red-50
+                      hover:bg-red-100
+                      disabled:cursor-not-allowed
+                      disabled:opacity-50
+                      lg:w-10
+                      lg:flex-none
+                    "
+                    title={`Delete advertisement ${row.id}`}
                   >
                     {isDeleting
                       ? "..."
                       : "🗑"}
+
+                    <span className="text-xs font-semibold text-red-700 lg:hidden">
+                      Delete
+                    </span>
                   </button>
 
                 </div>
+
+                {/* DESKTOP STATUS BADGES */}
+
+                <div
+                  className="
+                    hidden
+                    shrink-0
+                    flex-wrap
+                    items-center
+                    justify-end
+                    gap-2
+                    lg:flex
+                  "
+                >
+                  {overlapping && (
+                    <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
+                      ⚠ OVERLAPPING
+                    </span>
+                  )}
+
+                  {isNew && (
+                    <span className="animate-pulse rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white">
+                      ✨ NEW DETECTED
+                    </span>
+                  )}
+
+                  {isSaved && (
+                    <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white">
+                      ✓ SAVED
+                    </span>
+                  )}
+                </div>
+
               </div>
 
-              <div className="mt-5">
+              {/* ==================================================
+                  TRANSCRIPT
+                  ================================================== */}
+
+              <div className="mt-4 sm:mt-5">
 
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Transcript
@@ -2850,7 +2582,8 @@ export default function SelectedSegments({
                 <div
                   className={`
                     rounded-xl
-                    p-4
+                    p-3
+                    sm:p-4
                     ${
                       overlapping
                         ? "bg-red-100"
@@ -2862,7 +2595,6 @@ export default function SelectedSegments({
                     }
                   `}
                 >
-
                   {editingId ===
                   row.id ? (
                     <textarea
@@ -2878,23 +2610,37 @@ export default function SelectedSegments({
                           e.target.value
                         )
                       }
-                      className="w-full rounded-lg border p-3 outline-none focus:border-blue-400"
+                      className="
+                        w-full
+                        rounded-lg
+                        border
+                        p-3
+                        text-sm
+                        outline-none
+                        focus:border-blue-400
+                      "
                     />
                   ) : (
-                    <p className="whitespace-pre-wrap leading-7">
+                    <p className="whitespace-pre-wrap break-words text-sm leading-6 sm:text-base sm:leading-7">
                       {row.text}
                     </p>
                   )}
-
                 </div>
+
               </div>
+
+              {/* ==================================================
+                  TIME SECTION
+                  ================================================== */}
 
               <div
                 className={`
-                  mt-5
+                  mt-4
                   rounded-xl
                   border
-                  p-4
+                  p-3
+                  sm:mt-5
+                  sm:p-4
                   ${
                     overlapping
                       ? "border-red-300 bg-red-100"
@@ -2907,41 +2653,48 @@ export default function SelectedSegments({
                 `}
               >
 
-                <div className="mb-3 flex items-center justify-between">
+                {/* TIME HEADER */}
+
+                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
 
                   <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                     ⏱ Time
                   </div>
 
                   {overlapping && (
-                    <div className="text-xs font-bold text-red-600">
+                    <div className="text-[10px] font-bold text-red-600 sm:text-xs">
                       ⚠ TIME RANGE CONFLICT
                     </div>
                   )}
 
                   {isNew &&
                     !overlapping && (
-                      <div className="text-xs font-bold text-orange-600">
+                      <div className="text-[10px] font-bold text-orange-600 sm:text-xs">
                         ✨ NEW TIME RANGE
                       </div>
                     )}
 
                   {isSaved &&
                     !overlapping && (
-                      <div className="text-xs font-bold text-green-600">
+                      <div className="text-[10px] font-bold text-green-600 sm:text-xs">
                         ✓ SAVED TIME RANGE
                       </div>
                     )}
 
                 </div>
 
+                {/* ==================================================
+                    EDITING TIME
+                    ================================================== */}
+
                 {editingId ===
                 row.id ? (
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
 
-                    <div className="flex flex-col gap-1">
+                    {/* START */}
 
-                      <span className="text-xs text-gray-500">
+                    <div className="min-w-0 flex-1 sm:flex-none">
+                      <span className="mb-1 block text-xs text-gray-500">
                         Start
                       </span>
 
@@ -2953,16 +2706,16 @@ export default function SelectedSegments({
                           changeEditStart
                         }
                       />
-
                     </div>
 
-                    <span className="mt-5 text-gray-400">
+                    <div className="hidden pb-2 text-gray-400 sm:block">
                       →
-                    </span>
+                    </div>
 
-                    <div className="flex flex-col gap-1">
+                    {/* DURATION */}
 
-                      <span className="text-xs text-gray-500">
+                    <div className="min-w-0 flex-1 sm:flex-none">
+                      <span className="mb-1 block text-xs text-gray-500">
                         Duration
                       </span>
 
@@ -2981,7 +2734,17 @@ export default function SelectedSegments({
                         onClick={(e) =>
                           e.stopPropagation()
                         }
-                        className="h-9 min-w-32 rounded-lg border bg-white px-3 text-sm font-semibold"
+                        className="
+                          h-10
+                          w-full
+                          rounded-lg
+                          border
+                          bg-white
+                          px-3
+                          text-sm
+                          font-semibold
+                          sm:min-w-32
+                        "
                       >
                         {getDurationOptions(
                           row.id
@@ -3005,16 +2768,16 @@ export default function SelectedSegments({
                           )
                         )}
                       </select>
-
                     </div>
 
-                    <span className="mt-5 text-gray-400">
+                    <div className="hidden pb-2 text-gray-400 sm:block">
                       →
-                    </span>
+                    </div>
 
-                    <div className="flex flex-col gap-1">
+                    {/* END */}
 
-                      <span className="text-xs text-gray-500">
+                    <div className="min-w-0 flex-1 sm:flex-none">
+                      <span className="mb-1 block text-xs text-gray-500">
                         End
                       </span>
 
@@ -3026,50 +2789,61 @@ export default function SelectedSegments({
                           setEditEnd
                         }
                       />
-
                     </div>
 
                   </div>
                 ) : (
-                  <div className="flex flex-wrap items-center gap-3">
 
-                    <div className="flex flex-col gap-1">
+                  /* ==================================================
+                     DISPLAY TIME
+                     ================================================== */
 
-                      <span className="text-xs text-gray-500">
+                  <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-end sm:gap-3">
+
+                    {/* START */}
+
+                    <div className="min-w-0">
+                      <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
                         Start
                       </span>
 
                       <span
                         className={`
+                          flex
+                          h-10
+                          w-full
+                          items-center
+                          justify-center
+                          overflow-hidden
                           rounded-lg
                           border
-                          px-3
-                          py-2
+                          bg-white
+                          px-1
+                          text-[11px]
                           font-semibold
+                          sm:w-auto
+                          sm:px-3
+                          sm:text-sm
                           ${
                             overlapping
-                              ? "border-red-300 bg-white text-red-700"
+                              ? "border-red-300 text-red-700"
                               : isNew
-                                ? "border-orange-300 bg-white text-orange-700"
+                                ? "border-orange-300 text-orange-700"
                                 : isSaved
-                                  ? "border-green-300 bg-white text-green-700"
-                                  : "bg-white"
+                                  ? "border-green-300 text-green-700"
+                                  : "border-gray-300"
                           }
                         `}
                       >
                         {row.start ||
                           "00:00:00"}
                       </span>
-
                     </div>
 
-                    <span className="mt-5 text-gray-400">
-                      →
-                    </span>
+                    {/* DURATION */}
 
-                    <div className="flex flex-col gap-1">
-
-                      <span className="text-xs text-gray-500">
+                    <div className="min-w-0">
+                      <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
                         Duration
                       </span>
 
@@ -3085,56 +2859,65 @@ export default function SelectedSegments({
                           isNew
                         }
                       />
-
                     </div>
 
-                    <span className="mt-5 text-gray-400">
-                      →
-                    </span>
+                    {/* END */}
 
-                    <div className="flex flex-col gap-1">
-
-                      <span className="text-xs text-gray-500">
+                    <div className="min-w-0">
+                      <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
                         End
                       </span>
 
                       <span
                         className={`
+                          flex
+                          h-10
+                          w-full
+                          items-center
+                          justify-center
+                          overflow-hidden
                           rounded-lg
                           border
-                          px-3
-                          py-2
+                          bg-white
+                          px-1
+                          text-[11px]
                           font-semibold
+                          sm:w-auto
+                          sm:px-3
+                          sm:text-sm
                           ${
                             overlapping
-                              ? "border-red-300 bg-white text-red-700"
+                              ? "border-red-300 text-red-700"
                               : isNew
-                                ? "border-orange-300 bg-white text-orange-700"
+                                ? "border-orange-300 text-orange-700"
                                 : isSaved
-                                  ? "border-green-300 bg-white text-green-700"
-                                  : "bg-white"
+                                  ? "border-green-300 text-green-700"
+                                  : "border-gray-300"
                           }
                         `}
                       >
                         {row.end ||
                           "00:00:00"}
                       </span>
-
                     </div>
 
                   </div>
                 )}
 
+                {/* ==================================================
+                    SOURCE SEGMENTS
+                    ================================================== */}
+
                 {row.segment_ids &&
                   row.segment_ids.length >
                     0 && (
-                  <div className="mt-4 rounded-lg border bg-white px-3 py-2">
+                  <div className="mt-3 rounded-lg border bg-white px-3 py-2">
 
-                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">
                       Source Transcript Segments
                     </div>
 
-                    <div className="mt-1 break-all font-mono text-xs text-gray-700">
+                    <div className="mt-1 break-all font-mono text-[10px] leading-4 text-gray-700 sm:text-xs">
                       [
                       {
                         row.segment_ids.join(
@@ -3148,6 +2931,7 @@ export default function SelectedSegments({
                 )}
 
               </div>
+
             </div>
           );
         }
@@ -3155,4 +2939,3 @@ export default function SelectedSegments({
     </div>
   );
 }
-
