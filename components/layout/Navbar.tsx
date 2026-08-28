@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -18,13 +19,13 @@ import {
 
 import { getWallet } from "@/services/wallet";
 
-
 // ============================================================
 // API
 // ============================================================
 
-const API_URL = "http://localhost:8000";
-
+const API_URL =
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:8000";
 
 // ============================================================
 // MENUS
@@ -34,7 +35,7 @@ const menus = [
     {
         name: "Dashboard",
         icon: "📊",
-        href: "/",
+        href: "/dashboard",
     },
     {
         name: "Projects",
@@ -58,22 +59,35 @@ const menus = [
     },
 ];
 
-
 // ============================================================
 // NAVBAR
 // ============================================================
 
 export default function Navbar() {
 
+    // ========================================================
+    // HYDRATION
+    // ========================================================
+
+    const [mounted, setMounted] =
+        useState(false);
+
+    // ========================================================
+    // MENU
+    // ========================================================
+
     const [menuOpen, setMenuOpen] =
         useState(false);
+
+    // ========================================================
+    // USER
+    // ========================================================
 
     const [username, setUsername] =
         useState("Admin");
 
     const [role, setRole] =
         useState("Admin");
-
 
     // ========================================================
     // WALLET
@@ -83,8 +97,7 @@ export default function Navbar() {
         useState<number | null>(null);
 
     const [balanceLoading, setBalanceLoading] =
-        useState(true);
-
+        useState(false);
 
     // ========================================================
     // BETA
@@ -94,82 +107,69 @@ export default function Navbar() {
         useState(false);
 
     const [betaLoading, setBetaLoading] =
-        useState(true);
-
+        useState(false);
 
     // ========================================================
     // GET TOKEN
     // ========================================================
 
-    function getToken() {
+    const getToken = useCallback((): string | null => {
 
-        if (
-            typeof window === "undefined"
-        ) {
+        if (typeof window === "undefined") {
             return null;
         }
 
         return localStorage.getItem(
             "access_token"
         );
-    }
 
+    }, []);
 
     // ========================================================
     // LOAD BETA SETTING
     // ========================================================
 
-    const loadBetaSetting =
-        useCallback(async () => {
+    const loadBetaSetting = useCallback(
+        async () => {
+
+            const token = getToken();
+
+            if (!token) {
+
+                setBetaEnabled(false);
+                setBetaLoading(false);
+
+                return;
+            }
 
             try {
 
                 setBetaLoading(true);
 
-                const token =
-                    getToken();
-
-                if (!token) {
-
-                    setBetaEnabled(false);
-
-                    return;
-                }
-
-
-                const res =
+                const response =
                     await fetch(
                         `${API_URL}/system/settings/beta`,
                         {
                             method: "GET",
-
                             headers: {
                                 Authorization:
                                     `Bearer ${token}`,
                                 "Content-Type":
                                     "application/json",
                             },
+                            cache: "no-store",
                         }
                     );
 
-
-                if (!res.ok) {
-
-                    /*
-                     * If the endpoint does not exist
-                     * or returns an error, safely assume
-                     * beta is disabled.
-                     */
+                if (!response.ok) {
 
                     setBetaEnabled(false);
 
                     return;
                 }
 
-
                 const data =
-                    await res.json();
-
+                    await response.json();
 
                 const value =
                     String(
@@ -178,14 +178,14 @@ export default function Navbar() {
                         "false"
                     ).toLowerCase();
 
-
-                setBetaEnabled(
+                const enabled =
                     value === "true" ||
                     value === "1" ||
                     value === "yes" ||
                     value === "on" ||
-                    value === "enabled"
-                );
+                    value === "enabled";
+
+                setBetaEnabled(enabled);
 
             } catch (error) {
 
@@ -202,34 +202,37 @@ export default function Navbar() {
 
             }
 
-        }, []);
-
+        },
+        [getToken]
+    );
 
     // ========================================================
     // LOAD WALLET
     // ========================================================
 
-    const loadWallet =
-        useCallback(async () => {
+    const loadWallet = useCallback(
+        async () => {
 
-            /*
-             * IMPORTANT:
-             *
-             * If beta is enabled,
-             * do not display/load wallet balance.
-             *
-             * We still allow this function to be called,
-             * but the actual hiding is handled by the UI.
-             */
+            const token = getToken();
+
+            if (!token) {
+
+                setBalance(null);
+                setBalanceLoading(false);
+
+                return;
+            }
 
             try {
+
+                setBalanceLoading(true);
 
                 const wallet =
                     await getWallet();
 
                 setBalance(
                     Number(
-                        wallet.balance
+                        wallet.balance ?? 0
                     )
                 );
 
@@ -248,8 +251,9 @@ export default function Navbar() {
 
             }
 
-        }, []);
-
+        },
+        [getToken]
+    );
 
     // ========================================================
     // INITIAL LOAD
@@ -257,12 +261,20 @@ export default function Navbar() {
 
     useEffect(() => {
 
+        /*
+         * This runs ONLY on the client after hydration.
+         *
+         * localStorage is never accessed during
+         * the initial server render.
+         */
+
+        setMounted(true);
+
         const storedUsername =
             getUsername();
 
         const storedRole =
             getRole();
-
 
         if (storedUsername) {
 
@@ -272,7 +284,6 @@ export default function Navbar() {
 
         }
 
-
         if (storedRole) {
 
             setRole(
@@ -281,33 +292,25 @@ export default function Navbar() {
 
         }
 
-
         loadBetaSetting();
 
     }, [
         loadBetaSetting,
     ]);
 
-
     // ========================================================
-    // LOAD WALLET AFTER BETA SETTING
+    // LOAD WALLET AFTER BETA CHECK
     // ========================================================
 
     useEffect(() => {
 
-        /*
-         * Wait until beta status is known.
-         */
+        if (!mounted) {
+            return;
+        }
 
         if (betaLoading) {
             return;
         }
-
-
-        /*
-         * If beta is enabled,
-         * do not need wallet balance.
-         */
 
         if (betaEnabled) {
 
@@ -317,32 +320,24 @@ export default function Navbar() {
             return;
         }
 
-
-        /*
-         * Beta disabled.
-         * Load wallet normally.
-         */
-
         loadWallet();
 
     }, [
+        mounted,
         betaEnabled,
         betaLoading,
         loadWallet,
     ]);
 
-
     // ========================================================
     // BETA UPDATED EVENT
-    //
-    // Other pages can call:
-    //
-    // window.dispatchEvent(
-    //     new Event("betaUpdated")
-    // );
     // ========================================================
 
     useEffect(() => {
+
+        if (!mounted) {
+            return;
+        }
 
         const handleBetaUpdated =
             () => {
@@ -351,12 +346,10 @@ export default function Navbar() {
 
             };
 
-
         window.addEventListener(
             "betaUpdated",
             handleBetaUpdated
         );
-
 
         return () => {
 
@@ -368,29 +361,22 @@ export default function Navbar() {
         };
 
     }, [
+        mounted,
         loadBetaSetting,
     ]);
 
-
     // ========================================================
     // WALLET UPDATED EVENT
-    //
-    // Other pages can call:
-    //
-    // window.dispatchEvent(
-    //     new Event("walletUpdated")
-    // );
     // ========================================================
 
     useEffect(() => {
 
+        if (!mounted) {
+            return;
+        }
+
         const handleWalletUpdated =
             () => {
-
-                /*
-                 * No reason to reload balance
-                 * when beta is enabled.
-                 */
 
                 if (betaEnabled) {
                     return;
@@ -400,12 +386,10 @@ export default function Navbar() {
 
             };
 
-
         window.addEventListener(
             "walletUpdated",
             handleWalletUpdated
         );
-
 
         return () => {
 
@@ -417,16 +401,20 @@ export default function Navbar() {
         };
 
     }, [
+        mounted,
         betaEnabled,
         loadWallet,
     ]);
-
 
     // ========================================================
     // REFRESH WHEN TAB BECOMES ACTIVE
     // ========================================================
 
     useEffect(() => {
+
+        if (!mounted) {
+            return;
+        }
 
         const handleVisibilityChange =
             () => {
@@ -438,33 +426,14 @@ export default function Navbar() {
                     return;
                 }
 
-
-                /*
-                 * Always check beta.
-                 */
-
                 loadBetaSetting();
 
-
-                /*
-                 * Only load wallet if
-                 * beta is disabled.
-                 */
-
-                if (!betaEnabled) {
-
-                    loadWallet();
-
-                }
-
             };
-
 
         document.addEventListener(
             "visibilitychange",
             handleVisibilityChange
         );
-
 
         return () => {
 
@@ -476,38 +445,31 @@ export default function Navbar() {
         };
 
     }, [
-        betaEnabled,
+        mounted,
         loadBetaSetting,
-        loadWallet,
     ]);
 
-
     // ========================================================
-    // REFRESH WHEN WINDOW GETS FOCUS
+    // WINDOW FOCUS
     // ========================================================
 
     useEffect(() => {
+
+        if (!mounted) {
+            return;
+        }
 
         const handleFocus =
             () => {
 
                 loadBetaSetting();
 
-
-                if (!betaEnabled) {
-
-                    loadWallet();
-
-                }
-
             };
-
 
         window.addEventListener(
             "focus",
             handleFocus
         );
-
 
         return () => {
 
@@ -519,65 +481,43 @@ export default function Navbar() {
         };
 
     }, [
-        betaEnabled,
+        mounted,
         loadBetaSetting,
-        loadWallet,
     ]);
-
 
     // ========================================================
     // AUTO REFRESH
-    //
-    // Check beta every 10 seconds.
-    //
-    // Wallet is only checked when beta is OFF.
     // ========================================================
-
-    useEffect(() => {
-
-        const interval =
-            window.setInterval(() => {
-
-                loadBetaSetting();
-
-
-                if (!betaEnabled) {
-
-                    loadWallet();
-
-                }
-
-            }, 10000);
-
-
-        return () => {
-
-            window.clearInterval(
-                interval
-            );
-
-        };
-
-    }, [
-        betaEnabled,
-        loadBetaSetting,
-        loadWallet,
-    ]);
-
+    //
+    // IMPORTANT:
+    // Removed the 10-second polling.
+    //
+    // This prevents:
+    //
+    // GET /system/settings/beta
+    //
+    // from being called every 10 seconds.
+    //
+    // The setting is refreshed on:
+    //
+    // 1. Initial page load
+    // 2. Browser tab becoming visible
+    // 3. Window focus
+    // 4. betaUpdated event
+    //
+    // ========================================================
 
     // ========================================================
     // LOGOUT
     // ========================================================
 
-    const handleLogout =
-        () => {
+    const handleLogout = () => {
 
-            setMenuOpen(false);
+        setMenuOpen(false);
 
-            logout();
+        logout();
 
-        };
-
+    };
 
     // ========================================================
     // USER INITIAL
@@ -589,7 +529,6 @@ export default function Navbar() {
                 .charAt(0)
                 .toUpperCase()
             : "A";
-
 
     // ========================================================
     // BALANCE DISPLAY
@@ -607,7 +546,6 @@ export default function Navbar() {
                     maximumFractionDigits: 2,
                 }
             )}`;
-
 
     // ========================================================
     // RENDER
@@ -650,22 +588,19 @@ export default function Navbar() {
                         menuOpen
                     }
                 >
-
                     {
                         menuOpen
                             ? "✕"
                             : "☰"
                     }
-
                 </button>
-
 
                 {/* ==================================================
                     LOGO
                 ================================================== */}
 
                 <Link
-                    href="/"
+                    href="/dashboard"
                     className={
                         styles.navbarLogo
                     }
@@ -683,7 +618,6 @@ export default function Navbar() {
                     </span>
 
                 </Link>
-
 
                 {/* ==================================================
                     DESKTOP MENU
@@ -729,9 +663,8 @@ export default function Navbar() {
 
                 </nav>
 
-
                 {/* ==================================================
-                    DESKTOP ADMIN / USER
+                    DESKTOP USER AREA
                 ================================================== */}
 
                 <div
@@ -741,22 +674,59 @@ export default function Navbar() {
                 >
 
                     {/* ==================================================
-                        DESKTOP BETA / BALANCE
+                        BETA / BALANCE
                     ================================================== */}
 
-                    {betaEnabled ? (
+                    {!mounted || betaLoading ? (
+
+                        /*
+                         * IMPORTANT:
+                         *
+                         * Server and first client render
+                         * show exactly the same neutral state.
+                         */
+
+                        <div
+                            className={
+                                styles.desktopBalance
+                            }
+                        >
+
+                            <span
+                                className={
+                                    styles.balanceIcon
+                                }
+                            >
+                                💰
+                            </span>
+
+                            <div>
+
+                                <small>
+                                    Balance
+                                </small>
+
+                                <strong>
+                                    ...
+                                </strong>
+
+                            </div>
+
+                        </div>
+
+                    ) : betaEnabled ? (
 
                         <div
                             className="
                                 flex
                                 items-center
                                 gap-2
-                                px-3
-                                py-2
                                 rounded-lg
                                 bg-purple-100
-                                text-purple-700
+                                px-3
+                                py-2
                                 font-semibold
+                                text-purple-700
                             "
                         >
 
@@ -804,7 +774,6 @@ export default function Navbar() {
 
                     )}
 
-
                     {/* ==================================================
                         USER
                     ================================================== */}
@@ -824,7 +793,6 @@ export default function Navbar() {
                                 userInitial
                             }
                         </span>
-
 
                         <span
                             className={
@@ -847,7 +815,6 @@ export default function Navbar() {
                         </span>
 
                     </div>
-
 
                     {/* ==================================================
                         LOGOUT
@@ -875,9 +842,8 @@ export default function Navbar() {
 
                 </div>
 
-
                 {/* ==================================================
-                    MOBILE BETA / BALANCE
+                    MOBILE BALANCE
                 ================================================== */}
 
                 <div
@@ -886,20 +852,42 @@ export default function Navbar() {
                     }
                 >
 
-                    {betaEnabled ? (
+                    {!mounted || betaLoading ? (
+
+                        <>
+
+                            <span
+                                className={
+                                    styles.mobileBalanceIcon
+                                }
+                            >
+                                💰
+                            </span>
+
+                            <span
+                                className={
+                                    styles.mobileBalanceValue
+                                }
+                            >
+                                ...
+                            </span>
+
+                        </>
+
+                    ) : betaEnabled ? (
 
                         <span
                             className="
                                 inline-flex
                                 items-center
                                 gap-1
-                                px-2
-                                py-1
                                 rounded-md
                                 bg-purple-100
-                                text-purple-700
-                                font-semibold
+                                px-2
+                                py-1
                                 text-sm
+                                font-semibold
+                                text-purple-700
                             "
                         >
 
@@ -943,7 +931,6 @@ export default function Navbar() {
 
             </div>
 
-
             {/* ======================================================
                 MOBILE MENU
             ====================================================== */}
@@ -957,22 +944,60 @@ export default function Navbar() {
                 >
 
                     {/* ==================================================
-                        MOBILE BETA / BALANCE CARD
+                        MOBILE BETA / BALANCE
                     ================================================== */}
 
-                    {betaEnabled ? (
+                    {!mounted || betaLoading ? (
+
+                        <div
+                            className={
+                                styles.mobileBalanceCard
+                            }
+                        >
+
+                            <div
+                                className={
+                                    styles.mobileBalanceCardIcon
+                                }
+                            >
+                                💰
+                            </div>
+
+                            <div>
+
+                                <div
+                                    className={
+                                        styles.mobileBalanceLabel
+                                    }
+                                >
+                                    Current Balance
+                                </div>
+
+                                <div
+                                    className={
+                                        styles.mobileBalanceAmount
+                                    }
+                                >
+                                    ...
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    ) : betaEnabled ? (
 
                         <div
                             className="
+                                mb-3
                                 flex
                                 items-center
                                 gap-3
-                                p-4
-                                mb-3
                                 rounded-xl
-                                bg-purple-50
                                 border
                                 border-purple-200
+                                bg-purple-50
+                                p-4
                             "
                         >
 
@@ -989,8 +1014,8 @@ export default function Navbar() {
                                 <div
                                     className="
                                         text-sm
-                                        text-purple-600
                                         font-medium
+                                        text-purple-600
                                     "
                                 >
                                     System Mode
@@ -1026,7 +1051,6 @@ export default function Navbar() {
                                 💰
                             </div>
 
-
                             <div>
 
                                 <div
@@ -1052,7 +1076,6 @@ export default function Navbar() {
                         </div>
 
                     )}
-
 
                     {/* ==================================================
                         MOBILE LINKS
@@ -1093,7 +1116,6 @@ export default function Navbar() {
                         )
                     )}
 
-
                     {/* ==================================================
                         MOBILE USER
                     ================================================== */}
@@ -1113,7 +1135,6 @@ export default function Navbar() {
                                 userInitial
                             }
                         </span>
-
 
                         <span
                             className={
@@ -1136,7 +1157,6 @@ export default function Navbar() {
                         </span>
 
                     </div>
-
 
                     {/* ==================================================
                         MOBILE LOGOUT
@@ -1169,3 +1189,4 @@ export default function Navbar() {
         </header>
     );
 }
+

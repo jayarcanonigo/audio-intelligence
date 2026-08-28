@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import BrandCombobox from "@/components/BrandCombobox";
+import KeywordModal from "@/components/KeywordModal";
 
 export type AdvertisementStatus =
   | "NEW"
@@ -72,6 +73,15 @@ interface Props {
   onSave?: (
     segments: Segment[]
   ) => void | Promise<void>;
+
+  onSaveKeyword?: (
+    row: Segment,
+    data: {
+      text: string;
+      duration: number;
+      brand_name: string;
+    }
+  ) => void | Promise<void>;
 }
 
 const DURATION_OPTIONS = [
@@ -96,6 +106,7 @@ export default function SelectedSegments({
   onRemove,
   onDownload,
   onSave,
+  onSaveKeyword,
 }: Props) {
   const [segmentList, setSegmentList] =
     useState<Segment[]>([]);
@@ -132,6 +143,21 @@ export default function SelectedSegments({
 
   const [deletingId, setDeletingId] =
     useState<number | null>(null);
+
+  /*
+   * ============================================================
+   * KEYWORD MODAL
+   * ============================================================
+   */
+
+  const [keywordModalOpen, setKeywordModalOpen] =
+    useState(false);
+
+  const [keywordRow, setKeywordRow] =
+    useState<Segment | null>(null);
+
+  const [keywordSaving, setKeywordSaving] =
+    useState(false);
 
   const durationDropdownRef =
     useRef<HTMLDivElement | null>(null);
@@ -284,9 +310,15 @@ export default function SelectedSegments({
     }
 
     return {
-      projectId: Number(match[1]),
-      startSegmentId: Number(match[2]),
-      endSegmentId: Number(match[3]),
+      projectId: Number(
+        match[1]
+      ),
+      startSegmentId: Number(
+        match[2]
+      ),
+      endSegmentId: Number(
+        match[3]
+      ),
     };
   }
 
@@ -445,10 +477,6 @@ export default function SelectedSegments({
     const targetEndSeconds =
       startSeconds + duration;
 
-    /*
-     * FIND START SEGMENT
-     */
-
     const startSegment =
       transcriptSegments.find(
         (segment) => {
@@ -491,10 +519,6 @@ export default function SelectedSegments({
       startSegment ||
       exactStart ||
       null;
-
-    /*
-     * FIND END SEGMENT
-     */
 
     const endSegment =
       transcriptSegments.find(
@@ -556,10 +580,6 @@ export default function SelectedSegments({
       fallbackEnd ||
       actualStart ||
       null;
-
-    /*
-     * MERGE TEXT
-     */
 
     const matchingSegments =
       transcriptSegments
@@ -677,9 +697,9 @@ export default function SelectedSegments({
 
   useEffect(() => {
     setSegmentList(
-      (previous) => {
+      (previous): Segment[] => {
         return segments.map(
-          (incoming) => {
+          (incoming): Segment => {
             const local =
               previous.find(
                 (item) =>
@@ -708,45 +728,51 @@ export default function SelectedSegments({
             }
 
             if (local) {
-              return {
-                ...incoming,
+              const updated: Segment =
+                {
+                  ...incoming,
 
-                text:
-                  local.text ??
-                  incoming.text,
+                  text:
+                    local.text ??
+                    incoming.text,
 
-                start:
-                  local.start ??
-                  incoming.start,
+                  start:
+                    local.start ??
+                    incoming.start,
 
-                end:
-                  local.end ??
-                  incoming.end,
+                  end:
+                    local.end ??
+                    incoming.end,
 
-                brand_name:
-                  local.brand_name ??
-                  incoming.brand_name,
+                  brand_name:
+                    local.brand_name ??
+                    incoming.brand_name,
 
-                detection_key:
-                  local.detection_key ??
-                  incoming.detection_key,
+                  detection_key:
+                    local.detection_key ??
+                    incoming.detection_key,
 
-                segment_ids:
-                  local.segment_ids ??
-                  incoming.segment_ids,
+                  segment_ids:
+                    local.segment_ids ??
+                    incoming.segment_ids,
 
-                project_id:
-                  local.project_id ??
-                  incoming.project_id,
+                  project_id:
+                    local.project_id ??
+                    incoming.project_id,
 
-                status,
-              };
+                  status,
+                };
+
+              return updated;
             }
 
-            return {
-              ...incoming,
-              status,
-            };
+            const updated: Segment =
+              {
+                ...incoming,
+                status,
+              };
+
+            return updated;
           }
         );
       }
@@ -793,6 +819,132 @@ export default function SelectedSegments({
       }
     );
   }, [segments]);
+
+  /*
+   * ============================================================
+   * KEYWORD MODAL
+   * ============================================================
+   */
+
+  function openKeywordModal(
+    row: Segment
+  ) {
+    setKeywordRow(row);
+    setKeywordModalOpen(true);
+
+    setEditingId(null);
+    setBrandOpenId(null);
+    setDurationOpenId(null);
+  }
+
+  function closeKeywordModal() {
+    if (keywordSaving) {
+      return;
+    }
+
+    setKeywordModalOpen(false);
+    setKeywordRow(null);
+  }
+
+  /*
+   * IMPORTANT:
+   *
+   * KeywordModal returns:
+   *
+   * {
+   *   keyword: string;
+   *   duration: number | null;
+   *   brand_id: number;
+   *   brand_name: string;
+   * }
+   *
+   * But SelectedSegments.onSaveKeyword
+   * expects:
+   *
+   * {
+   *   text: string;
+   *   duration: number;
+   *   brand_name: string;
+   * }
+   */
+
+  async function addKeyword(
+    data: {
+      keyword: string;
+      duration: number | null;
+      brand_id: number;
+      brand_name: string;
+    }
+  ) {
+    if (!keywordRow) {
+      return;
+    }
+
+    if (!onSaveKeyword) {
+      console.warn(
+        "onSaveKeyword is not provided."
+      );
+
+      closeKeywordModal();
+      return;
+    }
+
+    const keyword =
+      data.keyword.trim();
+
+    if (!keyword) {
+      alert(
+        "Please enter a keyword."
+      );
+      return;
+    }
+
+    const duration =
+      data.duration ?? 30;
+
+    if (
+      !Number.isFinite(duration) ||
+      duration <= 0
+    ) {
+      alert(
+        "Please enter a valid keyword duration."
+      );
+      return;
+    }
+
+    try {
+      setKeywordSaving(true);
+
+      await onSaveKeyword(
+        keywordRow,
+        {
+          text: keyword,
+
+          duration:
+            Math.floor(
+              duration
+            ),
+
+          brand_name:
+            data.brand_name ||
+            "",
+        }
+      );
+
+      closeKeywordModal();
+    } catch (error) {
+      console.error(
+        "SAVE KEYWORD FAILED:",
+        error
+      );
+
+      alert(
+        "Failed to save keyword."
+      );
+    } finally {
+      setKeywordSaving(false);
+    }
+  }
 
   /*
    * ============================================================
@@ -890,7 +1042,8 @@ export default function SelectedSegments({
         duration
       );
 
-    let detectionKey =
+    let detectionKey:
+      string | null =
       row.detection_key ||
       null;
 
@@ -923,9 +1076,9 @@ export default function SelectedSegments({
     );
 
     setSegmentList(
-      (previous) =>
+      (previous): Segment[] =>
         previous.map(
-          (item) =>
+          (item): Segment =>
             item.id === row.id
               ? {
                   ...item,
@@ -946,9 +1099,7 @@ export default function SelectedSegments({
                     segmentIds,
 
                   status:
-                    item.status ??
-                    row.status ??
-                    "NEW",
+                    "NEW" as AdvertisementStatus,
                 }
               : item
         )
@@ -971,8 +1122,7 @@ export default function SelectedSegments({
           "",
 
         status:
-          row.status ??
-          "NEW",
+          "NEW" as AdvertisementStatus,
 
         detection_key:
           detectionKey,
@@ -1086,7 +1236,6 @@ export default function SelectedSegments({
             h-10
             w-full
             min-w-0
-            sm:min-w-36
             items-center
             justify-between
             rounded-lg
@@ -1387,6 +1536,13 @@ export default function SelectedSegments({
         editEnd
       );
 
+    if (duration <= 0) {
+      alert(
+        "Please enter a valid time range."
+      );
+      return;
+    }
+
     const merged =
       mergeTranscriptLikeBackend(
         row,
@@ -1394,7 +1550,8 @@ export default function SelectedSegments({
         duration
       );
 
-    let detectionKey =
+    let detectionKey:
+      string | null =
       row.detection_key ||
       null;
 
@@ -1419,7 +1576,17 @@ export default function SelectedSegments({
     const segmentIds =
       merged.segmentIds;
 
-    const data = {
+    const data: {
+      text: string;
+      start: string;
+      end: string;
+      brand_name: string;
+      status: AdvertisementStatus;
+      detection_key:
+        | string
+        | null;
+      segment_ids: number[];
+    } = {
       text:
         merged.text ||
         editText,
@@ -1434,7 +1601,6 @@ export default function SelectedSegments({
         editBrand,
 
       status:
-        row.status ??
         "NEW",
 
       detection_key:
@@ -1445,15 +1611,18 @@ export default function SelectedSegments({
     };
 
     setSegmentList(
-      (previous) =>
+      (previous): Segment[] =>
         previous
           .map(
-            (item) =>
+            (item): Segment =>
               item.id === row.id
                 ? {
                     ...item,
 
                     ...data,
+
+                    status:
+                      "NEW",
 
                     segment_ids:
                       segmentIds,
@@ -1503,15 +1672,18 @@ export default function SelectedSegments({
     );
 
     setSegmentList(
-      (previous) =>
+      (previous): Segment[] =>
         previous.map(
-          (item) =>
+          (item): Segment =>
             item.id === row.id
               ? {
                   ...item,
 
                   brand_name:
                     value,
+
+                  status:
+                    "NEW" as AdvertisementStatus,
                 }
               : item
         )
@@ -1601,6 +1773,12 @@ export default function SelectedSegments({
         setDurationOpenId(
           null
         );
+      }
+
+      if (
+        keywordRow?.id === id
+      ) {
+        closeKeywordModal();
       }
 
       setDurationSearch(
@@ -1756,9 +1934,9 @@ export default function SelectedSegments({
         );
 
       setSegmentList(
-        (previous) =>
+        (previous): Segment[] =>
           previous.map(
-            (item) =>
+            (item): Segment =>
               savedIds.has(
                 item.id
               )
@@ -1766,7 +1944,7 @@ export default function SelectedSegments({
                     ...item,
 
                     status:
-                      "SAVED",
+                      "SAVED" as AdvertisementStatus,
                   }
                 : item
           )
@@ -1866,13 +2044,15 @@ export default function SelectedSegments({
 
   const sortedSegments =
     [...segmentList]
-      .map((item) => ({
-        ...item,
+      .map(
+        (item): Segment => ({
+          ...item,
 
-        status:
-          item.status ??
-          "NEW",
-      }))
+          status:
+            item.status ??
+            ("NEW" as AdvertisementStatus),
+        })
+      )
       .sort(
         (a, b) =>
           toSeconds(a.start) -
@@ -1905,539 +2085,531 @@ export default function SelectedSegments({
    */
 
   return (
-    <div className="space-y-4">
+    <>
+      <div className="space-y-4">
 
-      {/* ========================================================
-          HEADER
-          ======================================================== */}
+        {/* HEADER */}
 
-      <div
-        className="
-          rounded-xl
-          border
-          bg-white
-          p-3
-          shadow-sm
-          sm:p-4
-        "
-      >
         <div
           className="
-            flex
-            flex-col
-            gap-4
-            lg:flex-row
-            lg:items-center
-            lg:justify-between
+            rounded-xl
+            border
+            bg-white
+            p-3
+            shadow-sm
+            sm:p-4
           "
         >
-          <div className="min-w-0">
-            <h2 className="text-base font-bold sm:text-lg">
-              📢 Selected Advertisements
-            </h2>
-
-            <p className="mt-1 text-xs text-gray-500 sm:text-sm">
-              Review detected advertisements before saving.
-            </p>
-          </div>
-
           <div
             className="
-              grid
-              grid-cols-2
-              gap-2
-              sm:flex
-              sm:flex-wrap
-              sm:items-center
+              flex
+              flex-col
+              gap-4
+              lg:flex-row
+              lg:items-center
+              lg:justify-between
             "
           >
-            {newDetectedCount >
-              0 && (
-              <div className="rounded-lg border border-orange-300 bg-orange-100 px-3 py-2 text-center text-xs font-bold text-orange-700">
-                ✨ {newDetectedCount} new
-              </div>
-            )}
+            <div className="min-w-0">
+              <h2 className="text-base font-bold sm:text-lg">
+                📢 Selected Advertisements
+              </h2>
 
-            {savedCount >
-              0 && (
-              <div className="rounded-lg border border-green-300 bg-green-100 px-3 py-2 text-center text-xs font-bold text-green-700">
-                ✓ {savedCount} saved
-              </div>
-            )}
+              <p className="mt-1 text-xs text-gray-500 sm:text-sm">
+                Review detected advertisements before saving.
+              </p>
+            </div>
 
-            {overlappingIds.size >
-              0 && (
-              <div className="rounded-lg border border-red-300 bg-red-100 px-3 py-2 text-center text-xs font-bold text-red-700">
-                ⚠ {overlappingIds.size} overlapping
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={saveAll}
-              disabled={
-                newDetectedCount ===
-                  0 ||
-                saving
-              }
+            <div
               className="
-                col-span-2
-                h-10
-                rounded-lg
-                bg-blue-600
-                px-5
-                text-sm
-                font-semibold
-                text-white
-                hover:bg-blue-700
-                disabled:cursor-not-allowed
-                disabled:opacity-50
-                sm:col-span-1
+                grid
+                grid-cols-2
+                gap-2
+                sm:flex
+                sm:flex-wrap
+                sm:items-center
               "
             >
-              {saving
-                ? "💾 Saving..."
-                : `💾 Save ${
-                    newDetectedCount >
-                    0
-                      ? `(${newDetectedCount})`
-                      : "All"
-                  }`}
-            </button>
+              {newDetectedCount >
+                0 && (
+                <div className="rounded-lg border border-orange-300 bg-orange-100 px-3 py-2 text-center text-xs font-bold text-orange-700">
+                  ✨ {newDetectedCount} new
+                </div>
+              )}
+
+              {savedCount >
+                0 && (
+                <div className="rounded-lg border border-green-300 bg-green-100 px-3 py-2 text-center text-xs font-bold text-green-700">
+                  ✓ {savedCount} saved
+                </div>
+              )}
+
+              {overlappingIds.size >
+                0 && (
+                <div className="rounded-lg border border-red-300 bg-red-100 px-3 py-2 text-center text-xs font-bold text-red-700">
+                  ⚠ {overlappingIds.size} overlapping
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={saveAll}
+                disabled={
+                  newDetectedCount ===
+                    0 ||
+                  saving
+                }
+                className="
+                  col-span-2
+                  h-10
+                  rounded-lg
+                  bg-blue-600
+                  px-5
+                  text-sm
+                  font-semibold
+                  text-white
+                  hover:bg-blue-700
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                  sm:col-span-1
+                "
+              >
+                {saving
+                  ? "💾 Saving..."
+                  : `💾 Save ${
+                      newDetectedCount >
+                      0
+                        ? `(${newDetectedCount})`
+                        : "All"
+                    }`}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ========================================================
-          EMPTY
-          ======================================================== */}
+        {/* EMPTY */}
 
-      {sortedSegments.length ===
-        0 && (
-        <div className="rounded-2xl border border-dashed bg-white p-8 text-center sm:p-10">
-          <div className="text-4xl">
-            📭
+        {sortedSegments.length ===
+          0 && (
+          <div className="rounded-2xl border border-dashed bg-white p-8 text-center sm:p-10">
+            <div className="text-4xl">
+              📭
+            </div>
+
+            <h3 className="mt-3 font-semibold text-gray-700">
+              No selected advertisements
+            </h3>
           </div>
+        )}
 
-          <h3 className="mt-3 font-semibold text-gray-700">
-            No selected advertisements
-          </h3>
-        </div>
-      )}
+        {/* LIST */}
 
-      {/* ========================================================
-          ADVERTISEMENT LIST
-          ======================================================== */}
+        {sortedSegments.map(
+          (row, index) => {
+            const selected =
+              selectedResultId ===
+              row.id;
 
-      {sortedSegments.map(
-        (row, index) => {
-          const selected =
-            selectedResultId ===
-            row.id;
-
-          const overlapping =
-            overlappingIds.has(
-              row.id
-            );
-
-          const isNew =
-            row.status ===
-            "NEW";
-
-          const isSaved =
-            row.status ===
-            "SAVED";
-
-          const isDeleting =
-            deletingId ===
-            row.id;
-
-          const duration =
-            getDuration(
-              row.start,
-              row.end
-            );
-
-          const editDuration =
-            getDuration(
-              editStart,
-              editEnd
-            );
-
-          const cardClass =
-            overlapping
-              ? "border-red-500 bg-red-50 ring-2 ring-red-300"
-              : isNew
-                ? "border-orange-400 bg-orange-50 ring-2 ring-orange-300"
-                : isSaved
-                  ? "border-green-400 bg-green-50"
-                  : selected
-                    ? "border-blue-300 bg-blue-50 ring-2 ring-blue-300"
-                    : "border-gray-200 bg-white";
-
-          const numberClass =
-            overlapping
-              ? "bg-red-600 text-white"
-              : isNew
-                ? "bg-orange-500 text-white"
-                : isSaved
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-100";
-
-          return (
-            <div
-              key={
-                row.detection_key ||
+            const overlapping =
+              overlappingIds.has(
                 row.id
-              }
-              id={`segment-${row.id}`}
-              onClick={(e) => {
-                const target =
-                  e.target as HTMLElement;
+              );
 
-                if (
-                  target.closest(
-                    "button"
-                  ) ||
-                  target.closest(
-                    "input"
-                  ) ||
-                  target.closest(
-                    "textarea"
-                  ) ||
-                  target.closest(
-                    "select"
-                  ) ||
-                  target.closest(
-                    ".brand-combobox"
-                  )
-                ) {
-                  return;
-                }
+            const isNew =
+              row.status ===
+              "NEW";
 
-                setSelectedResultId(
+            const isSaved =
+              row.status ===
+              "SAVED";
+
+            const isDeleting =
+              deletingId ===
+              row.id;
+
+            const duration =
+              getDuration(
+                row.start,
+                row.end
+              );
+
+            const editDuration =
+              getDuration(
+                editStart,
+                editEnd
+              );
+
+            const cardClass =
+              overlapping
+                ? "border-red-500 bg-red-50 ring-2 ring-red-300"
+                : isNew
+                  ? "border-orange-400 bg-orange-50 ring-2 ring-orange-300"
+                  : isSaved
+                    ? "border-green-400 bg-green-50"
+                    : selected
+                      ? "border-blue-300 bg-blue-50 ring-2 ring-blue-300"
+                      : "border-gray-200 bg-white";
+
+            const numberClass =
+              overlapping
+                ? "bg-red-600 text-white"
+                : isNew
+                  ? "bg-orange-500 text-white"
+                  : isSaved
+                    ? "bg-green-600 text-white"
+                    : "bg-gray-100";
+
+            return (
+              <div
+                key={
+                  row.detection_key ||
                   row.id
-                );
-              }}
-              className={`
-                relative
-                overflow-visible
-                rounded-2xl
-                border
-                p-3
-                shadow-sm
-                transition-all
-                sm:p-5
-                ${cardClass}
-                ${
-                  isDeleting
-                    ? "pointer-events-none opacity-50"
-                    : ""
                 }
-              `}
-            >
+                id={`segment-${row.id}`}
+                onClick={(e) => {
+                  const target =
+                    e.target as HTMLElement;
 
-              {/* ==================================================
-                  STATUS MESSAGE
-                  ================================================== */}
+                  if (
+                    target.closest(
+                      "button"
+                    ) ||
+                    target.closest(
+                      "input"
+                    ) ||
+                    target.closest(
+                      "textarea"
+                    ) ||
+                    target.closest(
+                      "select"
+                    ) ||
+                    target.closest(
+                      ".brand-combobox"
+                    )
+                  ) {
+                    return;
+                  }
 
-              {overlapping && (
-                <div className="mb-3 flex items-start gap-3 rounded-xl border border-red-300 bg-red-100 px-3 py-3 text-red-700 sm:mb-4 sm:px-4">
-                  <span className="text-lg sm:text-xl">
-                    ⚠
-                  </span>
+                  setSelectedResultId(
+                    row.id
+                  );
+                }}
+                className={`
+                  relative
+                  overflow-visible
+                  rounded-2xl
+                  border
+                  p-3
+                  shadow-sm
+                  transition-all
+                  sm:p-5
+                  ${cardClass}
+                  ${
+                    isDeleting
+                      ? "pointer-events-none opacity-50"
+                      : ""
+                  }
+                `}
+              >
 
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold sm:text-base">
-                      OVERLAPPING ADVERTISEMENT
-                    </div>
+                {/* STATUS */}
 
-                    <div className="mt-1 text-xs">
-                      This advertisement overlaps another selected advertisement.
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isNew && (
-                <div className="mb-3 flex items-start gap-3 rounded-xl border border-orange-300 bg-orange-100 px-3 py-3 text-orange-700 sm:mb-4 sm:px-4">
-                  <span className="text-lg sm:text-xl">
-                    ✨
-                  </span>
-
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold sm:text-base">
-                      NEW DETECTED ADVERTISEMENT
-                    </div>
-
-                    <div className="mt-1 text-xs">
-                      This advertisement was detected during the latest processing and has not been saved yet.
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isSaved &&
-                !overlapping && (
-                  <div className="mb-3 flex items-start gap-3 rounded-xl border border-green-300 bg-green-100 px-3 py-3 text-green-700 sm:mb-4 sm:px-4">
+                {overlapping && (
+                  <div className="mb-3 flex items-start gap-3 rounded-xl border border-red-300 bg-red-100 px-3 py-3 text-red-700 sm:mb-4 sm:px-4">
                     <span className="text-lg sm:text-xl">
-                      💾
+                      ⚠
                     </span>
 
                     <div className="min-w-0">
                       <div className="text-sm font-bold sm:text-base">
-                        SAVED ADVERTISEMENT
+                        OVERLAPPING ADVERTISEMENT
                       </div>
 
                       <div className="mt-1 text-xs">
-                        This advertisement has already been saved.
+                        This advertisement overlaps another selected advertisement.
                       </div>
                     </div>
                   </div>
                 )}
 
-              {/* ==================================================
-                  TOP SECTION
-                  ================================================== */}
+                {isNew && (
+                  <div className="mb-3 flex items-start gap-3 rounded-xl border border-orange-300 bg-orange-100 px-3 py-3 text-orange-700 sm:mb-4 sm:px-4">
+                    <span className="text-lg sm:text-xl">
+                      ✨
+                    </span>
 
-              <div
-                className="
-                  flex
-                  flex-col
-                  gap-4
-                  lg:flex-row
-                  lg:items-start
-                  lg:justify-between
-                "
-              >
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold sm:text-base">
+                        NEW DETECTED ADVERTISEMENT
+                      </div>
 
-                {/* ------------------------------------------------
-                    LEFT / INFORMATION
-                    ------------------------------------------------ */}
+                      <div className="mt-1 text-xs">
+                        This advertisement was detected or modified and has not been saved yet.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isSaved &&
+                  !overlapping && (
+                    <div className="mb-3 flex items-start gap-3 rounded-xl border border-green-300 bg-green-100 px-3 py-3 text-green-700 sm:mb-4 sm:px-4">
+                      <span className="text-lg sm:text-xl">
+                        💾
+                      </span>
+
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold sm:text-base">
+                          SAVED ADVERTISEMENT
+                        </div>
+
+                        <div className="mt-1 text-xs">
+                          This advertisement has already been saved.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {/* TOP */}
 
                 <div
                   className="
                     flex
-                    min-w-0
-                    flex-1
-                    gap-3
-                    sm:gap-4
+                    flex-col
+                    gap-4
+                    lg:flex-row
+                    lg:items-start
+                    lg:justify-between
                   "
                 >
-
-                  {/* NUMBER */}
-
-                  <div
-                    className={`
-                      flex
-                      h-9
-                      w-9
-                      shrink-0
-                      items-center
-                      justify-center
-                      rounded-full
-                      text-sm
-                      font-bold
-                      sm:h-10
-                      sm:w-10
-                      sm:text-base
-                      ${numberClass}
-                    `}
-                  >
-                    {index + 1}
-                  </div>
 
                   {/* INFORMATION */}
 
-                  <div className="min-w-0 flex-1">
-
-                    <div>
-                      <h3 className="font-bold">
-                        Advertisement
-                      </h3>
-
-                      <p className="text-xs text-gray-500">
-                        ID: {row.id}
-                      </p>
-
-                      {row.segment_ids &&
-                        row.segment_ids.length > 0 && (
-                          <p className="mt-1 break-all font-mono text-[11px] text-gray-400">
-                            segment_ids: [{row.segment_ids.join(", ")}]
-                          </p>
-                        )}
-                    </div>
-
-                    {/* MOBILE STATUS BADGES */}
-
-                    <div
-                      className="
-                        mt-3
-                        flex
-                        flex-wrap
-                        gap-2
-                        lg:hidden
-                      "
-                    >
-                      {overlapping && (
-                        <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-bold text-white">
-                          ⚠ OVERLAPPING
-                        </span>
-                      )}
-
-                      {isNew && (
-                        <span className="rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-bold text-white">
-                          ✨ NEW DETECTED
-                        </span>
-                      )}
-
-                      {isSaved && (
-                        <span className="rounded-full bg-green-600 px-2.5 py-1 text-[10px] font-bold text-white">
-                          ✓ SAVED
-                        </span>
-                      )}
-                    </div>
-
-                    {/* BRAND */}
-
-                    <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      Brand
-                    </label>
-
-                    {editingId ===
-                    row.id ? (
-                      <div
-                        className="brand-combobox w-full"
-                        onClick={(e) =>
-                          e.stopPropagation()
-                        }
-                      >
-                        <BrandCombobox
-                          value={
-                            editBrand
-                          }
-                          open={
-                            brandOpenId ===
-                            row.id
-                          }
-                          onOpenChange={(
-                            open
-                          ) =>
-                            setBrandOpenId(
-                              open
-                                ? row.id
-                                : null
-                            )
-                          }
-                          onChange={(
-                            value
-                          ) => {
-                            updateBrand(
-                              row,
-                              value
-                            );
-
-                            setBrandOpenId(
-                              null
-                            );
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div
-                        className={`
-                          min-h-11
-                          w-full
-                          rounded-xl
-                          border
-                          px-3
-                          py-2
-                          sm:px-4
-                          ${
-                            overlapping
-                              ? "border-red-300 bg-red-100"
-                              : isNew
-                                ? "border-orange-300 bg-orange-100"
-                                : isSaved
-                                  ? "border-green-300 bg-green-100"
-                                  : "border-gray-300 bg-gray-50"
-                          }
-                        `}
-                      >
-                        <div className="flex min-w-0 items-start gap-2">
-                          <span className="shrink-0 text-lg">
-                            🏷
-                          </span>
-
-                          <span className="break-words text-sm font-semibold leading-6 text-gray-800">
-                            {row.brand_name ||
-                              "No brand selected"}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                  </div>
-                </div>
-
-                {/* ==================================================
-                    ACTION BUTTONS
-                    ================================================== */}
-
-                <div
-                  className="
-                    flex
-                    w-full
-                    shrink-0
-                    items-center
-                    gap-2
-                    border-t
-                    pt-3
-                    lg:w-auto
-                    lg:border-0
-                    lg:pt-0
-                  "
-                >
-
-                  {/* PLAY */}
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPlay(row);
-                    }}
+                  <div
                     className="
                       flex
-                      h-10
+                      min-w-0
                       flex-1
-                      items-center
-                      justify-center
-                      rounded-lg
-                      bg-green-500
-                      text-white
-                      hover:bg-green-600
-                      lg:w-10
-                      lg:flex-none
+                      gap-3
+                      sm:gap-4
                     "
-                    title="Play advertisement"
                   >
-                    ▶
-                    <span className="ml-2 text-xs font-semibold lg:hidden">
-                      Play
-                    </span>
-                  </button>
 
-                  {/* EDIT */}
+                    {/* NUMBER */}
 
-                  {editingId ===
-                  row.id ? (
+                    <div
+                      className={`
+                        flex
+                        h-9
+                        w-9
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-full
+                        text-sm
+                        font-bold
+                        sm:h-10
+                        sm:w-10
+                        sm:text-base
+                        ${numberClass}
+                      `}
+                    >
+                      {index + 1}
+                    </div>
+
+                    {/* INFO */}
+
+                    <div className="min-w-0 flex-1">
+
+                      <div>
+                        <h3 className="font-bold">
+                          Advertisement
+                        </h3>
+
+                        <p className="text-xs text-gray-500">
+                          ID: {row.id}
+                        </p>
+
+                        {row.segment_ids &&
+                          row.segment_ids.length >
+                            0 && (
+                          <p className="mt-1 break-all font-mono text-[11px] text-gray-400">
+                            segment_ids: [
+                            {row.segment_ids.join(
+                              ", "
+                            )}
+                            ]
+                          </p>
+                        )}
+                      </div>
+
+                      {/* MOBILE STATUS */}
+
+                      <div
+                        className="
+                          mt-3
+                          flex
+                          flex-wrap
+                          gap-2
+                          lg:hidden
+                        "
+                      >
+                        {overlapping && (
+                          <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-bold text-white">
+                            ⚠ OVERLAPPING
+                          </span>
+                        )}
+
+                        {isNew && (
+                          <span className="rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-bold text-white">
+                            ✨ NEW DETECTED
+                          </span>
+                        )}
+
+                        {isSaved && (
+                          <span className="rounded-full bg-green-600 px-2.5 py-1 text-[10px] font-bold text-white">
+                            ✓ SAVED
+                          </span>
+                        )}
+                      </div>
+
+                      {/* BRAND */}
+
+                      <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Brand
+                      </label>
+
+                      {editingId ===
+                      row.id ? (
+                        <div
+                          className="brand-combobox w-full"
+                          onClick={(e) =>
+                            e.stopPropagation()
+                          }
+                        >
+                          <BrandCombobox
+                            value={
+                              editBrand
+                            }
+                            open={
+                              brandOpenId ===
+                              row.id
+                            }
+                            onOpenChange={(
+                              open
+                            ) =>
+                              setBrandOpenId(
+                                open
+                                  ? row.id
+                                  : null
+                              )
+                            }
+                            onChange={(
+                              value
+                            ) => {
+                              updateBrand(
+                                row,
+                                value
+                              );
+
+                              setBrandOpenId(
+                                null
+                              );
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className={`
+                            min-h-11
+                            w-full
+                            rounded-xl
+                            border
+                            px-3
+                            py-2
+                            sm:px-4
+                            ${
+                              overlapping
+                                ? "border-red-300 bg-red-100"
+                                : isNew
+                                  ? "border-orange-300 bg-orange-100"
+                                  : isSaved
+                                    ? "border-green-300 bg-green-100"
+                                    : "border-gray-300 bg-gray-50"
+                            }
+                          `}
+                        >
+                          <div className="flex min-w-0 items-start gap-2">
+                            <span className="shrink-0 text-lg">
+                              🏷
+                            </span>
+
+                            <span className="break-words text-sm font-semibold leading-6 text-gray-800">
+                              {row.brand_name ||
+                                "No brand selected"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+                  </div>
+
+                  {/* ACTIONS */}
+
+                  <div
+                    className="
+                      flex
+                      w-full
+                      shrink-0
+                      flex-wrap
+                      items-center
+                      gap-2
+                      border-t
+                      pt-3
+                      lg:w-auto
+                      lg:border-0
+                      lg:pt-0
+                    "
+                  >
+
+                    {/* PLAY */}
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPlay(row);
+                      }}
+                      className="
+                        flex
+                        h-10
+                        flex-1
+                        items-center
+                        justify-center
+                        rounded-lg
+                        bg-green-500
+                        px-3
+                        text-white
+                        hover:bg-green-600
+                        lg:w-10
+                        lg:flex-none
+                      "
+                      title="Play advertisement"
+                    >
+                      ▶
+                      <span className="ml-2 text-xs font-semibold lg:hidden">
+                        Play
+                      </span>
+                    </button>
+
+                    {/* ADD KEYWORD */}
+
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
 
-                        saveEdit(
+                        openKeywordModal(
                           row
                         );
                       }}
@@ -2449,27 +2621,98 @@ export default function SelectedSegments({
                         justify-center
                         gap-1
                         rounded-lg
-                        bg-blue-600
+                        bg-purple-100
                         px-3
-                        text-sm
-                        font-semibold
-                        text-white
-                        hover:bg-blue-700
+                        text-purple-700
+                        hover:bg-purple-200
                         lg:flex-none
                       "
+                      title="Add keyword"
                     >
-                      💾
-                      <span className="lg:hidden">
-                        Save
+                      🔑
+                      <span className="text-xs font-semibold lg:hidden">
+                        Keyword
                       </span>
                     </button>
-                  ) : (
+
+                    {/* EDIT / SAVE */}
+
+                    {editingId ===
+                    row.id ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+
+                          saveEdit(
+                            row
+                          );
+                        }}
+                        className="
+                          flex
+                          h-10
+                          flex-1
+                          items-center
+                          justify-center
+                          gap-1
+                          rounded-lg
+                          bg-blue-600
+                          px-3
+                          text-sm
+                          font-semibold
+                          text-white
+                          hover:bg-blue-700
+                          lg:flex-none
+                        "
+                      >
+                        💾
+                        <span className="lg:hidden">
+                          Save
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+
+                          edit(row);
+                        }}
+                        className="
+                          flex
+                          h-10
+                          flex-1
+                          items-center
+                          justify-center
+                          gap-1
+                          rounded-lg
+                          bg-gray-100
+                          hover:bg-gray-200
+                          lg:w-10
+                          lg:flex-none
+                        "
+                        title="Edit advertisement"
+                      >
+                        ✏️
+                        <span className="text-xs font-semibold lg:hidden">
+                          Edit
+                        </span>
+                      </button>
+                    )}
+
+                    {/* DELETE */}
+
                     <button
                       type="button"
+                      disabled={
+                        isDeleting
+                      }
                       onClick={(e) => {
                         e.stopPropagation();
 
-                        edit(row);
+                        void deleteSegment(
+                          row.id
+                        );
                       }}
                       className="
                         flex
@@ -2479,463 +2722,417 @@ export default function SelectedSegments({
                         justify-center
                         gap-1
                         rounded-lg
-                        bg-gray-100
-                        hover:bg-gray-200
+                        bg-red-50
+                        hover:bg-red-100
+                        disabled:cursor-not-allowed
+                        disabled:opacity-50
                         lg:w-10
                         lg:flex-none
                       "
-                      title="Edit advertisement"
+                      title={`Delete advertisement ${row.id}`}
                     >
-                      ✏️
-                      <span className="text-xs font-semibold lg:hidden">
-                        Edit
+                      {isDeleting
+                        ? "..."
+                        : "🗑"}
+
+                      <span className="text-xs font-semibold text-red-700 lg:hidden">
+                        Delete
                       </span>
                     </button>
-                  )}
 
-                  {/* DELETE */}
-
-                  <button
-                    type="button"
-                    disabled={
-                      isDeleting
-                    }
-                    onClick={(e) => {
-                      e.stopPropagation();
-
-                      void deleteSegment(
-                        row.id
-                      );
-                    }}
-                    className="
-                      flex
-                      h-10
-                      flex-1
-                      items-center
-                      justify-center
-                      gap-1
-                      rounded-lg
-                      bg-red-50
-                      hover:bg-red-100
-                      disabled:cursor-not-allowed
-                      disabled:opacity-50
-                      lg:w-10
-                      lg:flex-none
-                    "
-                    title={`Delete advertisement ${row.id}`}
-                  >
-                    {isDeleting
-                      ? "..."
-                      : "🗑"}
-
-                    <span className="text-xs font-semibold text-red-700 lg:hidden">
-                      Delete
-                    </span>
-                  </button>
-
-                </div>
-
-                {/* DESKTOP STATUS BADGES */}
-
-                <div
-                  className="
-                    hidden
-                    shrink-0
-                    flex-wrap
-                    items-center
-                    justify-end
-                    gap-2
-                    lg:flex
-                  "
-                >
-                  {overlapping && (
-                    <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
-                      ⚠ OVERLAPPING
-                    </span>
-                  )}
-
-                  {isNew && (
-                    <span className="animate-pulse rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white">
-                      ✨ NEW DETECTED
-                    </span>
-                  )}
-
-                  {isSaved && (
-                    <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white">
-                      ✓ SAVED
-                    </span>
-                  )}
-                </div>
-
-              </div>
-
-              {/* ==================================================
-                  TRANSCRIPT
-                  ================================================== */}
-
-              <div className="mt-4 sm:mt-5">
-
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Transcript
-                </label>
-
-                <div
-                  className={`
-                    rounded-xl
-                    p-3
-                    sm:p-4
-                    ${
-                      overlapping
-                        ? "bg-red-100"
-                        : isNew
-                          ? "bg-orange-100"
-                          : isSaved
-                            ? "bg-green-100"
-                            : "bg-gray-50"
-                    }
-                  `}
-                >
-                  {editingId ===
-                  row.id ? (
-                    <textarea
-                      value={
-                        editText
-                      }
-                      rows={5}
-                      onClick={(e) =>
-                        e.stopPropagation()
-                      }
-                      onChange={(e) =>
-                        setEditText(
-                          e.target.value
-                        )
-                      }
-                      className="
-                        w-full
-                        rounded-lg
-                        border
-                        p-3
-                        text-sm
-                        outline-none
-                        focus:border-blue-400
-                      "
-                    />
-                  ) : (
-                    <p className="whitespace-pre-wrap break-words text-sm leading-6 sm:text-base sm:leading-7">
-                      {row.text}
-                    </p>
-                  )}
-                </div>
-
-              </div>
-
-              {/* ==================================================
-                  TIME SECTION
-                  ================================================== */}
-
-              <div
-                className={`
-                  mt-4
-                  rounded-xl
-                  border
-                  p-3
-                  sm:mt-5
-                  sm:p-4
-                  ${
-                    overlapping
-                      ? "border-red-300 bg-red-100"
-                      : isNew
-                        ? "border-orange-300 bg-orange-100"
-                        : isSaved
-                          ? "border-green-300 bg-green-100"
-                          : "border-gray-200 bg-gray-50"
-                  }
-                `}
-              >
-
-                {/* TIME HEADER */}
-
-                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-
-                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    ⏱ Time
                   </div>
 
-                  {overlapping && (
-                    <div className="text-[10px] font-bold text-red-600 sm:text-xs">
-                      ⚠ TIME RANGE CONFLICT
-                    </div>
-                  )}
+                  {/* DESKTOP STATUS */}
 
-                  {isNew &&
-                    !overlapping && (
-                      <div className="text-[10px] font-bold text-orange-600 sm:text-xs">
-                        ✨ NEW TIME RANGE
-                      </div>
+                  <div
+                    className="
+                      hidden
+                      shrink-0
+                      flex-wrap
+                      items-center
+                      justify-end
+                      gap-2
+                      lg:flex
+                    "
+                  >
+                    {overlapping && (
+                      <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
+                        ⚠ OVERLAPPING
+                      </span>
                     )}
 
-                  {isSaved &&
-                    !overlapping && (
-                      <div className="text-[10px] font-bold text-green-600 sm:text-xs">
-                        ✓ SAVED TIME RANGE
-                      </div>
+                    {isNew && (
+                      <span className="animate-pulse rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white">
+                        ✨ NEW DETECTED
+                      </span>
                     )}
+
+                    {isSaved && (
+                      <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white">
+                        ✓ SAVED
+                      </span>
+                    )}
+                  </div>
 
                 </div>
 
-                {/* ==================================================
-                    EDITING TIME
-                    ================================================== */}
+                {/* TRANSCRIPT */}
 
-                {editingId ===
-                row.id ? (
-                  <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
+                <div className="mt-4 sm:mt-5">
 
-                    {/* START */}
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Transcript
+                  </label>
 
-                    <div className="min-w-0 flex-1 sm:flex-none">
-                      <span className="mb-1 block text-xs text-gray-500">
-                        Start
-                      </span>
-
-                      <TimeInput
+                  <div
+                    className={`
+                      rounded-xl
+                      p-3
+                      sm:p-4
+                      ${
+                        overlapping
+                          ? "bg-red-100"
+                          : isNew
+                            ? "bg-orange-100"
+                            : isSaved
+                              ? "bg-green-100"
+                              : "bg-gray-50"
+                      }
+                    `}
+                  >
+                    {editingId ===
+                    row.id ? (
+                      <textarea
                         value={
-                          editStart
+                          editText
                         }
-                        onChange={
-                          changeEditStart
-                        }
-                      />
-                    </div>
-
-                    <div className="hidden pb-2 text-gray-400 sm:block">
-                      →
-                    </div>
-
-                    {/* DURATION */}
-
-                    <div className="min-w-0 flex-1 sm:flex-none">
-                      <span className="mb-1 block text-xs text-gray-500">
-                        Duration
-                      </span>
-
-                      <select
-                        value={
-                          editDuration
-                        }
-                        onChange={(e) =>
-                          changeEditDuration(
-                            Number(
-                              e.target
-                                .value
-                            )
-                          )
-                        }
+                        rows={5}
                         onClick={(e) =>
                           e.stopPropagation()
                         }
-                        className="
-                          h-10
-                          w-full
-                          rounded-lg
-                          border
-                          bg-white
-                          px-3
-                          text-sm
-                          font-semibold
-                          sm:min-w-32
-                        "
-                      >
-                        {getDurationOptions(
-                          row.id
-                        ).map(
-                          (
-                            value
-                          ) => (
-                            <option
-                              key={
-                                value
-                              }
-                              value={
-                                value
-                              }
-                            >
-                              {
-                                value
-                              }{" "}
-                              seconds
-                            </option>
+                        onChange={(e) =>
+                          setEditText(
+                            e.target.value
                           )
-                        )}
-                      </select>
-                    </div>
-
-                    <div className="hidden pb-2 text-gray-400 sm:block">
-                      →
-                    </div>
-
-                    {/* END */}
-
-                    <div className="min-w-0 flex-1 sm:flex-none">
-                      <span className="mb-1 block text-xs text-gray-500">
-                        End
-                      </span>
-
-                      <TimeInput
-                        value={
-                          editEnd
                         }
-                        onChange={
-                          setEditEnd
-                        }
-                      />
-                    </div>
-
-                  </div>
-                ) : (
-
-                  /* ==================================================
-                     DISPLAY TIME
-                     ================================================== */
-
-                  <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-end sm:gap-3">
-
-                    {/* START */}
-
-                    <div className="min-w-0">
-                      <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
-                        Start
-                      </span>
-
-                      <span
-                        className={`
-                          flex
-                          h-10
+                        className="
                           w-full
-                          items-center
-                          justify-center
-                          overflow-hidden
                           rounded-lg
                           border
-                          bg-white
-                          px-1
-                          text-[11px]
-                          font-semibold
-                          sm:w-auto
-                          sm:px-3
-                          sm:text-sm
-                          ${
-                            overlapping
-                              ? "border-red-300 text-red-700"
-                              : isNew
-                                ? "border-orange-300 text-orange-700"
-                                : isSaved
-                                  ? "border-green-300 text-green-700"
-                                  : "border-gray-300"
-                          }
-                        `}
-                      >
-                        {row.start ||
-                          "00:00:00"}
-                      </span>
-                    </div>
-
-                    {/* DURATION */}
-
-                    <div className="min-w-0">
-                      <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
-                        Duration
-                      </span>
-
-                      <DurationDropdown
-                        row={row}
-                        duration={
-                          duration
-                        }
-                        overlapping={
-                          overlapping
-                        }
-                        isNew={
-                          isNew
-                        }
+                          p-3
+                          text-sm
+                          outline-none
+                          focus:border-blue-400
+                        "
                       />
-                    </div>
-
-                    {/* END */}
-
-                    <div className="min-w-0">
-                      <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
-                        End
-                      </span>
-
-                      <span
-                        className={`
-                          flex
-                          h-10
-                          w-full
-                          items-center
-                          justify-center
-                          overflow-hidden
-                          rounded-lg
-                          border
-                          bg-white
-                          px-1
-                          text-[11px]
-                          font-semibold
-                          sm:w-auto
-                          sm:px-3
-                          sm:text-sm
-                          ${
-                            overlapping
-                              ? "border-red-300 text-red-700"
-                              : isNew
-                                ? "border-orange-300 text-orange-700"
-                                : isSaved
-                                  ? "border-green-300 text-green-700"
-                                  : "border-gray-300"
-                          }
-                        `}
-                      >
-                        {row.end ||
-                          "00:00:00"}
-                      </span>
-                    </div>
-
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words text-sm leading-6 sm:text-base sm:leading-7">
+                        {row.text}
+                      </p>
+                    )}
                   </div>
-                )}
 
-                {/* ==================================================
-                    SOURCE SEGMENTS
-                    ================================================== */}
+                </div>
 
-                {row.segment_ids &&
-                  row.segment_ids.length >
-                    0 && (
-                  <div className="mt-3 rounded-lg border bg-white px-3 py-2">
+                {/* TIME */}
 
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">
-                      Source Transcript Segments
+                <div
+                  className={`
+                    mt-4
+                    rounded-xl
+                    border
+                    p-3
+                    sm:mt-5
+                    sm:p-4
+                    ${
+                      overlapping
+                        ? "border-red-300 bg-red-100"
+                        : isNew
+                          ? "border-orange-300 bg-orange-100"
+                          : isSaved
+                            ? "border-green-300 bg-green-100"
+                            : "border-gray-200 bg-gray-50"
+                    }
+                  `}
+                >
+
+                  <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      ⏱ Time
                     </div>
 
-                    <div className="mt-1 break-all font-mono text-[10px] leading-4 text-gray-700 sm:text-xs">
-                      [
-                      {
-                        row.segment_ids.join(
+                    {overlapping && (
+                      <div className="text-[10px] font-bold text-red-600 sm:text-xs">
+                        ⚠ TIME RANGE CONFLICT
+                      </div>
+                    )}
+
+                    {isNew &&
+                      !overlapping && (
+                        <div className="text-[10px] font-bold text-orange-600 sm:text-xs">
+                          ✨ NEW / MODIFIED TIME RANGE
+                        </div>
+                      )}
+
+                    {isSaved &&
+                      !overlapping && (
+                        <div className="text-[10px] font-bold text-green-600 sm:text-xs">
+                          ✓ SAVED TIME RANGE
+                        </div>
+                      )}
+                  </div>
+
+                  {/* EDIT TIME */}
+
+                  {editingId ===
+                  row.id ? (
+                    <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
+
+                      <div className="min-w-0 flex-1 sm:flex-none">
+                        <span className="mb-1 block text-xs text-gray-500">
+                          Start
+                        </span>
+
+                        <TimeInput
+                          value={
+                            editStart
+                          }
+                          onChange={
+                            changeEditStart
+                          }
+                        />
+                      </div>
+
+                      <div className="hidden pb-2 text-gray-400 sm:block">
+                        →
+                      </div>
+
+                      <div className="min-w-0 flex-1 sm:flex-none">
+                        <span className="mb-1 block text-xs text-gray-500">
+                          Duration
+                        </span>
+
+                        <select
+                          value={
+                            editDuration
+                          }
+                          onChange={(e) =>
+                            changeEditDuration(
+                              Number(
+                                e.target
+                                  .value
+                              )
+                            )
+                          }
+                          onClick={(e) =>
+                            e.stopPropagation()
+                          }
+                          className="
+                            h-10
+                            w-full
+                            rounded-lg
+                            border
+                            bg-white
+                            px-3
+                            text-sm
+                            font-semibold
+                            sm:min-w-32
+                          "
+                        >
+                          {getDurationOptions(
+                            row.id
+                          ).map(
+                            (
+                              value
+                            ) => (
+                              <option
+                                key={
+                                  value
+                                }
+                                value={
+                                  value
+                                }
+                              >
+                                {
+                                  value
+                                }{" "}
+                                seconds
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </div>
+
+                      <div className="hidden pb-2 text-gray-400 sm:block">
+                        →
+                      </div>
+
+                      <div className="min-w-0 flex-1 sm:flex-none">
+                        <span className="mb-1 block text-xs text-gray-500">
+                          End
+                        </span>
+
+                        <TimeInput
+                          value={
+                            editEnd
+                          }
+                          onChange={
+                            setEditEnd
+                          }
+                        />
+                      </div>
+
+                    </div>
+                  ) : (
+
+                    <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-end sm:gap-3">
+
+                      {/* START */}
+
+                      <div className="min-w-0">
+                        <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
+                          Start
+                        </span>
+
+                        <span
+                          className="
+                            flex
+                            h-10
+                            w-full
+                            items-center
+                            justify-center
+                            overflow-hidden
+                            rounded-lg
+                            border
+                            bg-white
+                            px-1
+                            text-[11px]
+                            font-semibold
+                            sm:w-auto
+                            sm:px-3
+                            sm:text-sm
+                          "
+                        >
+                          {row.start ||
+                            "00:00:00"}
+                        </span>
+                      </div>
+
+                      {/* DURATION */}
+
+                      <div className="min-w-0">
+                        <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
+                          Duration
+                        </span>
+
+                        <DurationDropdown
+                          row={row}
+                          duration={
+                            duration
+                          }
+                          overlapping={
+                            overlapping
+                          }
+                          isNew={
+                            isNew
+                          }
+                        />
+                      </div>
+
+                      {/* END */}
+
+                      <div className="min-w-0">
+                        <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
+                          End
+                        </span>
+
+                        <span
+                          className="
+                            flex
+                            h-10
+                            w-full
+                            items-center
+                            justify-center
+                            overflow-hidden
+                            rounded-lg
+                            border
+                            bg-white
+                            px-1
+                            text-[11px]
+                            font-semibold
+                            sm:w-auto
+                            sm:px-3
+                            sm:text-sm
+                          "
+                        >
+                          {row.end ||
+                            "00:00:00"}
+                        </span>
+                      </div>
+
+                    </div>
+                  )}
+
+                  {/* SOURCE SEGMENTS */}
+
+                  {row.segment_ids &&
+                    row.segment_ids.length >
+                      0 && (
+                    <div className="mt-3 rounded-lg border bg-white px-3 py-2">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">
+                        Source Transcript Segments
+                      </div>
+
+                      <div className="mt-1 break-all font-mono text-[10px] leading-4 text-gray-700 sm:text-xs">
+                        [
+                        {row.segment_ids.join(
                           ", "
-                        )
-                      }
-                      ]
+                        )}
+                        ]
+                      </div>
                     </div>
+                  )}
 
-                  </div>
-                )}
+                </div>
 
               </div>
+            );
+          }
+        )}
+      </div>
 
-            </div>
-          );
+      {/* ========================================================
+          KEYWORD MODAL
+          ======================================================== */}
+
+      <KeywordModal
+        open={
+          keywordModalOpen
         }
-      )}
-    </div>
+        initialText={
+          keywordRow?.text ||
+          ""
+        }
+        initialDuration={
+          keywordRow
+            ? getDuration(
+                keywordRow.start,
+                keywordRow.end
+              ) || 30
+            : 30
+        }
+        initialBrand={
+          keywordRow?.brand_name ||
+          ""
+        }
+        onClose={
+          closeKeywordModal
+        }
+        onAdd={
+          addKeyword
+        }
+        
+      />
+    </>
   );
 }

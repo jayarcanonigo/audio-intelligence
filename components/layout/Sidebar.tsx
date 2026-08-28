@@ -6,7 +6,7 @@ const menus = [
   {
     name: "Dashboard",
     icon: "📊",
-    href: "/",
+    href: "/dashboard",
   },
   {
     name: "Projects",

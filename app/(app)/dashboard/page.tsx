@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -61,14 +62,13 @@ export default function DashboardPage() {
 
         loadProjects(token);
 
-        // Load wallet only for USER
         if (
             savedRole.toUpperCase() ===
             "USER"
         ) {
             loadWallet();
         }
-    }, []);
+    }, [router]);
 
     // ============================================================
     // LOAD PROJECTS
@@ -77,6 +77,13 @@ export default function DashboardPage() {
     async function loadProjects(
         token: string
     ) {
+        if (!token) {
+            router.replace("/login");
+            return;
+        }
+
+        setLoading(true);
+
         try {
             const response =
                 await fetch(
@@ -97,18 +104,26 @@ export default function DashboardPage() {
                 return;
             }
 
+            if (!response.ok) {
+                setProjects([]);
+                return;
+            }
+
             const data =
                 await response.json();
 
-            if (response.ok) {
-                setProjects(
-                    Array.isArray(data)
-                        ? data
-                        : []
-                );
-            }
+            setProjects(
+                Array.isArray(data)
+                    ? data
+                    : []
+            );
         } catch (error) {
-            console.error(error);
+            console.error(
+                "Failed to load projects:",
+                error
+            );
+
+            setProjects([]);
         } finally {
             setLoading(false);
         }
@@ -234,12 +249,18 @@ export default function DashboardPage() {
                     </div>
 
                     <button
+                        type="button"
                         onClick={() =>
                             setMobileMenu(
                                 !mobileMenu
                             )
                         }
-                        className="w-10 h-10 rounded-lg border border-slate-200 flex items-center justify-center"
+                        aria-label={
+                            mobileMenu
+                                ? "Close menu"
+                                : "Open menu"
+                        }
+                        className="w-10 h-10 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50"
                     >
                         {mobileMenu ? (
                             <CloseIcon />
@@ -307,6 +328,12 @@ export default function DashboardPage() {
                         {/* Dashboard */}
 
                         <button
+                            type="button"
+                            onClick={() =>
+                                setMobileMenu(
+                                    false
+                                )
+                            }
                             className="w-full text-left px-3 py-3 rounded-lg bg-indigo-50 text-indigo-700 text-sm font-semibold"
                         >
                             Dashboard
@@ -317,6 +344,7 @@ export default function DashboardPage() {
                         {role.toUpperCase() ===
                             "ADMIN" && (
                             <button
+                                type="button"
                                 onClick={() =>
                                     router.push(
                                         "/admin/users"
@@ -331,6 +359,7 @@ export default function DashboardPage() {
                         {/* Logout */}
 
                         <button
+                            type="button"
                             onClick={logout}
                             className="w-full text-left px-3 py-3 rounded-lg text-sm text-red-600 hover:bg-red-50"
                         >
@@ -355,18 +384,6 @@ export default function DashboardPage() {
 
                     <Logo dark />
 
-                    <div className="ml-3">
-
-                        <p className="text-sm font-bold">
-                            Radio Intelligence
-                        </p>
-
-                        <p className="text-[10px] text-slate-500">
-                            Audio Intelligence Platform
-                        </p>
-
-                    </div>
-
                 </div>
 
 
@@ -375,6 +392,7 @@ export default function DashboardPage() {
                 <nav className="flex-1 p-4">
 
                     <button
+                        type="button"
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600 text-sm font-semibold"
                     >
                         <DashboardIcon />
@@ -385,6 +403,7 @@ export default function DashboardPage() {
                     {role.toUpperCase() ===
                         "ADMIN" && (
                         <button
+                            type="button"
                             onClick={() =>
                                 router.push(
                                     "/admin/users"
@@ -428,6 +447,7 @@ export default function DashboardPage() {
                     </div>
 
                     <button
+                        type="button"
                         onClick={logout}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-400 hover:bg-red-500/10 hover:text-red-400"
                     >
@@ -584,8 +604,6 @@ export default function DashboardPage() {
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
 
-                        {/* Projects */}
-
                         <StatCard
                             title="Projects"
                             value={
@@ -596,8 +614,6 @@ export default function DashboardPage() {
                             }
                         />
 
-                        {/* Broadcasts */}
-
                         <StatCard
                             title="Broadcasts"
                             value="—"
@@ -606,8 +622,6 @@ export default function DashboardPage() {
                             }
                         />
 
-                        {/* Advertisements */}
-
                         <StatCard
                             title="Advertisements"
                             value="—"
@@ -615,8 +629,6 @@ export default function DashboardPage() {
                                 <AdIcon />
                             }
                         />
-
-                        {/* Segments */}
 
                         <StatCard
                             title="Segments"
@@ -651,6 +663,7 @@ export default function DashboardPage() {
                             </div>
 
                             <button
+                                type="button"
                                 onClick={() =>
                                     loadProjects(
                                         localStorage.getItem(
@@ -712,6 +725,7 @@ export default function DashboardPage() {
                                     ) => (
 
                                         <button
+                                            type="button"
                                             key={
                                                 project.id
                                             }
@@ -832,24 +846,52 @@ function Logo({
     dark?: boolean;
 }) {
     return (
-        <div className="w-10 h-10 shrink-0 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
+        <div className="flex items-center gap-3">
 
-            <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-            >
-                <path d="M3 12h2" />
-                <path d="M7 8v8" />
-                <path d="M11 4v16" />
-                <path d="M15 8v8" />
-                <path d="M19 6v12" />
-                <path d="M21 10v4" />
-            </svg>
+            <div className="w-10 h-10 shrink-0 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
+
+                <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                >
+                    <path d="M3 12h2" />
+                    <path d="M7 8v8" />
+                    <path d="M11 4v16" />
+                    <path d="M15 8v8" />
+                    <path d="M19 6v12" />
+                    <path d="M21 10v4" />
+                </svg>
+
+            </div>
+
+            <div className="hidden sm:block lg:block">
+
+                <p
+                    className={`text-sm font-bold ${
+                        dark
+                            ? "text-white"
+                            : "text-slate-900"
+                    }`}
+                >
+                    Radio Intelligence
+                </p>
+
+                <p
+                    className={`text-[10px] ${
+                        dark
+                            ? "text-slate-500"
+                            : "text-slate-500"
+                    }`}
+                >
+                    Audio Intelligence Platform
+                </p>
+
+            </div>
 
         </div>
     );
@@ -1249,3 +1291,4 @@ function Spinner() {
         </svg>
     );
 }
+

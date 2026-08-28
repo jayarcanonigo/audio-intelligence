@@ -1,360 +1,469 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-import Navbar from "@/components/layout/Navbar";
-import {
-    isAuthenticated,
-    getUsername,
-} from "@/services/auth";
+/* ============================================================
+   LANDING PAGE
+============================================================ */
 
-import styles from "./page.module.css";
-
-export default function DashboardPage() {
-    const router = useRouter();
-
-    const [checkingAuth, setCheckingAuth] = useState(true);
-    const [username, setUsername] = useState("Admin");
-
-    useEffect(() => {
-        const authenticated = isAuthenticated();
-
-        if (!authenticated) {
-            router.replace("/login");
-            return;
-        }
-
-        const storedUsername = getUsername();
-
-        if (storedUsername) {
-            setUsername(storedUsername);
-        }
-
-        setCheckingAuth(false);
-    }, [router]);
-
-    if (checkingAuth) {
-        return (
-            <main className={styles.page}>
-                <div className={styles.emptyState}>
-                    <div className={styles.emptyIcon}>
-                        <IconRadio />
-                    </div>
-
-                    <div className={styles.emptyTitle}>
-                        Checking authentication...
-                    </div>
-                </div>
-            </main>
-        );
-    }
-
+export default function LandingPage() {
     return (
-        <div>
-            <Navbar />
+        <main className="min-h-screen bg-slate-100">
 
-            <main className={styles.page}>
+            {/* =================================================
+                HEADER
+            ================================================= */}
 
-                {/* ==================================================
-                    HEADER
-                ================================================== */}
+            <header className="border-b border-slate-200 bg-white">
 
-                <header className={styles.header}>
+                <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
 
-                    <div className={styles.headerContent}>
-                        <h1 className={styles.title}>
-                            Radio Intelligence
+                    {/* Logo */}
+
+                    <Logo />
+
+                    {/* Sign In */}
+
+                    <Link
+                        href="/login"
+                        className="inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
+                    >
+                        Sign in
+                    </Link>
+
+                </div>
+
+            </header>
+
+
+            {/* =================================================
+                HERO
+            ================================================= */}
+
+            <section className="relative overflow-hidden">
+
+                {/* Background decoration */}
+
+                <div className="pointer-events-none absolute inset-0">
+
+                    <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-indigo-200/30 blur-3xl" />
+
+                    <div className="absolute -right-32 top-20 h-96 w-96 rounded-full bg-indigo-200/30 blur-3xl" />
+
+                </div>
+
+
+                <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+
+                    <div className="mx-auto max-w-4xl text-center">
+
+                        {/* Badge */}
+
+                        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700">
+
+                            <span className="h-2 w-2 rounded-full bg-indigo-600" />
+
+                            Audio Intelligence Platform
+
+                        </div>
+
+
+                        {/* Title */}
+
+                        <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+
+                            Turn radio broadcasts into
+
+                            <span className="block text-indigo-600">
+                                actionable intelligence
+                            </span>
+
                         </h1>
 
-                        <p className={styles.subtitle}>
-                            Broadcast monitoring and audio intelligence
+
+                        {/* Description */}
+
+                        <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+
+                            Monitor broadcasts, process audio,
+                            generate transcripts, detect
+                            advertisements, and organize your
+                            radio intelligence data in one
+                            centralized platform.
+
                         </p>
-                    </div>
-
-                    <div className={styles.status}>
-                        <span className={styles.signalMeter} aria-hidden="true">
-                            <span />
-                            <span />
-                            <span />
-                            <span />
-                            <span />
-                        </span>
-                        <span className={styles.statusDot} />
-                        System Online
-                    </div>
-
-                </header>
 
 
-                {/* ==================================================
-                    WELCOME
-                ================================================== */}
+                        {/* Buttons */}
 
-                <section className={styles.welcomeCard}>
+                        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
 
-                    <div className={styles.welcomeContent}>
+                            <Link
+                                href="/login"
+                                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-7 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 sm:w-auto"
+                            >
+                                Sign in to Dashboard
 
-                        <div className={styles.welcomeLabel}>
-                            Dashboard
+                                <ArrowIcon />
+
+                            </Link>
+
                         </div>
 
-                        <h2 className={styles.welcomeTitle}>
-                            Welcome back, {username}
+                    </div>
+
+
+                    {/* =================================================
+                        PLATFORM PREVIEW
+                    ================================================= */}
+
+                    <div className="mx-auto mt-16 max-w-5xl">
+
+                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/40">
+
+                            {/* Browser Header */}
+
+                            <div className="flex h-12 items-center gap-2 border-b border-slate-200 bg-slate-50 px-4">
+
+                                <span className="h-3 w-3 rounded-full bg-slate-300" />
+                                <span className="h-3 w-3 rounded-full bg-slate-300" />
+                                <span className="h-3 w-3 rounded-full bg-slate-300" />
+
+                                <div className="ml-4 h-7 flex-1 rounded-lg bg-white border border-slate-200" />
+
+                            </div>
+
+
+                            {/* Dashboard Preview */}
+
+                            <div className="grid min-h-[320px] grid-cols-12">
+
+                                {/* Sidebar */}
+
+                                <div className="col-span-3 hidden bg-slate-950 p-4 sm:block">
+
+                                    <div className="flex items-center gap-2">
+
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
+                                            <WaveIcon />
+                                        </div>
+
+                                        <div className="h-3 w-20 rounded bg-white/20" />
+
+                                    </div>
+
+
+                                    <div className="mt-8 space-y-2">
+
+                                        <div className="h-9 rounded-lg bg-indigo-600" />
+
+                                        <div className="h-9 rounded-lg bg-white/5" />
+
+                                        <div className="h-9 rounded-lg bg-white/5" />
+
+                                    </div>
+
+                                </div>
+
+
+                                {/* Main Preview */}
+
+                                <div className="col-span-12 bg-slate-50 p-5 sm:col-span-9">
+
+                                    <div className="flex items-center justify-between">
+
+                                        <div>
+
+                                            <div className="h-4 w-28 rounded bg-slate-300" />
+
+                                            <div className="mt-2 h-3 w-48 rounded bg-slate-200" />
+
+                                        </div>
+
+                                        <div className="h-9 w-9 rounded-lg bg-indigo-100" />
+
+                                    </div>
+
+
+                                    {/* Stats */}
+
+                                    <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+
+                                        <PreviewCard value="18" />
+                                        <PreviewCard value="42" />
+                                        <PreviewCard value="156" />
+                                        <PreviewCard value="2,481" />
+
+                                    </div>
+
+
+                                    {/* Project */}
+
+                                    <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+
+                                        <div className="flex items-center justify-between">
+
+                                            <div>
+
+                                                <div className="h-3 w-32 rounded bg-slate-300" />
+
+                                                <div className="mt-2 h-2.5 w-48 rounded bg-slate-200" />
+
+                                            </div>
+
+                                            <div className="h-8 w-16 rounded-lg bg-indigo-50" />
+
+                                        </div>
+
+
+                                        <div className="mt-5 grid grid-cols-3 gap-3">
+
+                                            <div className="h-16 rounded-lg bg-slate-50" />
+                                            <div className="h-16 rounded-lg bg-slate-50" />
+                                            <div className="h-16 rounded-lg bg-slate-50" />
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            {/* =================================================
+                FEATURES
+            ================================================= */}
+
+            <section className="border-t border-slate-200 bg-white">
+
+                <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+
+                    <div className="mx-auto max-w-2xl text-center">
+
+                        <p className="text-sm font-semibold text-indigo-600">
+                            PLATFORM
+                        </p>
+
+                        <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
+                            Everything you need for radio intelligence
                         </h2>
 
-                        <p className={styles.welcomeText}>
-                            Monitor radio broadcasts, process audio,
-                            detect advertisements, and review transcript
-                            segments from your centralized workspace.
+                        <p className="mt-4 text-sm leading-6 text-slate-500 sm:text-base">
+                            A centralized workspace for monitoring,
+                            processing, analyzing, and reviewing
+                            radio broadcast data.
                         </p>
 
                     </div>
 
-                </section>
 
+                    <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
 
-                {/* ==================================================
-                    STATISTICS
-                ================================================== */}
+                        <Feature
+                            icon={<RadioIcon />}
+                            title="Broadcast Monitoring"
+                            description="Organize and monitor radio broadcast recordings from your projects."
+                        />
 
-                <section className={styles.statsGrid}>
+                        <Feature
+                            icon={<AudioIcon />}
+                            title="Audio Processing"
+                            description="Process broadcast audio and prepare recordings for intelligent analysis."
+                        />
 
-                    <StatCard
-                        icon={<IconFolder />}
-                        title="Projects"
-                        value="0"
-                        description="Total monitoring projects"
-                        tone="signal"
-                    />
+                        <Feature
+                            icon={<TranscriptIcon />}
+                            title="AI Transcription"
+                            description="Convert broadcast audio into searchable transcript segments."
+                        />
 
-                    <StatCard
-                        icon={<IconMegaphone />}
-                        title="Advertisements"
-                        value="0"
-                        description="Detected advertisements"
-                        tone="alert"
-                    />
-
-                    <StatCard
-                        icon={<IconHeadphones />}
-                        title="Audio Processed"
-                        value="0"
-                        description="Processed recordings"
-                        tone="signal"
-                    />
-
-                    <StatCard
-                        icon={<IconFileText />}
-                        title="Segments"
-                        value="0"
-                        description="Transcript segments"
-                        tone="success"
-                    />
-
-                </section>
-
-
-                {/* ==================================================
-                    CONTENT
-                ================================================== */}
-
-                <section className={styles.grid}>
-
-                    {/* LEFT */}
-
-                    <div className={styles.card}>
-
-                        <div className={styles.cardHeader}>
-
-                            <div>
-                                <h2 className={styles.sectionTitle}>
-                                    Quick Actions
-                                </h2>
-
-                                <p className={styles.sectionSubtitle}>
-                                    Access frequently used tools
-                                </p>
-                            </div>
-
-                        </div>
-
-
-                        <div className={styles.actions}>
-
-                            <Action
-                                href="/projects"
-                                icon={<IconFolder />}
-                                title="Projects"
-                                description="Manage monitoring projects"
-                            />
-
-                            <Action
-                                href="/ad-editor"
-                                icon={<IconHeadphones />}
-                                title="Ad Editor"
-                                description="Review detected advertisements"
-                            />
-
-                            <Action
-                                href="/reports"
-                                icon={<IconClipboard />}
-                                title="Reports"
-                                description="View broadcast reports"
-                            />
-
-                        </div>
-
-
-                        {/* Recent Activity */}
-
-                        <div
-                            style={{
-                                marginTop: "24px",
-                            }}
-                        >
-
-                            <div className={styles.cardHeader}>
-
-                                <div>
-                                    <h2 className={styles.sectionTitle}>
-                                        Recent Activity
-                                    </h2>
-
-                                    <p className={styles.sectionSubtitle}>
-                                        Latest system activity
-                                    </p>
-                                </div>
-
-                            </div>
-
-                            <div className={styles.emptyState}>
-
-                                <div className={styles.emptyIcon}>
-                                    <IconActivity />
-                                </div>
-
-                                <div className={styles.emptyTitle}>
-                                    No recent activity
-                                </div>
-
-                                <p className={styles.emptyText}>
-                                    Activity from projects, audio
-                                    processing, and advertisement
-                                    detection will appear here.
-                                </p>
-
-                            </div>
-
-                        </div>
+                        <Feature
+                            icon={<AdIcon />}
+                            title="Advertisement Detection"
+                            description="Identify and organize advertisements from processed broadcasts."
+                        />
 
                     </div>
 
+                </div>
 
-                    {/* RIGHT */}
+            </section>
 
-                    <div className={styles.card}>
 
-                        <div className={styles.cardHeader}>
+            {/* =================================================
+                WORKFLOW
+            ================================================= */}
 
-                            <div>
-                                <h2 className={styles.sectionTitle}>
-                                    System Status
-                                </h2>
+            <section className="bg-slate-50">
 
-                                <p className={styles.sectionSubtitle}>
-                                    Current service status
-                                </p>
-                            </div>
+                <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+
+                    <div className="grid items-center gap-12 lg:grid-cols-2">
+
+                        <div>
+
+                            <p className="text-sm font-semibold text-indigo-600">
+                                SIMPLE WORKFLOW
+                            </p>
+
+                            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
+                                From broadcast to intelligence
+                            </h2>
+
+                            <p className="mt-4 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
+                                Radio Intelligence brings the complete
+                                broadcast analysis workflow into one
+                                centralized system.
+                            </p>
 
                         </div>
 
 
-                        <div className={styles.statusList}>
+                        <div className="space-y-4">
 
-                            <StatusItem
-                                name="Authentication"
+                            <WorkflowStep
+                                number="01"
+                                title="Upload"
+                                description="Upload your broadcast recordings to a monitoring project."
                             />
 
-                            <StatusItem
-                                name="Audio Processing"
+                            <WorkflowStep
+                                number="02"
+                                title="Transcribe"
+                                description="Process audio and generate timestamped transcript segments."
                             />
 
-                            <StatusItem
-                                name="Transcription"
+                            <WorkflowStep
+                                number="03"
+                                title="Detect"
+                                description="Identify advertisements and relevant broadcast content."
                             />
 
-                            <StatusItem
-                                name="Advertisement Detection"
-                            />
-
-                            <StatusItem
-                                name="Database"
+                            <WorkflowStep
+                                number="04"
+                                title="Analyze"
+                                description="Review segments, advertisements, projects, and reports."
                             />
 
                         </div>
 
                     </div>
 
-                </section>
+                </div>
 
-            </main>
-        </div>
+            </section>
+
+
+            {/* =================================================
+                CTA
+            ================================================= */}
+
+            <section className="bg-slate-950">
+
+                <div className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 lg:px-8">
+
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white">
+                        <WaveIcon />
+                    </div>
+
+                    <h2 className="mt-6 text-3xl font-bold tracking-tight text-white">
+                        Ready to monitor your broadcasts?
+                    </h2>
+
+                    <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-400 sm:text-base">
+                        Sign in to access your radio intelligence
+                        workspace and start analyzing your broadcast
+                        data.
+                    </p>
+
+                    <Link
+                        href="/login"
+                        className="mt-8 inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-7 text-sm font-semibold text-white transition hover:bg-indigo-500"
+                    >
+                        Sign in
+
+                        <ArrowIcon />
+
+                    </Link>
+
+                </div>
+
+            </section>
+
+
+            {/* =================================================
+                FOOTER
+            ================================================= */}
+
+            <footer className="bg-slate-950 border-t border-white/10">
+
+                <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-6 sm:flex-row sm:px-6 lg:px-8">
+
+                    <Logo dark />
+
+                    <p className="text-xs text-slate-500">
+                        Radio Intelligence — Audio Intelligence Platform
+                    </p>
+
+                </div>
+
+            </footer>
+
+        </main>
     );
 }
 
 
-/* ================================================================
-   STAT CARD
-================================================================ */
+/* ============================================================
+   LOGO
+============================================================ */
 
-function StatCard({
-    icon,
-    title,
-    value,
-    description,
-    tone = "signal",
+function Logo({
+    dark = false,
 }: {
-    icon: React.ReactNode;
-    title: string;
-    value: string;
-    description: string;
-    tone?: "signal" | "alert" | "success";
+    dark?: boolean;
 }) {
-    const toneVar =
-        tone === "alert"
-            ? "var(--alert)"
-            : tone === "success"
-            ? "var(--success)"
-            : "var(--signal)";
-
     return (
-        <div
-            className={styles.statCard}
-            style={{ ["--tone" as string]: toneVar }}
-        >
+        <div className="flex items-center gap-3">
 
-            <div className={styles.statTop}>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
 
-                <div>
-                    <div className={styles.statTitle}>
-                        {title}
-                    </div>
-                </div>
-
-                <div className={styles.statIcon}>
-                    {icon}
-                </div>
+                <WaveIcon />
 
             </div>
 
-            <div className={styles.statValue}>
-                {value}
-            </div>
+            <div>
 
-            <div className={styles.statDescription}>
-                {description}
+                <div
+                    className={`text-sm font-bold tracking-wide ${
+                        dark
+                            ? "text-white"
+                            : "text-slate-900"
+                    }`}
+                >
+                    RADIO INTELLIGENCE
+                </div>
+
+                <div
+                    className={`text-[10px] ${
+                        dark
+                            ? "text-slate-500"
+                            : "text-slate-500"
+                    }`}
+                >
+                    Audio Intelligence Platform
+                </div>
+
             </div>
 
         </div>
@@ -362,146 +471,219 @@ function StatCard({
 }
 
 
-/* ================================================================
-   ACTION
-================================================================ */
+/* ============================================================
+   FEATURE
+============================================================ */
 
-function Action({
-    href,
+function Feature({
     icon,
     title,
     description,
 }: {
-    href: string;
     icon: React.ReactNode;
     title: string;
     description: string;
 }) {
     return (
-        <Link
-            href={href}
-            className={styles.action}
-        >
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-indigo-200 hover:shadow-md">
 
-            <div className={styles.actionIcon}>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                 {icon}
             </div>
 
-            <div className={styles.actionContent}>
+            <h3 className="mt-5 font-bold text-slate-900">
+                {title}
+            </h3>
 
-                <div className={styles.actionTitle}>
-                    {title}
-                </div>
-
-                <div className={styles.actionDescription}>
-                    {description}
-                </div>
-
-            </div>
-
-        </Link>
-    );
-}
-
-
-/* ================================================================
-   STATUS ITEM
-================================================================ */
-
-function StatusItem({
-    name,
-}: {
-    name: string;
-}) {
-    return (
-        <div className={styles.statusItem}>
-
-            <div className={styles.statusName}>
-
-                <span className={styles.serviceDot} />
-
-                {name}
-
-            </div>
-
-            <span className={styles.statusOperational}>
-                Operational
-            </span>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+                {description}
+            </p>
 
         </div>
     );
 }
 
 
-/* ================================================================
+/* ============================================================
+   WORKFLOW
+============================================================ */
+
+function WorkflowStep({
+    number,
+    title,
+    description,
+}: {
+    number: string;
+    title: string;
+    description: string;
+}) {
+    return (
+        <div className="flex gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-xs font-bold text-indigo-600">
+                {number}
+            </div>
+
+            <div>
+
+                <h3 className="font-bold text-slate-900">
+                    {title}
+                </h3>
+
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                    {description}
+                </p>
+
+            </div>
+
+        </div>
+    );
+}
+
+
+/* ============================================================
+   PREVIEW CARD
+============================================================ */
+
+function PreviewCard({
+    value,
+}: {
+    value: string;
+}) {
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+
+            <div className="h-2.5 w-16 rounded bg-slate-200" />
+
+            <p className="mt-3 text-xl font-bold text-slate-800">
+                {value}
+            </p>
+
+        </div>
+    );
+}
+
+
+/* ============================================================
    ICONS
-   Stroke-based, 1.6px weight, 24x24 viewbox — deliberately plain
-   so the signal-meter in the header stays the one expressive mark.
-================================================================ */
+============================================================ */
 
-function IconFolder() {
+function WaveIcon() {
     return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+        <svg
+            width="21"
+            height="21"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M3 12h2" />
+            <path d="M7 8v8" />
+            <path d="M11 4v16" />
+            <path d="M15 8v8" />
+            <path d="M19 6v12" />
+            <path d="M21 10v4" />
         </svg>
     );
 }
 
-function IconMegaphone() {
+function RadioIcon() {
     return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 11v2a2 2 0 0 0 2 2h1l3.5 4.5V6.5L6 11H5a2 2 0 0 0-2 2Z" />
-            <path d="M14 8.5c1.2 1 1.2 6 0 7" />
-            <path d="M17.5 5.5c2.6 2.7 2.6 10.3 0 13" />
+        <svg
+            width="21"
+            height="21"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+        >
+            <circle cx="12" cy="12" r="2" />
+            <path d="M7.8 7.8a6 6 0 0 0 0 8.4" />
+            <path d="M16.2 7.8a6 6 0 0 1 0 8.4" />
+            <path d="M4.9 4.9a10 10 0 0 0 0 14.2" />
+            <path d="M19.1 4.9a10 10 0 0 1 0 14.2" />
         </svg>
     );
 }
 
-function IconHeadphones() {
+function AudioIcon() {
     return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
-            <rect x="3" y="14" width="4" height="6" rx="1.5" />
-            <rect x="17" y="14" width="4" height="6" rx="1.5" />
+        <svg
+            width="21"
+            height="21"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+        >
+            <path d="M4 12h2" />
+            <path d="M8 8v8" />
+            <path d="M12 4v16" />
+            <path d="M16 8v8" />
+            <path d="M20 10v4" />
         </svg>
     );
 }
 
-function IconFileText() {
+function TranscriptIcon() {
     return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+        <svg
+            width="21"
+            height="21"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M7 3h7l4 4v14H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
             <path d="M14 3v4h4" />
-            <path d="M9 13h6M9 16.5h6M9 9.5h2" />
+            <path d="M9 12h6" />
+            <path d="M9 15.5h6" />
         </svg>
     );
 }
 
-function IconClipboard() {
+function AdIcon() {
     return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="6" y="4" width="12" height="17" rx="1.5" />
-            <path d="M9 4V3.5A1.5 1.5 0 0 1 10.5 2h3A1.5 1.5 0 0 1 15 3.5V4" />
-            <path d="M9 11h6M9 15h6" />
+        <svg
+            width="21"
+            height="21"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M4 5h16v14H4z" />
+            <path d="M8 9h8" />
+            <path d="M8 13h5" />
         </svg>
     );
 }
 
-function IconActivity() {
+function ArrowIcon() {
     return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 12h4l2 7 4-14 2 7h6" />
+        <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M5 12h14" />
+            <path d="m13 6 6 6-6 6" />
         </svg>
     );
 }
 
-function IconRadio() {
-    return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="14.5" r="5.5" />
-            <path d="M12 14.5v.01" />
-            <path d="M7 3 3 6.5M17 3l4 3.5" />
-            <path d="M12 3v3" />
-        </svg>
-    );
-}
