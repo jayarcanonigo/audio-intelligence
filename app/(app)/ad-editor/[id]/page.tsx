@@ -20,25 +20,14 @@ import {
 
 import {
   getLogs,
-
   deleteAdvertisement,
-
-  deleteAdvertisementsByProject,
-
   saveProject,
-
   deleteAdvertisementsByProjectHour,
-
   getAdvertisementsByProjectHour,
-
   createAdvertisement,
-
-  getAdvertisements,
-
   reprocessAdvertisements,
-
   getSegmentHours,
-  updateAdvertisement
+  updateAdvertisement,
 } from "@/services/api";
 
 import {
@@ -166,14 +155,240 @@ export default function AdEditorPage() {
   };
 
   // ============================================================
+  // DETECTION KEY
+  // ============================================================
+
+  /**
+   * Generates the detection key ONLY from source segment IDs.
+   *
+   * Examples:
+   *
+   * [98]
+   * => project-4-segments-98-98
+   *
+   * [98, 99, 100]
+   * => project-4-segments-98-100
+   */
+  const makeDetectionKey = useCallback(
+    (
+      segmentIds: number[]
+    ): string | null => {
+      if (
+        !Array.isArray(segmentIds) ||
+        segmentIds.length === 0
+      ) {
+        return null;
+      }
+
+      const ids = segmentIds
+        .map(Number)
+        .filter(
+          (id) =>
+            Number.isFinite(id)
+        );
+
+      if (ids.length === 0) {
+        return null;
+      }
+
+      const sortedIds =
+        [...ids].sort(
+          (a, b) => a - b
+        );
+
+      const startSegmentId =
+        sortedIds[0];
+
+      const endSegmentId =
+        sortedIds[
+          sortedIds.length - 1
+        ];
+
+      return `project-${projectId}-segments-${startSegmentId}-${endSegmentId}`;
+    },
+    [projectId]
+  );
+
+  // ============================================================
+  // PARSE DETECTION KEY
+  // ============================================================
+
+  /**
+   * Converts:
+   *
+   * project-4-segments-98-100
+   *
+   * into:
+   *
+   * {
+   *   startId: 98,
+   *   endId: 100
+   * }
+   */
+  const parseDetectionKey = useCallback(
+    (
+      detectionKey?: string | null
+    ): {
+      startId: number;
+      endId: number;
+    } | null => {
+      if (!detectionKey) {
+        return null;
+      }
+
+      const match =
+        String(
+          detectionKey
+        ).match(
+          /^project-\d+-segments-(\d+)-(\d+)$/
+        );
+
+      if (!match) {
+        return null;
+      }
+
+      const startId =
+        Number(match[1]);
+
+      const endId =
+        Number(match[2]);
+
+      if (
+        !Number.isFinite(
+          startId
+        ) ||
+        !Number.isFinite(
+          endId
+        ) ||
+        startId > endId
+      ) {
+        return null;
+      }
+
+      return {
+        startId,
+        endId,
+      };
+    },
+    []
+  );
+
+  // ============================================================
+  // RECOVER SEGMENT IDS FROM DETECTION KEY
+  // ============================================================
+
+  /**
+   * IMPORTANT:
+   *
+   * detection_key is the source of truth for an existing
+   * advertisement.
+   *
+   * Example:
+   *
+   * detection_key:
+   * project-4-segments-98-100
+   *
+   * The function returns:
+   *
+   * [98, 99, 100]
+   *
+   * It does NOT look at advertisement start/end first.
+   */
+
+  const getSegmentIdsFromDetectionKey =
+    useCallback(
+      (
+        detectionKey:
+          | string
+          | null
+          | undefined,
+        sourceLogs: any[]
+      ): number[] => {
+        const parsed =
+          parseDetectionKey(
+            detectionKey
+          );
+
+        if (!parsed) {
+          return [];
+        }
+
+        const {
+          startId,
+          endId,
+        } = parsed;
+
+        // ======================================================
+        // Get actual transcript IDs from logs.
+        // ======================================================
+
+        const logIds =
+          sourceLogs
+            .map(
+              (log: any) =>
+                Number(log.id)
+            )
+            .filter(
+              (id: number) =>
+                Number.isFinite(id) &&
+                id >= startId &&
+                id <= endId
+            )
+            .sort(
+              (a, b) => a - b
+            );
+
+        // ======================================================
+        // If logs contain the source IDs, use them.
+        // ======================================================
+
+        if (
+          logIds.length > 0
+        ) {
+          return logIds;
+        }
+
+        // ======================================================
+        // Fallback:
+        //
+        // Build the complete range directly from detection_key.
+        //
+        // Example:
+        //
+        // 98-100
+        //
+        // => [98,99,100]
+        // ======================================================
+
+        const ids: number[] =
+          [];
+
+        for (
+          let id = startId;
+          id <= endId;
+          id++
+        ) {
+          ids.push(id);
+        }
+
+        return ids;
+      },
+      [parseDetectionKey]
+    );
+
+  // ============================================================
   // LOAD LOGS
   // ============================================================
 
   const loadLogs = useCallback(
     async (
-      opts: { silent?: boolean } = {}
+      opts: {
+        silent?: boolean;
+      } = {}
     ) => {
-      if (!projectId) return;
+      if (!projectId) {
+        return;
+      }
 
       try {
         if (!opts.silent) {
@@ -183,7 +398,9 @@ export default function AdEditorPage() {
         const hour =
           broadcastHour === "all"
             ? undefined
-            : Number(broadcastHour);
+            : Number(
+                broadcastHour
+              );
 
         const data =
           await getLogs(
@@ -196,6 +413,10 @@ export default function AdEditorPage() {
             ? data
             : data.logs || [];
 
+        // ======================================================
+        // FIRST SAVE THE LOGS
+        // ======================================================
+
         setLogs(list);
 
         // ======================================================
@@ -203,12 +424,15 @@ export default function AdEditorPage() {
         // ======================================================
 
         if (
-          broadcastHour !== "all"
+          broadcastHour !==
+          "all"
         ) {
           const ads =
             await getAdvertisementsByProjectHour(
               projectId,
-              Number(broadcastHour)
+              Number(
+                broadcastHour
+              )
             );
 
           if (
@@ -218,21 +442,112 @@ export default function AdEditorPage() {
             const loaded =
               ads.map(
                 (ad: any) => {
-                  const matchedLogs =
-                    list.filter(
-                      (log: any) =>
-                        log.start_time ===
-                          ad.start_time &&
-                        log.end_time ===
-                          ad.end_time
+                  // ==================================================
+                  // IMPORTANT
+                  //
+                  // DO NOT calculate source segments from
+                  // advertisement start/end.
+                  //
+                  // detection_key is the source of truth.
+                  // ==================================================
+
+                  let segmentIds =
+                    getSegmentIdsFromDetectionKey(
+                      ad.detection_key,
+                      list
                     );
+
+                  // ==================================================
+                  // ONLY if detection_key is missing/invalid,
+                  // fallback to exact start/end matching.
+                  // ==================================================
+
+                  if (
+                    segmentIds.length ===
+                    0
+                  ) {
+                    const matchedLogs =
+                      list.filter(
+                        (log: any) =>
+                          log.start_time ===
+                            ad.start_time &&
+                          log.end_time ===
+                            ad.end_time
+                      );
+
+                    segmentIds =
+                      matchedLogs.map(
+                        (log: any) =>
+                          Number(
+                            log.id
+                          )
+                      );
+                  }
+
+                  // ==================================================
+                  // ALWAYS regenerate the normalized key from
+                  // source segment IDs when available.
+                  // ==================================================
+
+                  const generatedDetectionKey =
+                    makeDetectionKey(
+                      segmentIds
+                    );
+
+                  const finalDetectionKey =
+                    generatedDetectionKey ??
+                    ad.detection_key ??
+                    null;
+
+                  console.log(
+                    "========================================"
+                  );
+
+                  console.log(
+                    "LOAD DATABASE ADVERTISEMENT"
+                  );
+
+                  console.log(
+                    "Advertisement ID:",
+                    ad.id
+                  );
+
+                  console.log(
+                    "Database detection_key:",
+                    ad.detection_key
+                  );
+
+                  console.log(
+                    "Advertisement start:",
+                    ad.start_time
+                  );
+
+                  console.log(
+                    "Advertisement end:",
+                    ad.end_time
+                  );
+
+                  console.log(
+                    "Recovered segmentIds:",
+                    segmentIds
+                  );
+
+                  console.log(
+                    "Final detection_key:",
+                    finalDetectionKey
+                  );
+
+                  console.log(
+                    "========================================"
+                  );
 
                   return {
                     // =================================================
-                    // IMPORTANT
-                    // This is the Advertisement DATABASE ID.
+                    // Advertisement DATABASE ID.
                     // =================================================
-                    id: ad.id,
+
+                    id:
+                      ad.id,
 
                     project_id:
                       ad.project_id,
@@ -250,9 +565,24 @@ export default function AdEditorPage() {
                       ad.brand_name ||
                       "",
 
+                    // =================================================
+                    // Correct detection key.
+                    // =================================================
+
                     detection_key:
-                      ad.detection_key ||
-                      null,
+                      finalDetectionKey,
+
+                    // =================================================
+                    // IMPORTANT:
+                    //
+                    // Source transcript IDs.
+                    //
+                    // These are independent from editable
+                    // advertisement start/end times.
+                    // =================================================
+
+                    segmentIds:
+                      segmentIds,
 
                     status:
                       normalizeStatus(
@@ -260,12 +590,9 @@ export default function AdEditorPage() {
                       ),
 
                     // =================================================
-                    // IMPORTANT
-                    //
-                    // This advertisement definitely exists
-                    // in the database, regardless of whether
-                    // its status is NEW or SAVED.
+                    // This is already in DB.
                     // =================================================
+
                     persisted:
                       true,
 
@@ -274,12 +601,6 @@ export default function AdEditorPage() {
 
                     segment_type:
                       "advertisement",
-
-                    segmentIds:
-                      matchedLogs.map(
-                        (log: any) =>
-                          log.id
-                      ),
                   };
                 }
               );
@@ -294,7 +615,7 @@ export default function AdEditorPage() {
                   item.segmentIds
                     ?.length
                     ? item.segmentIds
-                    : [item.id]
+                    : []
               )
             );
           } else {
@@ -328,6 +649,8 @@ export default function AdEditorPage() {
     [
       projectId,
       broadcastHour,
+      getSegmentIdsFromDetectionKey,
+      makeDetectionKey,
     ]
   );
 
@@ -336,10 +659,12 @@ export default function AdEditorPage() {
   // ============================================================
 
   useEffect(() => {
-    const checkScreen = () =>
-      setIsMobile(
-        window.innerWidth < 768
-      );
+    const checkScreen =
+      () =>
+        setIsMobile(
+          window.innerWidth <
+            768
+        );
 
     checkScreen();
 
@@ -388,7 +713,9 @@ export default function AdEditorPage() {
           data.length > 0
         ) {
           setBroadcastHour(
-            String(data[0])
+            String(
+              data[0]
+            )
           );
         }
       } catch (error) {
@@ -447,7 +774,8 @@ export default function AdEditorPage() {
     async () => {
       try {
         const hour =
-          broadcastHour === "all"
+          broadcastHour ===
+          "all"
             ? undefined
             : Number(
                 broadcastHour
@@ -458,9 +786,15 @@ export default function AdEditorPage() {
         );
 
         console.log(
-          "REPROCESS START",
+          "REPROCESS START"
+        );
+
+        console.log(
           "Project ID:",
-          projectId,
+          projectId
+        );
+
+        console.log(
           "Hour:",
           hour
         );
@@ -493,12 +827,8 @@ export default function AdEditorPage() {
 
         const created =
           Number(
-            data?.created ?? 0
-          );
-
-        const skipped =
-          Number(
-            data?.skipped ?? 0
+            data?.created ??
+              0
           );
 
         if (
@@ -575,7 +905,9 @@ export default function AdEditorPage() {
       log.start_time ||
       log.start;
 
-    if (!time) return null;
+    if (!time) {
+      return null;
+    }
 
     const [hh] =
       String(time).split(
@@ -611,7 +943,9 @@ export default function AdEditorPage() {
           const hour =
             getHour(log);
 
-          if (!hour) return;
+          if (!hour) {
+            return;
+          }
 
           const fileName =
             getFileName(log);
@@ -656,7 +990,9 @@ export default function AdEditorPage() {
     async () => {
       const getSeconds =
         (time?: string) => {
-          if (!time) return 0;
+          if (!time) {
+            return 0;
+          }
 
           const parts =
             time
@@ -664,7 +1000,8 @@ export default function AdEditorPage() {
               .map(Number);
 
           if (
-            parts.length === 3
+            parts.length ===
+            3
           ) {
             const [
               hour,
@@ -680,7 +1017,8 @@ export default function AdEditorPage() {
           }
 
           if (
-            parts.length === 2
+            parts.length ===
+            2
           ) {
             const [
               minute,
@@ -728,7 +1066,9 @@ export default function AdEditorPage() {
           ]
             .map(
               (v) =>
-                String(v).padStart(
+                String(
+                  v
+                ).padStart(
                   2,
                   "0"
                 )
@@ -747,31 +1087,35 @@ export default function AdEditorPage() {
                 b.start
               )
           )
-          .map((r) => ({
-            "Start HH:MM:SS":
-              r.start ||
-              "00:00:00",
+          .map(
+            (r) => ({
+              "Start HH:MM:SS":
+                r.start ||
+                "00:00:00",
 
-            "End time HH:MM:SS":
-              r.end ||
-              "00:00:00",
+              "End time HH:MM:SS":
+                r.end ||
+                "00:00:00",
 
-            "ACTUAL LENGTH":
-              formatLength(
-                r.start,
-                r.end
-              ),
+              "ACTUAL LENGTH":
+                formatLength(
+                  r.start,
+                  r.end
+                ),
 
-            BRAND:
-              r.brand_name ||
-              "",
+              BRAND:
+                r.brand_name ||
+                "",
 
-            COPYLINE:
-              r.text || "",
-          }));
+              COPYLINE:
+                r.text ||
+                "",
+            })
+          );
 
       if (
-        exportData.length === 0
+        exportData.length ===
+        0
       ) {
         toast.warning(
           "No advertisements to export"
@@ -979,60 +1323,216 @@ export default function AdEditorPage() {
   // UPDATE SEGMENT
   // ============================================================
 
-  function handleUpdateSegment(
-    id: number,
-    data: {
-      text: string;
-      start: string;
-      end: string;
-      brand_name: string;
-      status: "NEW" | "SAVED";
-    }
+// ============================================================
+// UPDATE SEGMENT
+// ============================================================
+
+function handleUpdateSegment(
+  id: number,
+  data: {
+    text: string;
+    start: string;
+    end: string;
+    brand_name: string;
+    status: "NEW" | "SAVED";
+  }
+) {
+  console.log(
+    "========================================"
+  );
+
+  console.log(
+    "UPDATE SEGMENT"
+  );
+
+  console.log(
+    "Advertisement ID:",
+    id
+  );
+
+  console.log(
+    "New Start:",
+    data.start
+  );
+
+  console.log(
+    "New End:",
+    data.end
+  );
+
+  // ==========================================================
+  // FIND ALL TRANSCRIPT SEGMENTS COVERED BY THE NEW RANGE
+  //
+  // This is the important fix.
+  //
+  // Example:
+  //
+  // 98 = 00:01:16 - 00:01:46
+  // 99 = 00:01:46 - 00:02:01
+  // 100 = 00:02:01 - 00:02:16
+  //
+  // If edited advertisement is:
+  //
+  // 00:01:16 - 00:02:16
+  //
+  // segmentIds becomes:
+  //
+  // [98, 99, 100]
+  // ==========================================================
+
+  const newStartSeconds =
+    parseTime(data.start);
+
+  const newEndSeconds =
+    parseTime(data.end);
+
+  const newSegmentIds =
+    logs
+      .filter((log: any) => {
+        const segmentStart =
+          parseTime(
+            log.start_time ||
+              log.start ||
+              "00:00:00"
+          );
+
+        const segmentEnd =
+          parseTime(
+            log.end_time ||
+              log.end ||
+              "00:00:00"
+          );
+
+        if (
+          segmentEnd <=
+          newStartSeconds
+        ) {
+          return false;
+        }
+
+        if (
+          segmentStart >=
+          newEndSeconds
+        ) {
+          return false;
+        }
+
+        return true;
+      })
+      .map(
+        (log: any) =>
+          Number(log.id)
+      );
+
+  console.log(
+    "========================================"
+  );
+
+  console.log(
+    "CALCULATED SEGMENT IDS:",
+    newSegmentIds
+  );
+
+  // ==========================================================
+  // DETECTION KEY
+  //
+  // ALWAYS generate this from the NEW segmentIds.
+  // ==========================================================
+
+  let detectionKey: string | null =
+    null;
+
+  if (
+    newSegmentIds.length > 0
   ) {
-    console.log(
-      "UPDATE SEGMENT ID:",
-      id,
-      "UPDATE DATA:",
-      data
-    );
+    const startSegmentId =
+      newSegmentIds[0];
 
-    setLastSavedId(id);
+    const endSegmentId =
+      newSegmentIds[
+        newSegmentIds.length - 1
+      ];
 
-    setResults(
-      (prev) =>
-        prev.map(
-          (item) =>
-            item.id === id
-              ? {
-                  ...item,
-
-                  text:
-                    data.text,
-
-                  start:
-                    data.start,
-
-                  end:
-                    data.end,
-
-                  brand_name:
-                    data.brand_name,
-
-                  status:
-                    data.status,
-                }
-              : item
-        )
-    );
+    detectionKey =
+      `project-${projectId}-segments-${startSegmentId}-${endSegmentId}`;
   }
 
+  console.log(
+    "NEW DETECTION KEY:",
+    detectionKey
+  );
+
+  console.log(
+    "========================================"
+  );
+
+  // ==========================================================
+  // UPDATE RESULT
+  // ==========================================================
+
+  setResults((prev) =>
+    prev.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+
+            text:
+              data.text,
+
+            start:
+              data.start,
+
+            end:
+              data.end,
+
+            brand_name:
+              data.brand_name,
+
+            status:
+              data.status,
+
+            // IMPORTANT
+            // Replace old segmentIds.
+            segmentIds:
+              newSegmentIds,
+
+            // IMPORTANT
+            // Replace old detection_key.
+            detection_key:
+              detectionKey,
+          }
+        : item
+    )
+  );
+
+  setLastSavedId(id);
+
+  console.log(
+    "RESULT UPDATED:",
+    {
+      id,
+      start: data.start,
+      end: data.end,
+      segmentIds:
+        newSegmentIds,
+      detection_key:
+        detectionKey,
+    }
+  );
+
+  console.log(
+    "========================================"
+  );
+}
   // ============================================================
   // TIME HELPERS
   // ============================================================
 
   const toSeconds =
     (time?: string) => {
-      if (!time) return null;
+      if (!time) {
+        return null;
+      }
 
       const parts =
         time
@@ -1040,7 +1540,8 @@ export default function AdEditorPage() {
           .map(Number);
 
       if (
-        parts.length === 3
+        parts.length ===
+        3
       ) {
         const [
           ,
@@ -1055,7 +1556,8 @@ export default function AdEditorPage() {
       }
 
       if (
-        parts.length === 2
+        parts.length ===
+        2
       ) {
         const [
           minute,
@@ -1079,7 +1581,8 @@ export default function AdEditorPage() {
           .map(Number);
 
       if (
-        parts.length === 3
+        parts.length ===
+        3
       ) {
         const [
           ,
@@ -1094,7 +1597,8 @@ export default function AdEditorPage() {
       }
 
       if (
-        parts.length === 2
+        parts.length ===
+        2
       ) {
         const [
           minute,
@@ -1186,7 +1690,9 @@ export default function AdEditorPage() {
       const audio =
         audioRef.current;
 
-      if (!audio) return;
+      if (!audio) {
+        return;
+      }
 
       const start =
         row.start ??
@@ -1390,19 +1896,40 @@ export default function AdEditorPage() {
         );
 
       const ids =
-        range.map(
-          (x) => x.id
+        range
+          .map(
+            (x) => Number(x.id)
+          )
+          .filter(
+            (id) =>
+              Number.isFinite(id)
+          );
+
+      if (
+        ids.length === 0
+      ) {
+        toast.error(
+          "No source segments found"
         );
 
+        return;
+      }
+
       // ========================================================
-      // IMPORTANT
-      //
-      // Temporary frontend ID.
-      // This is NOT an Advertisement database ID.
+      // TEMPORARY FRONTEND ID
       // ========================================================
 
       const newId =
         Date.now();
+
+      // ========================================================
+      // DETECTION KEY FROM SOURCE IDS
+      // ========================================================
+
+      const detectionKey =
+        makeDetectionKey(
+          ids
+        );
 
       const newSegment =
         {
@@ -1426,31 +1953,40 @@ export default function AdEditorPage() {
               range.length - 1
             ].end_time,
 
-          segmentIds: ids,
+          // ====================================================
+          // SOURCE OF TRUTH
+          // ====================================================
+
+          segmentIds:
+            ids,
 
           advertisement:
             true,
 
           brand_name: "",
 
-          status: "NEW",
+          status:
+            "NEW",
 
-          // IMPORTANT
-          persisted: false,
+          persisted:
+            false,
 
           segment_type:
             "new",
 
           detection_key:
-            `manual-${projectId}-${range[0].start_time}-${range[range.length - 1].end_time}`,
+            detectionKey,
         };
 
       const clean =
         results.filter(
           (row) => {
             const rowIds =
-              row.segmentIds ??
-              [row.id];
+              Array.isArray(
+                row.segmentIds
+              )
+                ? row.segmentIds
+                : [];
 
             return !rowIds.some(
               (id: number) =>
@@ -1474,7 +2010,7 @@ export default function AdEditorPage() {
             updated.flatMap(
               (x) =>
                 x.segmentIds ??
-                [x.id]
+                []
             )
           ),
         ]
@@ -1492,117 +2028,264 @@ export default function AdEditorPage() {
         null
       );
 
+      console.log(
+        "ADD RANGE:",
+        {
+          ids,
+          detectionKey,
+        }
+      );
+
       toast.success(
         "✅ Advertisement segment added"
       );
     };
 
   // ============================================================
-  // SAVE ALL
-  // ============================================================
+// SAVE ALL
+// ============================================================
 
-  async function handleSaveAllSegments() {
-    try {
+async function handleSaveAllSegments() {
+  try {
+    if (results.length === 0) {
+      toast.warning(
+        "No advertisements to save"
+      );
+
+      return;
+    }
+
+    console.log(
+      "========================================"
+    );
+
+    console.log(
+      "SAVE ALL ADVERTISEMENTS"
+    );
+
+    console.log(
+      "Project ID:",
+      projectId
+    );
+
+    console.log(
+      "Results before save:",
+      results
+    );
+
+    console.log(
+      "========================================"
+    );
+
+    for (const segment of results) {
+      // ========================================================
+      // ALWAYS USE CURRENT segmentIds
+      // ========================================================
+
+      const segmentIds =
+        Array.isArray(
+          segment.segmentIds
+        )
+          ? segment.segmentIds
+              .map(Number)
+              .filter(
+                (id: number) =>
+                  Number.isFinite(id)
+              )
+          : [];
+
+      // ========================================================
+      // DO NOT silently use the old detection_key.
+      //
+      // The current segmentIds are the source of truth.
+      // ========================================================
+
       if (
-        results.length === 0
+        segmentIds.length === 0
       ) {
-        toast.warning(
-          "No advertisements to save"
-        );
-
-        return;
-      }
-
-      for (
-        const segment of results
-      ) {
-        let detectionKey =
-          segment.detection_key ||
-          null;
-
-        if (
-          !detectionKey &&
-          segment.segmentIds &&
-          segment.segmentIds.length >
-            0
-        ) {
-          const ids =
-            segment.segmentIds;
-
-          const startSegmentId =
-            ids[0];
-
-          const endSegmentId =
-            ids[ids.length - 1];
-
-          detectionKey =
-            `project-${projectId}-segments-${startSegmentId}-${endSegmentId}`;
-        }
-
-        if (
-          !detectionKey &&
-          segment.id
-        ) {
-          detectionKey =
-            `project-${projectId}-segments-${segment.id}-${segment.id}`;
-        }
-
-        console.log(
-          "SAVING ADVERTISEMENT:",
+        console.error(
+          "SAVE ERROR: segmentIds is empty",
           {
-            project_id:
-              projectId,
+            advertisementId:
+              segment.id,
 
-            text:
-              segment.text,
+            oldDetectionKey:
+              segment.detection_key,
 
-            start:
-              segment.start,
-
-            end:
-              segment.end,
-
-            brand_name:
-              segment.brand_name,
-
-            detection_key:
-              detectionKey,
-
-            status:
-              "SAVED",
-
-            persisted:
-              segment.persisted,
+            segment,
           }
         );
 
-        // ======================================================
-        // IMPORTANT:
-        //
-        // If this item already exists in DB, do not create
-        // another Advertisement record.
-        // ======================================================
+        throw new Error(
+          `Cannot save advertisement ${segment.id}: segmentIds is empty`
+        );
+      }
 
-       if (
-          segment.persisted === true
-        ) {
+      // ========================================================
+      // GENERATE DETECTION KEY
+      // ========================================================
+
+      const startSegmentId =
+        segmentIds[0];
+
+      const endSegmentId =
+        segmentIds[
+          segmentIds.length - 1
+        ];
+
+      const detectionKey =
+        `project-${projectId}-segments-${startSegmentId}-${endSegmentId}`;
+
+      console.log(
+        "========================================"
+      );
+
+      console.log(
+        "SAVING ADVERTISEMENT"
+      );
+
+      console.log(
+        "Advertisement ID:",
+        segment.id
+      );
+
+      console.log(
+        "Persisted:",
+        segment.persisted
+      );
+
+      console.log(
+        "Segment IDs:",
+        segmentIds
+      );
+
+      console.log(
+        "Old detection_key:",
+        segment.detection_key
+      );
+
+      console.log(
+        "NEW detection_key:",
+        detectionKey
+      );
+
+      console.log(
+        "Start:",
+        segment.start
+      );
+
+      console.log(
+        "End:",
+        segment.end
+      );
+
+      console.log(
+        "Status:",
+        "SAVED"
+      );
+
+      console.log(
+        "========================================"
+      );
+
+      // ========================================================
+      // EXISTING DATABASE ADVERTISEMENT
+      // ========================================================
+
+      if (
+        segment.persisted === true
+      ) {
+        console.log(
+          "UPDATING EXISTING ADVERTISEMENT:",
+          segment.id
+        );
+
+        const updated =
           await updateAdvertisement(
             segment.id,
-            {              
-              text: segment.text,
-              start: segment.start,
-              end: segment.end,
+            {
+              text:
+                segment.text,
+
+              start:
+                segment.start,
+
+              end:
+                segment.end,
+
               brand_name:
-                segment.brand_name || "",
+                segment.brand_name ||
+                "",
+
               detection_key:
                 detectionKey,
-              status: "SAVED",
+
+              status:
+                "SAVED",
             }
           );
 
-          continue;
-        }
+        console.log(
+          "UPDATE SUCCESS:",
+          updated
+        );
 
+        // ======================================================
+        // UPDATE FRONTEND STATE
+        // ======================================================
+
+        setResults((prev) =>
+          prev.map((item) =>
+            item.id ===
+            segment.id
+              ? {
+                  ...item,
+
+                  text:
+                    segment.text,
+
+                  start:
+                    segment.start,
+
+                  end:
+                    segment.end,
+
+                  brand_name:
+                    segment.brand_name ||
+                    "",
+
+                  segmentIds:
+                    segmentIds,
+
+                  detection_key:
+                    detectionKey,
+
+                  status:
+                    "SAVED",
+
+                  persisted:
+                    true,
+                }
+              : item
+          )
+        );
+
+        setLastSavedId(
+          segment.id
+        );
+
+        continue;
+      }
+
+      // ========================================================
+      // NEW FRONTEND ADVERTISEMENT
+      // ========================================================
+
+      console.log(
+        "CREATING NEW ADVERTISEMENT"
+      );
+
+      const created =
         await createAdvertisement({
           project_id:
             projectId,
@@ -1620,201 +2303,119 @@ export default function AdEditorPage() {
             segment.brand_name ||
             "",
 
+          // IMPORTANT:
+          // Use detectionKey, NOT segment.detectionKey
           detection_key:
             detectionKey,
 
           status:
             "SAVED",
         });
-      }
 
-      toast.success(
-        "✅ Advertisements saved successfully"
+      console.log(
+        "CREATE SUCCESS:",
+        created
       );
 
       // ========================================================
-      // Reload from database.
-      //
-      // This converts newly created items from:
-      //
-      // persisted: false
-      //
-      // to:
-      //
-      // persisted: true
-      //
-      // and gives them the real Advertisement DB ID.
+      // GET REAL DATABASE ID
       // ========================================================
 
-      await loadLogs({
-        silent: true,
-      });
-    } catch (
-      error: any
-    ) {
-      console.error(
-        "SAVE ERROR",
-        error
+      const createdAd =
+        created?.data ??
+        created?.advertisement ??
+        created;
+
+      const realAdvertisementId =
+        createdAd?.id ??
+        createdAd?.advertisement_id ??
+        null;
+
+      // ========================================================
+      // UPDATE FRONTEND STATE
+      // ========================================================
+
+      setResults((prev) =>
+        prev.map((item) =>
+          item.id ===
+          segment.id
+            ? {
+                ...item,
+
+                id:
+                  realAdvertisementId ??
+                  item.id,
+
+                text:
+                  segment.text,
+
+                start:
+                  segment.start,
+
+                end:
+                  segment.end,
+
+                brand_name:
+                  segment.brand_name ||
+                  "",
+
+                segmentIds:
+                  segmentIds,
+
+                detection_key:
+                  detectionKey,
+
+                status:
+                  "SAVED",
+
+                persisted:
+                  true,
+              }
+            : item
+        )
       );
 
-      toast.error(
-        error?.message ||
-          "Save failed"
+      setLastSavedId(
+        realAdvertisementId ??
+        segment.id
       );
     }
-  }
 
-  // ============================================================
-  // REMOVE / DELETE SINGLE
-  // ============================================================
-
-
-const handleRemove = async (id: number) => {
-  const item = results.find(
-    (r) => r.id === id
-  );
-
-  if (!item) {
-    console.warn(
-      "DELETE: item not found:",
-      id
-    );
-
-    return;
-  }
-
-  console.log(
-    "========================================"
-  );
-
-  console.log(
-    "DELETE ADVERTISEMENT"
-  );
-
-  console.log(
-    "Advertisement ID:",
-    id
-  );
-
-  console.log(
-    "Status:",
-    item.status
-  );
-
-  console.log(
-    "Detection Key:",
-    item.detection_key
-  );
-
-  console.log(
-    "Project ID:",
-    item.project_id
-  );
-
-  console.log(
-    "Item:",
-    item
-  );
-
-  console.log(
-    "========================================"
-  );
-
-  /*
-   * IMPORTANT
-   *
-   * DO NOT use status to determine whether the
-   * advertisement exists in the database.
-   *
-   * A database advertisement can have status = NEW.
-   *
-   * If the item has a real database ID, delete it
-   * through the backend.
-   */
-
-  try {
-    console.log(
-      "CALLING DELETE API:",
-      id
-    );
-
-    await deleteAdvertisement(id);
+    // ==========================================================
+    // SAVE COMPLETE
+    // ==========================================================
 
     console.log(
-      "DELETE API SUCCESS:",
-      id
+      "========================================"
     );
 
-    // ----------------------------------------------------------
-    // Remove from UI
-    // ----------------------------------------------------------
-
-    setResults((prev) =>
-      prev.filter(
-        (r) => r.id !== id
-      )
+    console.log(
+      "ALL ADVERTISEMENTS SAVED"
     );
 
-    // ----------------------------------------------------------
-    // Re-enable transcript segments
-    // ----------------------------------------------------------
-
-    const itemSegmentIds =
-      item.segmentIds ?? [item.id];
-
-    setDisabledLogs((prev) =>
-      prev.filter(
-        (logId) =>
-          !itemSegmentIds.includes(
-            logId
-          )
-      )
+    console.log(
+      "========================================"
     );
-
-    // ----------------------------------------------------------
-    // Clear selected result
-    // ----------------------------------------------------------
-
-    if (
-      selectedResultId === id
-    ) {
-      setSelectedResultId(null);
-    }
-
-    if (
-      lastSavedId === id
-    ) {
-      setLastSavedId(null);
-    }
 
     toast.success(
-      `🗑 Advertisement ${id} deleted`
+      "✅ Advertisements saved successfully"
     );
 
-    console.log(
-      "========================================"
-    );
-    console.log(
-      "ADVERTISEMENT DELETED COMPLETELY:",
-      id
-    );
-    console.log(
-      "========================================"
-    );
+    // ==========================================================
+    // RELOAD DATABASE
+    // ==========================================================
 
+    await loadLogs({
+      silent: true,
+    });
   } catch (error: any) {
     console.error(
       "========================================"
     );
 
     console.error(
-      "DELETE ADVERTISEMENT ERROR:",
+      "SAVE ERROR:",
       error
-    );
-
-    console.error(
-      "Advertisement ID:",
-      id
     );
 
     console.error(
@@ -1823,10 +2424,161 @@ const handleRemove = async (id: number) => {
 
     toast.error(
       error?.message ||
-        "Failed to delete advertisement"
+        "Save failed"
     );
   }
-};
+}
+
+  // ============================================================
+  // REMOVE / DELETE SINGLE
+  // ============================================================
+
+  const handleRemove =
+    async (
+      id: number
+    ) => {
+      const item =
+        results.find(
+          (r) =>
+            r.id === id
+        );
+
+      if (!item) {
+        console.warn(
+          "DELETE: item not found:",
+          id
+        );
+
+        return;
+      }
+
+      console.log(
+        "========================================"
+      );
+
+      console.log(
+        "DELETE ADVERTISEMENT"
+      );
+
+      console.log(
+        "Advertisement ID:",
+        id
+      );
+
+      console.log(
+        "Status:",
+        item.status
+      );
+
+      console.log(
+        "Detection Key:",
+        item.detection_key
+      );
+
+      console.log(
+        "Segment IDs:",
+        item.segmentIds
+      );
+
+      console.log(
+        "Project ID:",
+        item.project_id
+      );
+
+      console.log(
+        "Item:",
+        item
+      );
+
+      console.log(
+        "========================================"
+      );
+
+      try {
+        console.log(
+          "CALLING DELETE API:",
+          id
+        );
+
+        await deleteAdvertisement(
+          id
+        );
+
+        console.log(
+          "DELETE API SUCCESS:",
+          id
+        );
+
+        // ======================================================
+        // Remove from UI.
+        // ======================================================
+
+        setResults(
+          (prev) =>
+            prev.filter(
+              (r) =>
+                r.id !== id
+            )
+        );
+
+        // ======================================================
+        // Re-enable transcript segments.
+        // ======================================================
+
+        const itemSegmentIds =
+          item.segmentIds ??
+          [];
+
+        setDisabledLogs(
+          (prev) =>
+            prev.filter(
+              (logId) =>
+                !itemSegmentIds.includes(
+                  logId
+                )
+            )
+        );
+
+        if (
+          selectedResultId ===
+          id
+        ) {
+          setSelectedResultId(
+            null
+          );
+        }
+
+        if (
+          lastSavedId === id
+        ) {
+          setLastSavedId(
+            null
+          );
+        }
+
+        toast.success(
+          `🗑 Advertisement ${id} deleted`
+        );
+
+        console.log(
+          "ADVERTISEMENT DELETED COMPLETELY:",
+          id
+        );
+      } catch (
+        error: any
+      ) {
+        console.error(
+          "DELETE ADVERTISEMENT ERROR:",
+          error
+        );
+
+        toast.error(
+          error?.message ||
+            "Failed to delete advertisement"
+        );
+      }
+    };
+
   // ============================================================
   // EDIT TIME
   // ============================================================
@@ -1898,6 +2650,23 @@ const handleRemove = async (id: number) => {
 
                 [field]:
                   `00:${minute}:${second}`,
+
+                // =================================================
+                // IMPORTANT:
+                //
+                // Changing time DOES NOT change segmentIds.
+                // =================================================
+
+                segmentIds:
+                  r.segmentIds,
+
+                detection_key:
+                  makeDetectionKey(
+                    r.segmentIds ||
+                      []
+                  ) ??
+                  r.detection_key ??
+                  null,
               };
             }
           )
@@ -1943,8 +2712,10 @@ const handleRemove = async (id: number) => {
 
         element?.scrollIntoView(
           {
-            behavior: "smooth",
-            block: "center",
+            behavior:
+              "smooth",
+            block:
+              "center",
           }
         );
       }, 200);
@@ -1956,7 +2727,9 @@ const handleRemove = async (id: number) => {
 
   const audioUrl =
     useMemo(() => {
-      if (!file) return "";
+      if (!file) {
+        return "";
+      }
 
       return URL.createObjectURL(
         file
@@ -1978,28 +2751,58 @@ const handleRemove = async (id: number) => {
   // ============================================================
 
   const handleAddSingle =
-    (row: any) => {
+    (
+      row: any
+    ) => {
       // ========================================================
       // IMPORTANT:
       //
-      // Do NOT use row.id as the advertisement ID.
+      // row.id = transcript Segment ID
       //
-      // row.id is the Segment database ID.
-      //
-      // This item is not yet an Advertisement DB record.
+      // It is NOT Advertisement ID.
       // ========================================================
 
       const temporaryId =
         Date.now();
 
+      const sourceSegmentId =
+        Number(row.id);
+
+      if (
+        !Number.isFinite(
+          sourceSegmentId
+        )
+      ) {
+        toast.error(
+          "Invalid source segment"
+        );
+
+        return;
+      }
+
+      // ========================================================
+      // SOURCE SEGMENT IDS
+      // ========================================================
+
+      const segmentIds = [
+        sourceSegmentId,
+      ];
+
+      // ========================================================
+      // DETECTION KEY
+      // ========================================================
+
+      const detectionKey =
+        makeDetectionKey(
+          segmentIds
+        );
+
       const newSegment =
         {
-          // Temporary frontend ID
           id: temporaryId,
 
-          // Original transcript Segment ID
           sourceSegmentId:
-            row.id,
+            sourceSegmentId,
 
           text:
             row.text ||
@@ -2012,9 +2815,12 @@ const handleRemove = async (id: number) => {
           end:
             row.end_time,
 
-          segmentIds: [
-            row.id,
-          ],
+          // ====================================================
+          // SOURCE OF TRUTH
+          // ====================================================
+
+          segmentIds:
+            segmentIds,
 
           advertisement:
             true,
@@ -2026,12 +2832,6 @@ const handleRemove = async (id: number) => {
           status:
             "NEW",
 
-          // ====================================================
-          // IMPORTANT
-          //
-          // This is NOT in Advertisement table yet.
-          // ====================================================
-
           persisted:
             false,
 
@@ -2039,18 +2839,27 @@ const handleRemove = async (id: number) => {
             "advertisement",
 
           detection_key:
-            row.detection_key ||
-            `manual-${projectId}-${row.start_time}-${row.end_time}`,
+            detectionKey,
         };
 
       const exists =
         results.some(
-          (item) =>
-            item.segmentIds?.includes(
-              row.id
-            ) ||
-            item.sourceSegmentId ===
-              row.id
+          (item) => {
+            const itemIds =
+              Array.isArray(
+                item.segmentIds
+              )
+                ? item.segmentIds
+                : [];
+
+            return (
+              itemIds.includes(
+                sourceSegmentId
+              ) ||
+              item.sourceSegmentId ===
+                sourceSegmentId
+            );
+          }
         );
 
       if (exists) {
@@ -2074,9 +2883,11 @@ const handleRemove = async (id: number) => {
         [
           ...new Set(
             updatedResults.flatMap(
-              (item: any) =>
+              (
+                item: any
+              ) =>
                 item.segmentIds ??
-                [item.id]
+                []
             )
           ),
         ]
@@ -2084,6 +2895,15 @@ const handleRemove = async (id: number) => {
 
       setLastSavedId(
         temporaryId
+      );
+
+      console.log(
+        "ADD SINGLE:",
+        {
+          sourceSegmentId,
+          segmentIds,
+          detectionKey,
+        }
       );
 
       toast.success(
@@ -2150,8 +2970,10 @@ const handleRemove = async (id: number) => {
       logRefs.current[
         current.id
       ]?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
+        behavior:
+          "smooth",
+        block:
+          "center",
       });
     }
   }, [
@@ -2171,6 +2993,7 @@ const handleRemove = async (id: number) => {
       />
 
       {/* HEADER */}
+
       <div className="bg-white rounded-xl shadow p-4 md:p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -2188,6 +3011,7 @@ const handleRemove = async (id: number) => {
           </div>
 
           {/* BROADCAST HOUR */}
+
           <div className="w-full md:w-auto">
             <div className="block md:hidden">
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -2206,7 +3030,9 @@ const handleRemove = async (id: number) => {
                 className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               >
                 {hours.map(
-                  (hour) => (
+                  (
+                    hour
+                  ) => (
                     <option
                       key={hour}
                       value={String(
@@ -2233,7 +3059,9 @@ const handleRemove = async (id: number) => {
 
               <div className="flex max-w-[700px] gap-2 overflow-x-auto rounded-xl border bg-gray-50 p-2">
                 {hours.map(
-                  (hour) => (
+                  (
+                    hour
+                  ) => (
                     <button
                       key={hour}
                       onClick={() =>
@@ -2269,6 +3097,7 @@ const handleRemove = async (id: number) => {
       </div>
 
       {/* CONTENT */}
+
       {isMobile ? (
         <div className="pb-40">
           <div className="sticky top-0 z-30 bg-gray-100 pb-3">
@@ -2410,7 +3239,9 @@ const handleRemove = async (id: number) => {
         </div>
       ) : (
         <div className="grid grid-cols-12 gap-6 pb-40">
+
           {/* LOGS */}
+
           <div className="col-span-5">
             <div className="bg-white rounded-xl shadow p-5">
               <h2 className="font-semibold mb-4">
@@ -2463,6 +3294,7 @@ const handleRemove = async (id: number) => {
           </div>
 
           {/* SEGMENTS */}
+
           <div className="col-span-7">
             <div className="bg-white rounded-xl shadow p-5">
               <div className="flex justify-between mb-4">
@@ -2513,8 +3345,10 @@ const handleRemove = async (id: number) => {
       )}
 
       {/* FOOTER */}
+
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white shadow-lg">
         <div className="px-3 py-2">
+
           {isMobile ? (
             <>
               <div className="mb-3 flex rounded-xl bg-gray-100 p-1">
@@ -2581,7 +3415,9 @@ const handleRemove = async (id: number) => {
                   <button
                     onClick={() =>
                       setShowMenu(
-                        (prev) =>
+                        (
+                          prev
+                        ) =>
                           !prev
                       )
                     }
@@ -2594,9 +3430,11 @@ const handleRemove = async (id: number) => {
 
                   {showMenu && (
                     <div className="absolute bottom-11 right-0 w-56 overflow-hidden rounded-xl border bg-white shadow-xl">
+
                       <button
                         onClick={() => {
                           handleAddRange();
+
                           setShowMenu(
                             false
                           );
@@ -2618,6 +3456,7 @@ const handleRemove = async (id: number) => {
                       <button
                         onClick={() => {
                           handleSaveAllSegments();
+
                           setShowMenu(
                             false
                           );
@@ -2637,6 +3476,7 @@ const handleRemove = async (id: number) => {
                       <button
                         onClick={() => {
                           handleDownloadExcel();
+
                           setShowMenu(
                             false
                           );
@@ -2656,6 +3496,7 @@ const handleRemove = async (id: number) => {
                       <button
                         onClick={() => {
                           handleDeleteAllAdvertisements();
+
                           setShowMenu(
                             false
                           );
@@ -2676,12 +3517,29 @@ const handleRemove = async (id: number) => {
 
                       <button
                         onClick={() => {
-                          setSearch("");
-                          setPhrase1("");
-                          setPhrase2("");
-                          setSelectedP1Id(null);
-                          setSelectedP2Id(null);
-                          setShowMenu(false);
+                          setSearch(
+                            ""
+                          );
+
+                          setPhrase1(
+                            ""
+                          );
+
+                          setPhrase2(
+                            ""
+                          );
+
+                          setSelectedP1Id(
+                            null
+                          );
+
+                          setSelectedP2Id(
+                            null
+                          );
+
+                          setShowMenu(
+                            false
+                          );
                         }}
                         className="flex w-full items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50"
                       >
@@ -2698,7 +3556,9 @@ const handleRemove = async (id: number) => {
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
+
                 <div className="flex items-center gap-1.5 flex-wrap">
+
                   <button
                     onClick={
                       handleCenterLastCompleted
@@ -2710,15 +3570,31 @@ const handleRemove = async (id: number) => {
 
                   <button
                     onClick={() => {
-                      setSearch("");
-                      setPhrase1("");
-                      setPhrase2("");
-                      setSelectedP1Id(null);
-                      setSelectedP2Id(null);
+                      setSearch(
+                        ""
+                      );
+
+                      setPhrase1(
+                        ""
+                      );
+
+                      setPhrase2(
+                        ""
+                      );
+
+                      setSelectedP1Id(
+                        null
+                      );
+
+                      setSelectedP2Id(
+                        null
+                      );
                     }}
                     className="flex h-8 items-center gap-1 rounded-md bg-gray-100 px-3 text-[11px] font-medium hover:bg-gray-200"
                   >
-                    <X size={13} />
+                    <X
+                      size={13}
+                    />
                     Clear
                   </button>
 
@@ -2751,6 +3627,7 @@ const handleRemove = async (id: number) => {
                 <div className="hidden h-6 w-px bg-gray-300 lg:block" />
 
                 <div className="relative flex-1 min-w-[220px]">
+
                   <Search
                     size={14}
                     className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
@@ -2759,7 +3636,9 @@ const handleRemove = async (id: number) => {
                   <input
                     type="text"
                     placeholder="Search transcript..."
-                    value={search}
+                    value={
+                      search
+                    }
                     onChange={(e) =>
                       setSearch(
                         e.target.value
@@ -2772,6 +3651,7 @@ const handleRemove = async (id: number) => {
                 <div className="hidden h-6 w-px bg-gray-300 lg:block" />
 
                 <div className="flex items-center gap-2 flex-wrap">
+
                   <button
                     onClick={
                       handleReprocessAds
@@ -2837,12 +3717,17 @@ const handleRemove = async (id: number) => {
           )}
 
           {/* AUDIO PLAYER */}
+
           <div className="mt-2 border-t pt-2">
             <AudioPlayer
               file={file}
               setFile={setFile}
-              audioRef={audioRef}
-              audioUrl={audioUrl}
+              audioRef={
+                audioRef
+              }
+              audioUrl={
+                audioUrl
+              }
               onChange={
                 handleAudioChange
               }

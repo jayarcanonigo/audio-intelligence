@@ -30,6 +30,19 @@ interface Segment {
 
   project_id?: number;
 
+  /*
+   * IMPORTANT:
+   *
+   * Contains the transcript segment IDs
+   * used by this advertisement.
+   *
+   * Example:
+   *
+   * 98 -> 100
+   *
+   * segment_ids:
+   * [98, 99, 100]
+   */
   segment_ids?: number[];
 }
 
@@ -57,6 +70,7 @@ interface Props {
       brand_name: string;
       status: AdvertisementStatus;
       detection_key?: string | null;
+      segment_ids?: number[];
     }
   ) => void;
 
@@ -325,6 +339,87 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
+   * GET SEGMENT IDS BETWEEN START AND END
+   * ============================================================
+   *
+   * Example:
+   *
+   * startSegment = 98
+   * endSegment   = 100
+   *
+   * returns:
+   *
+   * [98, 99, 100]
+   *
+   * ============================================================
+   */
+
+  function getSegmentIdsBetween(
+    startSegmentId: number | null,
+    endSegmentId: number | null
+  ): number[] {
+    if (
+      startSegmentId === null ||
+      endSegmentId === null
+    ) {
+      return [];
+    }
+
+    const startId =
+      Math.min(
+        startSegmentId,
+        endSegmentId
+      );
+
+    const endId =
+      Math.max(
+        startSegmentId,
+        endSegmentId
+      );
+
+    const ids: number[] = [];
+
+    /*
+     * Prefer actual transcript segment IDs.
+     *
+     * This prevents us from inventing IDs when
+     * the database IDs are not sequential.
+     */
+    const matching =
+      transcriptSegments
+        .filter(
+          (segment) =>
+            segment.id >= startId &&
+            segment.id <= endId
+        )
+        .sort(
+          (a, b) =>
+            a.id - b.id
+        );
+
+    if (matching.length > 0) {
+      return matching.map(
+        (segment) =>
+          segment.id
+      );
+    }
+
+    /*
+     * Fallback.
+     */
+    for (
+      let id = startId;
+      id <= endId;
+      id++
+    ) {
+      ids.push(id);
+    }
+
+    return ids;
+  }
+
+  /*
+   * ============================================================
    * FIND SOURCE START SEGMENT
    * ============================================================
    */
@@ -487,6 +582,7 @@ export default function SelectedSegments({
     endTime: string;
     startSegmentId: number | null;
     endSegmentId: number | null;
+    segmentIds: number[];
   } {
     if (
       transcriptSegments.length ===
@@ -494,22 +590,180 @@ export default function SelectedSegments({
     ) {
       return {
         text: row.text,
+
         startTime: start,
-        endTime: secondsToTime(
-          toSeconds(start) +
-            duration
-        ),
+
+        endTime:
+          secondsToTime(
+            toSeconds(start) +
+              duration
+          ),
+
         startSegmentId: null,
+
         endSegmentId: null,
+
+        segmentIds:
+          row.segment_ids ?? [],
       };
     }
 
-    const sorted =
+    const startSeconds =
+      toSeconds(start);
+
+    const targetEndSeconds =
+      startSeconds + duration;
+
+    /*
+     * ==========================================================
+     * FIND START SEGMENT
+     * ==========================================================
+     */
+
+    const startSegment =
+      transcriptSegments.find(
+        (segment) => {
+          if (
+            !segment.start ||
+            !segment.end
+          ) {
+            return false;
+          }
+
+          const segmentStart =
+            toSeconds(
+              segment.start
+            );
+
+          const segmentEnd =
+            toSeconds(
+              segment.end
+            );
+
+          return (
+            segmentStart <=
+              startSeconds &&
+            segmentEnd >
+              startSeconds
+          );
+        }
+      );
+
+    const exactStart =
+      transcriptSegments.find(
+        (segment) =>
+          segment.start &&
+          toSeconds(
+            segment.start
+          ) === startSeconds
+      );
+
+    const actualStart =
+      startSegment ||
+      exactStart ||
+      null;
+
+    /*
+     * ==========================================================
+     * FIND END SEGMENT
+     * ==========================================================
+     */
+
+    const endSegment =
+      transcriptSegments.find(
+        (segment) => {
+          if (
+            !segment.start ||
+            !segment.end
+          ) {
+            return false;
+          }
+
+          const segmentStart =
+            toSeconds(
+              segment.start
+            );
+
+          const segmentEnd =
+            toSeconds(
+              segment.end
+            );
+
+          return (
+            segmentStart <
+              targetEndSeconds &&
+            segmentEnd >=
+              targetEndSeconds
+          );
+        }
+      );
+
+    const exactEnd =
+      transcriptSegments.find(
+        (segment) =>
+          segment.start &&
+          toSeconds(
+            segment.start
+          ) === targetEndSeconds
+      );
+
+    const fallbackEnd =
       [...transcriptSegments]
         .filter(
           (segment) =>
             segment.start &&
-            segment.end
+            toSeconds(
+              segment.start
+            ) < targetEndSeconds
+        )
+        .sort(
+          (a, b) =>
+            toSeconds(a.start) -
+            toSeconds(b.start)
+        )
+        .pop() || null;
+
+    const actualEnd =
+      endSegment ||
+      exactEnd ||
+      fallbackEnd ||
+      actualStart ||
+      null;
+
+    /*
+     * ==========================================================
+     * MERGE TEXT
+     * ==========================================================
+     */
+
+    const matchingSegments =
+      transcriptSegments
+        .filter(
+          (segment) => {
+            if (
+              !segment.start ||
+              !segment.end
+            ) {
+              return false;
+            }
+
+            const segmentStart =
+              toSeconds(
+                segment.start
+              );
+
+            const segmentEnd =
+              toSeconds(
+                segment.end
+              );
+
+            return (
+              segmentStart <
+                targetEndSeconds &&
+              segmentEnd >
+                startSeconds
+            );
+          }
         )
         .sort(
           (a, b) =>
@@ -517,135 +771,172 @@ export default function SelectedSegments({
             toSeconds(b.start)
         );
 
-    const sourceStart =
-      findSourceStartSegment(
-        row,
-        start
-      );
+    const mergedText =
+      matchingSegments
+        .map(
+          (segment) =>
+            segment.text?.trim()
+        )
+        .filter(Boolean)
+        .join(" ");
 
-    if (!sourceStart) {
-      return {
-        text:
-          getTranscriptForRange(
-            start,
-            duration,
-            row.text
-          ),
-        startTime: start,
-        endTime: secondsToTime(
-          toSeconds(start) +
-            duration
-        ),
-        startSegmentId: null,
-        endSegmentId: null,
-      };
-    }
+    /*
+     * ==========================================================
+     * IDS
+     * ==========================================================
+     */
 
-    const sourceIndex =
-      sorted.findIndex(
+    const startSegmentId =
+      actualStart?.id ??
+      null;
+
+    const endSegmentId =
+      actualEnd?.id ??
+      startSegmentId;
+
+    /*
+     * IMPORTANT:
+     *
+     * Get ALL transcript segment IDs
+     * inside the selected range.
+     */
+
+    const segmentIds =
+      matchingSegments.map(
         (segment) =>
-          segment.id ===
-          sourceStart.id
+          segment.id
       );
 
-    if (sourceIndex < 0) {
-      return {
-        text:
-          getTranscriptForRange(
-            start,
-            duration,
-            row.text
-          ),
-        startTime: start,
-        endTime: secondsToTime(
-          toSeconds(start) +
-            duration
-        ),
-        startSegmentId:
-          sourceStart.id,
-        endSegmentId:
-          sourceStart.id,
-      };
-    }
+    /*
+     * Make sure start/end IDs are
+     * included even if text filtering
+     * did not return them.
+     */
 
-    const actualStart =
-      sorted[sourceIndex];
-
-    const startSeconds =
-      toSeconds(
-        actualStart.start
-      );
-
-    const targetEndSeconds =
-      startSeconds +
-      duration;
-
-    const mergedText: string[] =
-      [];
-
-    let lastSegmentId =
-      actualStart.id;
-
-    for (
-      let i = sourceIndex;
-      i < sorted.length;
-      i++
+    if (
+      startSegmentId !== null &&
+      !segmentIds.includes(
+        startSegmentId
+      )
     ) {
-      const segment =
-        sorted[i];
-
-      const segmentStart =
-        toSeconds(
-          segment.start
-        );
-
-      const segmentEnd =
-        toSeconds(
-          segment.end
-        );
-
-      if (
-        segmentStart >=
-        targetEndSeconds
-      ) {
-        break;
-      }
-
-      if (
-        segmentEnd >
-        targetEndSeconds
-      ) {
-        break;
-      }
-
-      if (
-        segment.text
-      ) {
-        mergedText.push(
-          segment.text
-        );
-      }
-
-      lastSegmentId =
-        segment.id;
+      segmentIds.unshift(
+        startSegmentId
+      );
     }
 
     if (
-      mergedText.length === 0
+      endSegmentId !== null &&
+      !segmentIds.includes(
+        endSegmentId
+      )
     ) {
-      lastSegmentId =
-        actualStart.id;
+      segmentIds.push(
+        endSegmentId
+      );
     }
+
+    const uniqueSegmentIds =
+      [...new Set(segmentIds)]
+        .sort(
+          (a, b) => a - b
+        );
+
+    /*
+     * ==========================================================
+     * DEBUG
+     * ==========================================================
+     */
+
+    const projectId =
+      getProjectIdFromRow(row);
+
+    console.log(
+      "========================================"
+    );
+
+    console.log(
+      "MERGE SEGMENT RANGE"
+    );
+
+    console.log(
+      "Advertisement ID:",
+      row.id
+    );
+
+    console.log(
+      "Start time:",
+      start
+    );
+
+    console.log(
+      "Duration:",
+      duration
+    );
+
+    console.log(
+      "Target end:",
+      secondsToTime(
+        targetEndSeconds
+      )
+    );
+
+    console.log(
+      "Start segment ID:",
+      startSegmentId
+    );
+
+    console.log(
+      "End segment ID:",
+      endSegmentId
+    );
+
+    console.log(
+      "Segment IDs:",
+      uniqueSegmentIds
+    );
+
+    console.log(
+      "Old detection_key:",
+      row.detection_key
+    );
+
+    if (
+      projectId !== null &&
+      startSegmentId !== null &&
+      endSegmentId !== null
+    ) {
+      console.log(
+        "New detection_key:",
+        makeDetectionKey(
+          projectId,
+          startSegmentId,
+          endSegmentId
+        )
+      );
+    }
+
+    console.log(
+      "========================================"
+    );
+
+    /*
+     * ==========================================================
+     * RETURN
+     * ==========================================================
+     */
 
     return {
       text:
-        mergedText
-          .join(" ")
-          .trim() ||
+        mergedText ||
         row.text,
 
+      /*
+       * Keep the requested start time.
+       *
+       * This is important when the user changes
+       * the start time manually.
+       */
       startTime:
-        actualStart.start ||
         start,
 
       endTime:
@@ -653,26 +944,18 @@ export default function SelectedSegments({
           targetEndSeconds
         ),
 
-      startSegmentId:
-        actualStart.id,
+      startSegmentId,
 
-      endSegmentId:
-        lastSegmentId,
+      endSegmentId,
+
+      segmentIds:
+        uniqueSegmentIds,
     };
   }
 
   /*
    * ============================================================
    * SYNC FROM PARENT
-   * ============================================================
-   *
-   * IMPORTANT:
-   *
-   * If the parent sends NEW again after save,
-   * do NOT overwrite our local SAVED state.
-   *
-   * SAVED has priority over incoming NEW.
-   *
    * ============================================================
    */
 
@@ -689,11 +972,12 @@ export default function SelectedSegments({
               );
 
             let status:
-              | AdvertisementStatus;
+              AdvertisementStatus;
 
             /*
              * Backend SAVED always wins.
              */
+
             if (
               incoming.status ===
               "SAVED"
@@ -702,9 +986,9 @@ export default function SelectedSegments({
             }
 
             /*
-             * If local state is already SAVED,
-             * don't allow incoming NEW to reset it.
+             * Local SAVED stays SAVED.
              */
+
             else if (
               local?.status ===
               "SAVED"
@@ -713,13 +997,61 @@ export default function SelectedSegments({
             }
 
             /*
-             * Otherwise use incoming status.
+             * Otherwise use incoming.
              */
+
             else {
               status =
                 incoming.status ??
                 local?.status ??
                 "NEW";
+            }
+
+            /*
+             * Preserve locally modified data.
+             */
+
+            if (local) {
+              return {
+                ...incoming,
+
+                text:
+                  local.text ??
+                  incoming.text,
+
+                start:
+                  local.start ??
+                  incoming.start,
+
+                end:
+                  local.end ??
+                  incoming.end,
+
+                brand_name:
+                  local.brand_name ??
+                  incoming.brand_name,
+
+                detection_key:
+                  local.detection_key ??
+                  incoming.detection_key,
+
+                /*
+                 * IMPORTANT:
+                 *
+                 * Preserve locally updated
+                 * segment IDs.
+                 */
+
+                segment_ids:
+                  local.segment_ids ??
+                  incoming.segment_ids,
+
+                project_id:
+                  local.project_id ??
+                  incoming.project_id,
+
+                status,
+              };
             }
 
             return {
@@ -789,8 +1121,13 @@ export default function SelectedSegments({
           event.target as Node
         )
       ) {
-        setDurationOpenId(null);
-        setDurationSearch("");
+        setDurationOpenId(
+          null
+        );
+
+        setDurationSearch(
+          ""
+        );
       }
     }
 
@@ -886,6 +1223,15 @@ export default function SelectedSegments({
         );
     }
 
+    /*
+     * IMPORTANT:
+     *
+     * Save the actual transcript segment IDs.
+     */
+
+    const segmentIds =
+      merged.segmentIds;
+
     setCustomDurations(
       (previous) => ({
         ...previous,
@@ -900,14 +1246,25 @@ export default function SelectedSegments({
             item.id === row.id
               ? {
                   ...item,
+
                   start:
                     merged.startTime,
+
                   end:
                     merged.endTime,
+
                   text:
                     merged.text,
+
                   detection_key:
                     detectionKey,
+
+                  /*
+                   * IMPORTANT
+                   */
+                  segment_ids:
+                    segmentIds,
+
                   status:
                     item.status ??
                     row.status ??
@@ -939,11 +1296,24 @@ export default function SelectedSegments({
 
         detection_key:
           detectionKey,
+
+        /*
+         * IMPORTANT:
+         * Send updated segment IDs
+         * to the parent.
+         */
+        segment_ids:
+          segmentIds,
       }
     );
 
-    setDurationOpenId(null);
-    setDurationSearch("");
+    setDurationOpenId(
+      null
+    );
+
+    setDurationSearch(
+      ""
+    );
   }
 
   /*
@@ -997,7 +1367,9 @@ export default function SelectedSegments({
         .toLowerCase();
 
     const options =
-      getDurationOptions(row.id);
+      getDurationOptions(
+        row.id
+      );
 
     const filtered =
       search
@@ -1030,7 +1402,9 @@ export default function SelectedSegments({
                 : row.id
             );
 
-            setDurationSearch("");
+            setDurationSearch(
+              ""
+            );
           }}
           className={`
             flex
@@ -1215,7 +1589,10 @@ export default function SelectedSegments({
     row: Segment
   ) {
     setEditingId(row.id);
-    setBrandOpenId(null);
+
+    setBrandOpenId(
+      null
+    );
 
     setEditText(
       row.text || ""
@@ -1263,8 +1640,13 @@ export default function SelectedSegments({
         editText
       );
 
-    setEditEnd(newEnd);
-    setEditText(newText);
+    setEditEnd(
+      newEnd
+    );
+
+    setEditText(
+      newText
+    );
   }
 
   /*
@@ -1300,9 +1682,17 @@ export default function SelectedSegments({
         editText
       );
 
-    setEditStart(value);
-    setEditEnd(newEnd);
-    setEditText(newText);
+    setEditStart(
+      value
+    );
+
+    setEditEnd(
+      newEnd
+    );
+
+    setEditText(
+      newText
+    );
   }
 
   /*
@@ -1349,32 +1739,46 @@ export default function SelectedSegments({
         );
     }
 
+    /*
+     * IMPORTANT:
+     *
+     * Use the merged transcript segment IDs.
+     */
+
+    const segmentIds =
+      merged.segmentIds;
+
     const data = {
       text:
         merged.text ||
         editText,
 
       start:
-        editStart,
+        merged.startTime,
 
       end:
-        editEnd,
+        merged.endTime,
 
       brand_name:
         editBrand,
 
-      /*
-       * IMPORTANT:
-       * Preserve SAVED if this advertisement
-       * was already saved.
-       */
       status:
         row.status ??
         "NEW",
 
       detection_key:
         detectionKey,
+
+      /*
+       * IMPORTANT
+       */
+      segment_ids:
+        segmentIds,
     };
+
+    /*
+     * Update local state immediately.
+     */
 
     setSegmentList(
       (previous) =>
@@ -1384,7 +1788,18 @@ export default function SelectedSegments({
               item.id === row.id
                 ? {
                     ...item,
+
                     ...data,
+
+                    /*
+                     * Make sure these remain
+                     * available on the local row.
+                     */
+                    segment_ids:
+                      segmentIds,
+
+                    detection_key:
+                      detectionKey,
                   }
                 : item
           )
@@ -1399,8 +1814,17 @@ export default function SelectedSegments({
           )
     );
 
-    setEditingId(null);
-    setBrandOpenId(null);
+    setEditingId(
+      null
+    );
+
+    setBrandOpenId(
+      null
+    );
+
+    /*
+     * Send update to parent.
+     */
 
     onUpdate?.(
       row.id,
@@ -1418,7 +1842,9 @@ export default function SelectedSegments({
     row: Segment,
     value: string
   ) {
-    setEditBrand(value);
+    setEditBrand(
+      value
+    );
 
     setSegmentList(
       (previous) =>
@@ -1427,6 +1853,7 @@ export default function SelectedSegments({
             item.id === row.id
               ? {
                   ...item,
+
                   brand_name:
                     value,
                 }
@@ -1492,6 +1919,11 @@ export default function SelectedSegments({
     );
 
     console.log(
+      "Segment IDs:",
+      row.segment_ids
+    );
+
+    console.log(
       "========================================"
     );
 
@@ -1510,19 +1942,8 @@ export default function SelectedSegments({
     try {
       setDeletingId(id);
 
-      /*
-       * IMPORTANT:
-       *
-       * Always call onRemove.
-       *
-       * NEW and SAVED advertisements can both
-       * already exist in the database.
-       */
       await onRemove(id);
 
-      /*
-       * Only remove from UI after backend success.
-       */
       setSegmentList(
         (previous) =>
           previous.filter(
@@ -1542,22 +1963,30 @@ export default function SelectedSegments({
       if (
         editingId === id
       ) {
-        setEditingId(null);
+        setEditingId(
+          null
+        );
       }
 
       if (
         brandOpenId === id
       ) {
-        setBrandOpenId(null);
+        setBrandOpenId(
+          null
+        );
       }
 
       if (
         durationOpenId === id
       ) {
-        setDurationOpenId(null);
+        setDurationOpenId(
+          null
+        );
       }
 
-      setDurationSearch("");
+      setDurationSearch(
+        ""
+      );
 
       setCustomDurations(
         (previous) => {
@@ -1585,7 +2014,9 @@ export default function SelectedSegments({
         "Failed to delete advertisement from the database. The advertisement was NOT removed."
       );
     } finally {
-      setDeletingId(null);
+      setDeletingId(
+        null
+      );
     }
   }
 
@@ -1596,13 +2027,29 @@ export default function SelectedSegments({
    */
 
   function cancelEdit() {
-    setEditingId(null);
-    setBrandOpenId(null);
+    setEditingId(
+      null
+    );
 
-    setEditText("");
-    setEditStart("");
-    setEditEnd("");
-    setEditBrand("");
+    setBrandOpenId(
+      null
+    );
+
+    setEditText(
+      ""
+    );
+
+    setEditStart(
+      ""
+    );
+
+    setEditEnd(
+      ""
+    );
+
+    setEditBrand(
+      ""
+    );
   }
 
   /*
@@ -1643,24 +2090,6 @@ export default function SelectedSegments({
   /*
    * ============================================================
    * SAVE ALL
-   * ============================================================
-   *
-   * THIS IS THE MAIN FIX.
-   *
-   * Flow:
-   *
-   * NEW
-   *   ↓
-   * onSave()
-   *   ↓
-   * backend succeeds
-   *   ↓
-   * NEW -> SAVED
-   *
-   * If backend fails:
-   *
-   * NEW remains NEW
-   *
    * ============================================================
    */
 
@@ -1714,35 +2143,54 @@ export default function SelectedSegments({
       console.log(
         "IDs:",
         newAdvertisements.map(
-          (item) => item.id
+          (item) =>
+            item.id
         )
       );
 
       /*
-       * --------------------------------------------------------
-       * CALL PARENT / BACKEND
-       * --------------------------------------------------------
-       *
-       * If onSave throws an error, execution jumps
-       * to catch and the status remains NEW.
+       * IMPORTANT DEBUG
        */
+
+      console.log(
+        "Advertisements being saved:"
+      );
+
+      newAdvertisements.forEach(
+        (item) => {
+          console.log({
+            id: item.id,
+
+            start: item.start,
+
+            end: item.end,
+
+            detection_key:
+              item.detection_key,
+
+            segment_ids:
+              item.segment_ids,
+          });
+        }
+      );
+
+      /*
+       * CALL PARENT / BACKEND
+       */
+
       await onSave(
         newAdvertisements
       );
 
       /*
-       * --------------------------------------------------------
        * BACKEND SUCCESS
-       * --------------------------------------------------------
-       *
-       * NOW change NEW -> SAVED.
-       * --------------------------------------------------------
        */
 
       const savedIds =
         new Set(
           newAdvertisements.map(
-            (item) => item.id
+            (item) =>
+              item.id
           )
         );
 
@@ -1756,9 +2204,6 @@ export default function SelectedSegments({
                 ? {
                     ...item,
 
-                    /*
-                     * THE IMPORTANT LINE
-                     */
                     status:
                       "SAVED",
                   }
@@ -1779,13 +2224,6 @@ export default function SelectedSegments({
         "========================================"
       );
     } catch (error) {
-      /*
-       * IMPORTANT:
-       *
-       * Do NOT change NEW -> SAVED here.
-       *
-       * Backend failed.
-       */
       console.error(
         "SAVE ALL FAILED:",
         error
@@ -1886,6 +2324,7 @@ export default function SelectedSegments({
     [...segmentList]
       .map((item) => ({
         ...item,
+
         status:
           item.status ??
           "NEW",
@@ -1923,7 +2362,9 @@ export default function SelectedSegments({
 
   return (
     <div className="space-y-4">
+
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4 shadow-sm">
+
         <div>
           <h2 className="text-lg font-bold">
             📢 Selected Advertisements
@@ -1935,6 +2376,7 @@ export default function SelectedSegments({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+
           {newDetectedCount >
             0 && (
             <div className="rounded-lg border border-orange-300 bg-orange-100 px-3 py-2 text-xs font-bold text-orange-700">
@@ -1964,7 +2406,9 @@ export default function SelectedSegments({
 
           <button
             type="button"
-            onClick={saveAll}
+            onClick={
+              saveAll
+            }
             disabled={
               newDetectedCount ===
                 0 ||
@@ -1987,6 +2431,7 @@ export default function SelectedSegments({
       {sortedSegments.length ===
         0 && (
         <div className="rounded-2xl border border-dashed bg-white p-10 text-center">
+
           <div className="text-4xl">
             📭
           </div>
@@ -1994,6 +2439,7 @@ export default function SelectedSegments({
           <h3 className="mt-3 font-semibold text-gray-700">
             No selected advertisements
           </h3>
+
         </div>
       )}
 
@@ -2103,6 +2549,7 @@ export default function SelectedSegments({
                 }
               `}
             >
+
               {overlapping && (
                 <div className="mb-4 flex items-center gap-3 rounded-xl border border-red-300 bg-red-100 px-4 py-3 text-red-700">
                   <span className="text-xl">
@@ -2123,6 +2570,7 @@ export default function SelectedSegments({
 
               {isNew && (
                 <div className="mb-4 flex items-center gap-3 rounded-xl border border-orange-300 bg-orange-100 px-4 py-3 text-orange-700">
+
                   <span className="text-xl">
                     ✨
                   </span>
@@ -2136,12 +2584,14 @@ export default function SelectedSegments({
                       This advertisement was detected during the latest processing and has not been saved yet.
                     </div>
                   </div>
+
                 </div>
               )}
 
               {isSaved &&
                 !overlapping && (
                   <div className="mb-4 flex items-center gap-3 rounded-xl border border-green-300 bg-green-100 px-4 py-3 text-green-700">
+
                     <span className="text-xl">
                       💾
                     </span>
@@ -2155,11 +2605,14 @@ export default function SelectedSegments({
                         This advertisement has already been saved.
                       </div>
                     </div>
+
                   </div>
                 )}
 
               <div className="flex items-start justify-between gap-4">
+
                 <div className="flex flex-1 gap-4">
+
                   <div
                     className={`
                       flex
@@ -2177,8 +2630,11 @@ export default function SelectedSegments({
                   </div>
 
                   <div className="min-w-0 flex-1">
+
                     <div className="flex items-center justify-between gap-2">
+
                       <div>
+
                         <h3 className="font-bold">
                           Advertisement
                         </h3>
@@ -2196,9 +2652,26 @@ export default function SelectedSegments({
                             }
                           </p>
                         )}
+
+                        {row.segment_ids &&
+                          row.segment_ids.length >
+                            0 && (
+                            <p className="mt-1 break-all font-mono text-[11px] text-gray-400">
+                              segment_ids:{" "}
+                              [
+                              {
+                                row.segment_ids.join(
+                                  ", "
+                                )
+                              }
+                              ]
+                            </p>
+                          )}
+
                       </div>
 
                       <div className="flex flex-wrap items-center justify-end gap-2">
+
                         {overlapping && (
                           <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
                             ⚠ OVERLAPPING
@@ -2216,6 +2689,7 @@ export default function SelectedSegments({
                             ✓ SAVED
                           </span>
                         )}
+
                       </div>
                     </div>
 
@@ -2283,6 +2757,7 @@ export default function SelectedSegments({
                         `}
                       >
                         <div className="flex items-start gap-2">
+
                           <span className="text-lg">
                             🏷
                           </span>
@@ -2291,13 +2766,16 @@ export default function SelectedSegments({
                             {row.brand_name ||
                               "No brand selected"}
                           </span>
+
                         </div>
                       </div>
                     )}
+
                   </div>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
+
                   <button
                     type="button"
                     onClick={(e) => {
@@ -2315,7 +2793,10 @@ export default function SelectedSegments({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        saveEdit(row);
+
+                        saveEdit(
+                          row
+                        );
                       }}
                       className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
                     >
@@ -2326,6 +2807,7 @@ export default function SelectedSegments({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+
                         edit(row);
                       }}
                       className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200"
@@ -2355,10 +2837,12 @@ export default function SelectedSegments({
                       ? "..."
                       : "🗑"}
                   </button>
+
                 </div>
               </div>
 
               <div className="mt-5">
+
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Transcript
                 </label>
@@ -2378,6 +2862,7 @@ export default function SelectedSegments({
                     }
                   `}
                 >
+
                   {editingId ===
                   row.id ? (
                     <textarea
@@ -2400,6 +2885,7 @@ export default function SelectedSegments({
                       {row.text}
                     </p>
                   )}
+
                 </div>
               </div>
 
@@ -2420,7 +2906,9 @@ export default function SelectedSegments({
                   }
                 `}
               >
+
                 <div className="mb-3 flex items-center justify-between">
+
                   <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                     ⏱ Time
                   </div>
@@ -2444,12 +2932,15 @@ export default function SelectedSegments({
                         ✓ SAVED TIME RANGE
                       </div>
                     )}
+
                 </div>
 
                 {editingId ===
                 row.id ? (
                   <div className="flex flex-wrap items-center gap-3">
+
                     <div className="flex flex-col gap-1">
+
                       <span className="text-xs text-gray-500">
                         Start
                       </span>
@@ -2462,6 +2953,7 @@ export default function SelectedSegments({
                           changeEditStart
                         }
                       />
+
                     </div>
 
                     <span className="mt-5 text-gray-400">
@@ -2469,6 +2961,7 @@ export default function SelectedSegments({
                     </span>
 
                     <div className="flex flex-col gap-1">
+
                       <span className="text-xs text-gray-500">
                         Duration
                       </span>
@@ -2512,6 +3005,7 @@ export default function SelectedSegments({
                           )
                         )}
                       </select>
+
                     </div>
 
                     <span className="mt-5 text-gray-400">
@@ -2519,6 +3013,7 @@ export default function SelectedSegments({
                     </span>
 
                     <div className="flex flex-col gap-1">
+
                       <span className="text-xs text-gray-500">
                         End
                       </span>
@@ -2531,11 +3026,15 @@ export default function SelectedSegments({
                           setEditEnd
                         }
                       />
+
                     </div>
+
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-center gap-3">
+
                     <div className="flex flex-col gap-1">
+
                       <span className="text-xs text-gray-500">
                         Start
                       </span>
@@ -2561,6 +3060,7 @@ export default function SelectedSegments({
                         {row.start ||
                           "00:00:00"}
                       </span>
+
                     </div>
 
                     <span className="mt-5 text-gray-400">
@@ -2568,6 +3068,7 @@ export default function SelectedSegments({
                     </span>
 
                     <div className="flex flex-col gap-1">
+
                       <span className="text-xs text-gray-500">
                         Duration
                       </span>
@@ -2584,6 +3085,7 @@ export default function SelectedSegments({
                           isNew
                         }
                       />
+
                     </div>
 
                     <span className="mt-5 text-gray-400">
@@ -2591,6 +3093,7 @@ export default function SelectedSegments({
                     </span>
 
                     <div className="flex flex-col gap-1">
+
                       <span className="text-xs text-gray-500">
                         End
                       </span>
@@ -2616,9 +3119,34 @@ export default function SelectedSegments({
                         {row.end ||
                           "00:00:00"}
                       </span>
+
                     </div>
+
                   </div>
                 )}
+
+                {row.segment_ids &&
+                  row.segment_ids.length >
+                    0 && (
+                  <div className="mt-4 rounded-lg border bg-white px-3 py-2">
+
+                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Source Transcript Segments
+                    </div>
+
+                    <div className="mt-1 break-all font-mono text-xs text-gray-700">
+                      [
+                      {
+                        row.segment_ids.join(
+                          ", "
+                        )
+                      }
+                      ]
+                    </div>
+
+                  </div>
+                )}
+
               </div>
             </div>
           );
@@ -2627,3 +3155,4 @@ export default function SelectedSegments({
     </div>
   );
 }
+
