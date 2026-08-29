@@ -37,6 +37,8 @@ import {
   Plus,
   RefreshCw,
   MoreVertical,
+  Copy,
+  Clock,
 } from "lucide-react";
 
 import {
@@ -657,6 +659,81 @@ export default function AdEditorPage() {
         })
       );
     }, [logs]);
+
+const handleCopyAllLogs = async () => {
+  const allLogsText = logs
+    .map((log: any) => log.text || log.message || "")
+    .filter(Boolean)
+    .join("\n");
+
+  if (!allLogsText) {
+    toast.warning("No logs to copy");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(allLogsText);
+    toast.success("Logs copied to clipboard");
+  } catch (error) {
+    console.error("Failed to copy logs:", error);
+    toast.error("Failed to copy logs");
+  }
+};
+
+
+
+const handleCopyLogsWithTime = async () => {
+  const allLogsText = logs
+    .map((log: any) => {
+      const start =
+        log.start_time ||
+        log.start ||
+        "";
+
+      const end =
+        log.end_time ||
+        log.end ||
+        "";
+
+      const text =
+        log.text ||
+        log.message ||
+        "";
+
+      if (!text.trim()) return "";
+
+      if (start && end) {
+        return `${start} - ${end} | ${text}`;
+      }
+
+      if (start) {
+        return `${start} | ${text}`;
+      }
+
+      return text;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  if (!allLogsText) {
+    toast.warning("No logs to copy");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(allLogsText);
+    toast.success("📋 Logs with time copied");
+  } catch (error) {
+    console.error(
+      "Failed to copy logs with time:",
+      error
+    );
+
+    toast.error(
+      "Failed to copy logs"
+    );
+  }
+};
 
   // ============================================================
   // REPROCESS
@@ -2889,6 +2966,27 @@ export default function AdEditorPage() {
               <h2 className="mb-4 font-semibold text-gray-800">
                 Live Logs
               </h2>
+                <button
+                type="button"
+                onClick={handleCopyAllLogs}
+                disabled={logs.length === 0}
+                title="Copy all logs"
+                className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Copy size={14} />
+                Copy
+              </button>
+              {/* COPY TIME + TEXT */}
+              <button
+                type="button"
+                onClick={handleCopyLogsWithTime}
+                disabled={logs.length === 0}
+                title="Copy logs with time"
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Clock size={14} />
+                Copy Time
+              </button>
 
               <LiveLogs
                 logs={logs}
@@ -3013,6 +3111,27 @@ export default function AdEditorPage() {
               <h2 className="mb-4 font-semibold text-gray-800">
                 Live Logs
               </h2>
+                <button
+            type="button"
+            onClick={handleCopyAllLogs}
+            disabled={logs.length === 0}
+            title="Copy all logs"
+            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Copy size={14} />
+            Copy
+          </button>
+          {/* COPY TIME + TEXT */}
+              <button
+                type="button"
+                onClick={handleCopyLogsWithTime}
+                disabled={logs.length === 0}
+                title="Copy logs with time"
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Clock size={14} />
+                Copy Time
+              </button>
 
               <LiveLogs
                 logs={logs}
