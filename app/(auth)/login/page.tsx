@@ -34,191 +34,210 @@ export default function LoginPage() {
         router.push("/dashboard");
       }
     } catch (error) {
-      setError(
+      const message =
         error instanceof Error
           ? error.message
-          : "Unable to connect to the server."
-      );
+          : "Unable to connect to the server.";
+
+      /*
+       * Detect Chrome unsafe connection error.
+       *
+       * Example:
+       * Continue to 162.0.234.94 (unsafe)
+       * chrome-error://chromewebdata/#
+       */
+      if (
+        message.includes("162.0.234.94") ||
+        message.includes("chrome-error://chromewebdata") ||
+        message.toLowerCase().includes("unsafe")
+      ) {
+        setError(
+          "Connection error: The server connection is unsafe. Please check the HTTPS/SSL certificate and server connection."
+        );
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
   }
-return (
-  <main className="min-h-screen bg-slate-100">
-    <div className="mx-auto flex min-h-screen w-full items-center justify-center px-4 py-8 sm:px-6">
-      <div className="w-full max-w-[440px]">
 
-        {/* Logo */}
-        <div className="mb-8 flex justify-center">
-          <Logo />
-        </div>
+  return (
+    <main className="min-h-screen bg-slate-100">
+      <div className="mx-auto flex min-h-screen w-full items-center justify-center px-4 py-8 sm:px-6">
+        <div className="w-full max-w-[440px]">
 
-        {/* Login Card */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-8">
-
-          {/* Header */}
-          <div className="mb-7 text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Welcome back
-            </h1>
-
-            <p className="mt-2 text-sm text-slate-500">
-              Sign in to access your dashboard.
-            </p>
+          {/* Logo */}
+          <div className="mb-8 flex justify-center">
+            <Logo />
           </div>
 
-          {/* Error */}
-          {error && (
-            <div
-              role="alert"
-              className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4"
-            >
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 shrink-0 text-red-500">
-                  <AlertIcon />
-                </div>
+          {/* Login Card */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-8">
 
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-red-800">
-                    Login failed
-                  </p>
+            {/* Header */}
+            <div className="mb-7 text-center">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                Welcome back
+              </h1>
 
-                  <p className="mt-1 break-words text-sm text-red-700">
-                    {error}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleLogin} className="space-y-5">
-
-            {/* Username */}
-            <div>
-              <label
-                htmlFor="username"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
-                Username
-              </label>
-
-              <div className="relative">
-                <div className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-slate-400">
-                  <UserIcon />
-                </div>
-
-                <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  value={username}
-                  onChange={(event) =>
-                    setUsername(event.target.value)
-                  }
-                  placeholder="Enter your username"
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  required
-                  disabled={loading}
-                  className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:bg-slate-100"
-                />
-              </div>
+              <p className="mt-2 text-sm text-slate-500">
+                Sign in to access your dashboard.
+              </p>
             </div>
 
-            {/* Password */}
-            <div>
-              <label
-                htmlFor="password"
-                className="mb-2 block text-sm font-medium text-slate-700"
+            {/* Error */}
+            {error && (
+              <div
+                role="alert"
+                className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4"
               >
-                Password
-              </label>
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 shrink-0 text-red-500">
+                    <AlertIcon />
+                  </div>
 
-              <div className="relative">
-                <div className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-slate-400">
-                  <LockIcon />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-red-800">
+                      Login failed
+                    </p>
+
+                    <p className="mt-1 break-words text-sm text-red-700">
+                      {error}
+                    </p>
+                  </div>
                 </div>
+              </div>
+            )}
 
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(event) =>
-                    setPassword(event.target.value)
-                  }
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  required
-                  disabled={loading}
-                  className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-12 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:bg-slate-100"
-                />
+            {/* Form */}
+            <form onSubmit={handleLogin} className="space-y-5">
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowPassword((current) => !current)
-                  }
-                  disabled={loading}
-                  aria-label={
-                    showPassword
-                      ? "Hide password"
-                      : "Show password"
-                  }
-                  className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              {/* Username */}
+              <div>
+                <label
+                  htmlFor="username"
+                  className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  {showPassword ? (
-                    <EyeOffIcon />
-                  ) : (
-                    <EyeIcon />
-                  )}
-                </button>
+                  Username
+                </label>
+
+                <div className="relative">
+                  <div className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-slate-400">
+                    <UserIcon />
+                  </div>
+
+                  <input
+                    id="username"
+                    name="username"
+                    type="text"
+                    value={username}
+                    onChange={(event) =>
+                      setUsername(event.target.value)
+                    }
+                    placeholder="Enter your username"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    required
+                    disabled={loading}
+                    className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label
+                  htmlFor="password"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Password
+                </label>
+
+                <div className="relative">
+                  <div className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 text-slate-400">
+                    <LockIcon />
+                  </div>
+
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) =>
+                      setPassword(event.target.value)
+                    }
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    required
+                    disabled={loading}
+                    className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-12 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowPassword((current) => !current)
+                    }
+                    disabled={loading}
+                    aria-label={
+                      showPassword
+                        ? "Hide password"
+                        : "Show password"
+                    }
+                    className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    {showPassword ? (
+                      <EyeOffIcon />
+                    ) : (
+                      <EyeIcon />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Sign In */}
+              <button
+                type="submit"
+                disabled={
+                  loading ||
+                  !username.trim() ||
+                  !password
+                }
+                className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+              >
+                {loading ? (
+                  <>
+                    <Spinner />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign in</span>
+                    <ArrowIcon />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Security */}
+            <div className="mt-7 border-t border-slate-100 pt-6">
+              <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+                <ShieldIcon />
+                <span>Secure authentication</span>
               </div>
             </div>
-
-            {/* Sign In */}
-            <button
-              type="submit"
-              disabled={
-                loading ||
-                !username.trim() ||
-                !password
-              }
-              className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
-            >
-              {loading ? (
-                <>
-                  <Spinner />
-                  <span>Signing in...</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign in</span>
-                  <ArrowIcon />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Security */}
-          <div className="mt-7 border-t border-slate-100 pt-6">
-            <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-              <ShieldIcon />
-              <span>Secure authentication</span>
-            </div>
           </div>
-        </div>
 
-        {/* Footer */}
-        <p className="mt-5 text-center text-xs text-slate-400">
-          Authorized users only
-        </p>
+          {/* Footer */}
+          <p className="mt-5 text-center text-xs text-slate-400">
+            Authorized users only
+          </p>
+        </div>
       </div>
-    </div>
-  </main>
-);
+    </main>
+  );
 }
 
 /* ============================================================
