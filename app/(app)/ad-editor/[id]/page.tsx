@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -38,7 +37,9 @@ import {
   RefreshCw,
   MoreVertical,
   Copy,
-  Clock,
+  Upload,
+  FileJson,
+  X,
 } from "lucide-react";
 
 import {
@@ -85,13 +86,6 @@ export default function AdEditorPage() {
   const [phrase2, setPhrase2] =
     useState("");
 
-  /*
-   * MOBILE ONLY TAB
-   *
-   * This is now controlled by the
-   * Logs / Segments button in the
-   * mobile footer.
-   */
   const [mobileTab, setMobileTab] =
     useState<"logs" | "segments">(
       "logs"
@@ -129,11 +123,40 @@ export default function AdEditorPage() {
   const [refreshing, setRefreshing] =
     useState(false);
 
+  // ============================================================
   const [isMobile, setIsMobile] =
     useState(false);
 
   const [lastSavedId, setLastSavedId] =
     useState<number | null>(null);
+
+  // ============================================================
+  // COPY PART STATE
+  // ============================================================
+
+  const MAX_COPY_CHARS = 10000;
+
+  const [copiedPart, setCopiedPart] =
+    useState<number | null>(null);
+
+  // ============================================================
+  // JSON IMPORT STATE
+  // ============================================================
+
+  const [showJsonImport, setShowJsonImport] =
+    useState(false);
+
+  const [jsonText, setJsonText] =
+    useState("");
+
+  const [jsonFile, setJsonFile] =
+    useState<File | null>(null);
+
+  const [jsonImporting, setJsonImporting] =
+    useState(false);
+
+  const jsonFileRef =
+    useRef<HTMLInputElement | null>(null);
 
   // ============================================================
   // NORMALIZE STATUS
@@ -255,7 +278,7 @@ export default function AdEditorPage() {
   );
 
   // ============================================================
-  // RECOVER SEGMENT IDS FROM DETECTION KEY
+  // RECOVER SEGMENT IDS
   // ============================================================
 
   const getSegmentIdsFromDetectionKey =
@@ -660,83 +683,1062 @@ export default function AdEditorPage() {
       );
     }, [logs]);
 
-const handleCopyAllLogs = async () => {
-  const allLogsText = logs
-    .map((log: any) => log.text || log.message || "")
-    .filter(Boolean)
-    .join("\n");
+  // ============================================================
+  // COPY PARTS
+  // ============================================================
 
-  if (!allLogsText) {
-    toast.warning("No logs to copy");
-    return;
-  }
-
-  try {
-    await navigator.clipboard.writeText(allLogsText);
-    toast.success("Logs copied to clipboard");
-  } catch (error) {
-    console.error("Failed to copy logs:", error);
-    toast.error("Failed to copy logs");
-  }
-};
-
-
-
-const handleCopyLogsWithTime = async () => {
-  const allLogsText = logs
-    .map((log: any) => {
-      const start =
-        log.start_time ||
-        log.start ||
-        "";
-
-      const end =
-        log.end_time ||
-        log.end ||
-        "";
-
-      const text =
-        log.text ||
-        log.message ||
-        "";
-
-      if (!text.trim()) return "";
-
-      if (start && end) {
-        return `${start} - ${end} | ${text}`;
+  const copyParts =
+    useMemo(() => {
+      if (
+        !Array.isArray(logs) ||
+        logs.length === 0
+      ) {
+        return [];
       }
 
-      if (start) {
-        return `${start} | ${text}`;
+      const lines =
+        logs
+          .map(
+            (log: any) => {
+              const start =
+                log.start_time ||
+                log.start ||
+                "";
+
+              const end =
+                log.end_time ||
+                log.end ||
+                "";
+
+              const text =
+                log.text ||
+                log.message ||
+                "";
+
+              if (
+                !String(
+                  text
+                ).trim()
+              ) {
+                return null;
+              }
+
+              if (
+                start &&
+                end
+              ) {
+                return `${start} - ${end} | ${text}`;
+              }
+
+              if (start) {
+                return `${start} | ${text}`;
+              }
+
+              return String(text);
+            }
+          )
+          .filter(
+            (
+              line
+            ): line is string =>
+              Boolean(line)
+          );
+
+      if (
+        lines.length === 0
+      ) {
+        return [];
       }
 
-      return text;
-    })
-    .filter(Boolean)
-    .join("\n");
+      const parts: string[] = [];
 
-  if (!allLogsText) {
-    toast.warning("No logs to copy");
-    return;
-  }
+      let currentPart =
+        "";
 
-  try {
-    await navigator.clipboard.writeText(allLogsText);
-    toast.success("📋 Logs with time copied");
-  } catch (error) {
-    console.error(
-      "Failed to copy logs with time:",
-      error
-    );
+      for (
+        const line of lines
+      ) {
+        if (
+          line.length >
+          MAX_COPY_CHARS
+        ) {
+          if (
+            currentPart
+          ) {
+            parts.push(
+              currentPart
+            );
 
-    toast.error(
-      "Failed to copy logs"
-    );
-  }
-};
+            currentPart =
+              "";
+          }
+
+          parts.push(
+            line
+          );
+
+          continue;
+        }
+
+        const candidate =
+          currentPart
+            ? `${currentPart}\n${line}`
+            : line;
+
+        if (
+          candidate.length >
+            MAX_COPY_CHARS &&
+          currentPart
+        ) {
+          parts.push(
+            currentPart
+          );
+
+          currentPart =
+            line;
+        } else {
+          currentPart =
+            candidate;
+        }
+      }
+
+      if (
+        currentPart
+      ) {
+        parts.push(
+          currentPart
+        );
+      }
+
+      return parts;
+    }, [logs]);
 
   // ============================================================
-  // REPROCESS
+  // COPY ONE PART
+  // ============================================================
+
+  const handleCopyPart =
+    async (
+      partIndex: number
+    ) => {
+      const part =
+        copyParts[
+          partIndex
+        ];
+
+      if (!part) {
+        toast.warning(
+          "No transcript available"
+        );
+
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(
+          part
+        );
+
+        setCopiedPart(
+          partIndex
+        );
+
+        toast.success(
+          `📋 PART ${
+            partIndex + 1
+          } copied`
+        );
+
+        window.setTimeout(
+          () => {
+            setCopiedPart(
+              (
+                current
+              ) =>
+                current ===
+                partIndex
+                  ? null
+                  : current
+            );
+          },
+          1500
+        );
+      } catch (
+        error
+      ) {
+        console.error(
+          "Failed to copy part:",
+          error
+        );
+
+        toast.error(
+          `Failed to copy PART ${
+            partIndex + 1
+          }`
+        );
+      }
+    };
+
+  // ============================================================
+  // COPY ALL
+  // ============================================================
+
+  const handleCopyAll =
+    async () => {
+      if (
+        copyParts.length ===
+        0
+      ) {
+        toast.warning(
+          "No transcript available"
+        );
+
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(
+          copyParts.join("\n")
+        );
+
+        toast.success(
+          "📋 Complete transcript copied"
+        );
+      } catch (
+        error
+      ) {
+        console.error(
+          "Failed to copy transcript:",
+          error
+        );
+
+        toast.error(
+          "Failed to copy transcript"
+        );
+      }
+    };
+
+  // ============================================================
+  // JSON IMPORT HELPERS
+  // ============================================================
+
+  const parseImportedTime =
+    (value: any): number | null => {
+      if (
+        value === null ||
+        value === undefined
+      ) {
+        return null;
+      }
+
+      const str =
+        String(value).trim();
+
+      if (!str) {
+        return null;
+      }
+
+      // HH:MM:SS
+      const match =
+        str.match(
+          /^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?$/
+        );
+
+      if (match) {
+        const hours =
+          Number(match[1]);
+
+        const minutes =
+          Number(match[2]);
+
+        const seconds =
+          Number(match[3]);
+
+        if (
+          minutes >= 60 ||
+          seconds >= 60
+        ) {
+          return null;
+        }
+
+        return (
+          hours * 3600 +
+          minutes * 60 +
+          seconds
+        );
+      }
+
+      // MM:SS
+      const shortMatch =
+        str.match(
+          /^(\d{1,3}):(\d{2})(?:\.(\d+))?$/
+        );
+
+      if (shortMatch) {
+        const minutes =
+          Number(
+            shortMatch[1]
+          );
+
+        const seconds =
+          Number(
+            shortMatch[2]
+          );
+
+        if (
+          seconds >= 60
+        ) {
+          return null;
+        }
+
+        return (
+          minutes * 60 +
+          seconds
+        );
+      }
+
+      // Numeric seconds
+      const numeric =
+        Number(str);
+
+      if (
+        Number.isFinite(
+          numeric
+        )
+      ) {
+        return numeric;
+      }
+
+      return null;
+    };
+
+  const formatImportedTime =
+    (
+      seconds: number
+    ) => {
+      const safeSeconds =
+        Math.max(
+          0,
+          Math.floor(
+            seconds
+          )
+        );
+
+      const h =
+        Math.floor(
+          safeSeconds / 3600
+        );
+
+      const m =
+        Math.floor(
+          (safeSeconds % 3600) /
+            60
+        );
+
+      const s =
+        safeSeconds % 60;
+
+      return [
+        String(h).padStart(
+          2,
+          "0"
+        ),
+        String(m).padStart(
+          2,
+          "0"
+        ),
+        String(s).padStart(
+          2,
+          "0"
+        ),
+      ].join(":");
+    };
+
+  // ============================================================
+  // JSON FILE CHANGE
+  // ============================================================
+
+  const handleJsonFileChange =
+    (
+      e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+      const selected =
+        e.target.files?.[0];
+
+      if (!selected) {
+        return;
+      }
+
+      if (
+        !selected.name
+          .toLowerCase()
+          .endsWith(".json")
+      ) {
+        toast.error(
+          "Please select a JSON file"
+        );
+
+        e.target.value = "";
+
+        return;
+      }
+
+      setJsonFile(
+        selected
+      );
+
+      const reader =
+        new FileReader();
+
+      reader.onload =
+        () => {
+          const content =
+            String(
+              reader.result ||
+                ""
+            );
+
+          setJsonText(
+            content
+          );
+        };
+
+      reader.onerror =
+        () => {
+          toast.error(
+            "Failed to read JSON file"
+          );
+        };
+
+      reader.readAsText(
+        selected
+      );
+    };
+
+  // ============================================================
+  // CLEAR JSON IMPORT
+  // ============================================================
+
+  const closeJsonImport =
+    () => {
+      setShowJsonImport(
+        false
+      );
+
+      setJsonText(
+        ""
+      );
+
+      setJsonFile(
+        null
+      );
+
+      setJsonImporting(
+        false
+      );
+
+      if (
+        jsonFileRef.current
+      ) {
+        jsonFileRef.current.value =
+          "";
+      }
+    };
+
+  // ============================================================
+  // IMPORT JSON
+  // ============================================================
+
+  const handleImportJson =
+    async () => {
+      if (
+        !jsonText.trim()
+      ) {
+        toast.warning(
+          "Please select a JSON file or paste JSON"
+        );
+
+        return;
+      }
+
+      setJsonImporting(
+        true
+      );
+
+      try {
+        let parsed: any;
+
+        try {
+          parsed =
+            JSON.parse(
+              jsonText
+            );
+        } catch {
+          toast.error(
+            "Invalid JSON format"
+          );
+
+          return;
+        }
+
+        // --------------------------------------------------------
+        // SUPPORT:
+        //
+        // [...]
+        //
+        // {
+        //   "advertisements": [...]
+        // }
+        //
+        // {
+        //   "ads": [...]
+        // }
+        // --------------------------------------------------------
+
+        let advertisements:
+          any[] = [];
+
+        if (
+          Array.isArray(
+            parsed
+          )
+        ) {
+          advertisements =
+            parsed;
+        } else if (
+          Array.isArray(
+            parsed?.advertisements
+          )
+        ) {
+          advertisements =
+            parsed.advertisements;
+        } else if (
+          Array.isArray(
+            parsed?.ads
+          )
+        ) {
+          advertisements =
+            parsed.ads;
+        } else {
+          toast.error(
+            'JSON must contain an array or an "advertisements" / "ads" array'
+          );
+
+          return;
+        }
+
+        if (
+          advertisements.length ===
+          0
+        ) {
+          toast.warning(
+            "No advertisements found in JSON"
+          );
+
+          return;
+        }
+
+        const newAds:
+          any[] = [];
+
+        const errors:
+          string[] = [];
+
+        // --------------------------------------------------------
+        // EXISTING OCCUPIED RANGES
+        // --------------------------------------------------------
+
+        const occupiedRanges =
+          results
+            .map(
+              (item: any) => {
+                const start =
+                  parseImportedTime(
+                    item.start
+                  );
+
+                const end =
+                  parseImportedTime(
+                    item.end
+                  );
+
+                if (
+                  start ===
+                    null ||
+                  end ===
+                    null
+                ) {
+                  return null;
+                }
+
+                return {
+                  start,
+                  end,
+                };
+              }
+            )
+            .filter(
+              Boolean
+            ) as {
+              start: number;
+              end: number;
+            }[];
+
+        // --------------------------------------------------------
+        // PROCESS EACH AD
+        // --------------------------------------------------------
+
+        for (
+          let index = 0;
+          index <
+          advertisements.length;
+          index++
+        ) {
+          const ad =
+            advertisements[
+              index
+            ];
+
+          if (
+            !ad ||
+            typeof ad !==
+              "object"
+          ) {
+            errors.push(
+              `Ad ${
+                index + 1
+              }: invalid advertisement object`
+            );
+
+            continue;
+          }
+
+          const startValue =
+            ad.start ??
+            ad.start_time ??
+            "";
+
+          const endValue =
+            ad.end ??
+            ad.end_time ??
+            "";
+
+          const brand =
+            String(
+              ad.brand ??
+                ad.brand_name ??
+                ad.name ??
+                ""
+            ).trim();
+
+          const text =
+            String(
+              ad.copyline ??
+                ad.text ??
+                ad.complete_text ??
+                ad.completeText ??
+                ""
+            ).trim();
+
+          const startSeconds =
+            parseImportedTime(
+              startValue
+            );
+
+          const endSeconds =
+            parseImportedTime(
+              endValue
+            );
+
+          // ------------------------------------------------------
+          // VALIDATION
+          // ------------------------------------------------------
+
+          if (
+            startSeconds ===
+            null
+          ) {
+            errors.push(
+              `Ad ${
+                index + 1
+              }: invalid start time`
+            );
+
+            continue;
+          }
+
+          if (
+            endSeconds ===
+            null
+          ) {
+            errors.push(
+              `Ad ${
+                index + 1
+              }: invalid end time`
+            );
+
+            continue;
+          }
+
+          if (
+            endSeconds <=
+            startSeconds
+          ) {
+            errors.push(
+              `Ad ${
+                index + 1
+              }: end time must be greater than start time`
+            );
+
+            continue;
+          }
+
+          if (!text) {
+            errors.push(
+              `Ad ${
+                index + 1
+              }: advertisement text is empty`
+            );
+
+            continue;
+          }
+
+          // ------------------------------------------------------
+          // CHECK OVERLAP WITH EXISTING ADS
+          // ------------------------------------------------------
+
+          const overlapsExisting =
+            occupiedRanges.some(
+              (
+                range
+              ) =>
+                range.end >
+                  startSeconds &&
+                range.start <
+                  endSeconds
+            );
+
+          if (
+            overlapsExisting
+          ) {
+            errors.push(
+              `Ad ${
+                index + 1
+              }: overlaps an existing advertisement`
+            );
+
+            continue;
+          }
+
+          // ------------------------------------------------------
+          // MATCH TRANSCRIPT SEGMENTS
+          //
+          // overlap rule:
+          //
+          // segmentEnd > adStart
+          // AND
+          // segmentStart < adEnd
+          // ------------------------------------------------------
+
+          const sourceSegments =
+            transcriptSegments.filter(
+              (
+                segment: any
+              ) => {
+                const segmentStart =
+                  parseImportedTime(
+                    segment.start
+                  );
+
+                const segmentEnd =
+                  parseImportedTime(
+                    segment.end
+                  );
+
+                if (
+                  segmentStart ===
+                    null ||
+                  segmentEnd ===
+                    null
+                ) {
+                  return false;
+                }
+
+                return (
+                  segmentEnd >
+                    startSeconds &&
+                  segmentStart <
+                    endSeconds
+                );
+              }
+            );
+
+          const segmentIds =
+            sourceSegments
+              .map(
+                (
+                  segment: any
+                ) =>
+                  Number(
+                    segment.id
+                  )
+              )
+              .filter(
+                (
+                  id: number
+                ) =>
+                  Number.isFinite(
+                    id
+                  )
+              )
+              .sort(
+                (
+                  a,
+                  b
+                ) =>
+                  a - b
+              );
+
+          // ------------------------------------------------------
+          // DETECTION KEY
+          // ------------------------------------------------------
+
+          const detectionKey =
+            makeDetectionKey(
+              segmentIds
+            );
+
+          // ------------------------------------------------------
+          // TEMPORARY ID
+          //
+          // Negative ID makes it clear that this is not a
+          // database advertisement yet.
+          // ------------------------------------------------------
+
+          const temporaryId =
+            -(
+              Date.now() +
+              index +
+              Math.floor(
+                Math.random() *
+                  10000
+              )
+            );
+
+          const start =
+            formatImportedTime(
+              startSeconds
+            );
+
+          const end =
+            formatImportedTime(
+              endSeconds
+            );
+
+          const durationSeconds =
+            Math.max(
+              0,
+              Math.round(
+                endSeconds -
+                  startSeconds
+              )
+            );
+
+          const newSegment =
+            {
+              id:
+                temporaryId,
+
+              project_id:
+                projectId,
+
+              text:
+                text,
+
+              start:
+                start,
+
+              end:
+                end,
+
+              brand_name:
+                brand,
+
+              segmentIds:
+                segmentIds,
+
+              detection_key:
+                detectionKey,
+
+              status:
+                "NEW",
+
+              persisted:
+                false,
+
+              advertisement:
+                true,
+
+              segment_type:
+                "advertisement",
+
+              csvDuration:
+                durationSeconds,
+
+              importedFromJSON:
+                true,
+            };
+
+          newAds.push(
+            newSegment
+          );
+
+          occupiedRanges.push({
+            start:
+              startSeconds,
+
+            end:
+              endSeconds,
+          });
+        }
+
+        // --------------------------------------------------------
+        // NO VALID ADS
+        // --------------------------------------------------------
+
+        if (
+          newAds.length ===
+          0
+        ) {
+          toast.error(
+            errors.length > 0
+              ? errors.join(
+                  "\n"
+                )
+              : "No valid advertisements found"
+          );
+
+          return;
+        }
+
+        // --------------------------------------------------------
+        // ADD TO SELECTED SEGMENTS
+        // --------------------------------------------------------
+
+        setResults(
+          (prev) => [
+            ...prev,
+            ...newAds,
+          ]
+        );
+
+        // --------------------------------------------------------
+        // DISABLE SOURCE TRANSCRIPT SEGMENTS
+        // --------------------------------------------------------
+
+        setDisabledLogs(
+          (
+            prev
+          ) => [
+            ...new Set(
+              [
+                ...prev,
+                ...newAds.flatMap(
+                  (
+                    item: any
+                  ) =>
+                    item.segmentIds ||
+                    []
+                ),
+              ]
+            ),
+          ]
+        );
+
+        // --------------------------------------------------------
+        // SELECT LAST IMPORTED
+        // --------------------------------------------------------
+
+        if (
+          newAds.length >
+          0
+        ) {
+          setLastSavedId(
+            newAds[
+              newAds.length -
+                1
+            ].id
+          );
+        }
+
+        // --------------------------------------------------------
+        // CLOSE
+        // --------------------------------------------------------
+
+        closeJsonImport();
+
+        // --------------------------------------------------------
+        // RESULT MESSAGE
+        // --------------------------------------------------------
+
+        if (
+          errors.length >
+          0
+        ) {
+          toast.warning(
+            `Imported ${
+              newAds.length
+            } advertisement${
+              newAds.length ===
+              1
+                ? ""
+                : "s"
+            }. ${
+              errors.length
+            } item${
+              errors.length ===
+              1
+                ? ""
+                : "s"
+            } skipped.`
+          );
+
+          console.warn(
+            "JSON import warnings:",
+            errors
+          );
+        } else {
+          toast.success(
+            `Imported ${
+              newAds.length
+            } advertisement${
+              newAds.length ===
+              1
+                ? ""
+                : "s"
+            }`
+          );
+        }
+      } catch (
+        error
+      ) {
+        console.error(
+          "JSON import failed:",
+          error
+        );
+
+        toast.error(
+          "Failed to import advertisements"
+        );
+      } finally {
+        setJsonImporting(
+          false
+        );
+      }
+    };
+
+  // ============================================================
+  // OLD REPROCESS
   // ============================================================
 
   const handleReprocessAds =
@@ -1300,29 +2302,6 @@ const handleCopyLogsWithTime = async () => {
       status: "NEW" | "SAVED";
     }
   ) {
-    console.log(
-      "========================================"
-    );
-
-    console.log(
-      "UPDATE SEGMENT"
-    );
-
-    console.log(
-      "Advertisement ID:",
-      id
-    );
-
-    console.log(
-      "New Start:",
-      data.start
-    );
-
-    console.log(
-      "New End:",
-      data.end
-    );
-
     const newStartSeconds =
       parseTime(data.start);
 
@@ -1367,17 +2346,8 @@ const handleCopyLogsWithTime = async () => {
             Number(log.id)
         );
 
-    console.log(
-      "========================================"
-    );
-
-    console.log(
-      "CALCULATED SEGMENT IDS:",
-      newSegmentIds
-    );
-
-    let detectionKey: string | null =
-      null;
+    let detectionKey:
+      string | null = null;
 
     if (
       newSegmentIds.length > 0
@@ -1393,15 +2363,6 @@ const handleCopyLogsWithTime = async () => {
       detectionKey =
         `project-${projectId}-segments-${startSegmentId}-${endSegmentId}`;
     }
-
-    console.log(
-      "NEW DETECTION KEY:",
-      detectionKey
-    );
-
-    console.log(
-      "========================================"
-    );
 
     setResults((prev) =>
       prev.map((item) =>
@@ -1435,23 +2396,6 @@ const handleCopyLogsWithTime = async () => {
     );
 
     setLastSavedId(id);
-
-    console.log(
-      "RESULT UPDATED:",
-      {
-        id,
-        start: data.start,
-        end: data.end,
-        segmentIds:
-          newSegmentIds,
-        detection_key:
-          detectionKey,
-      }
-    );
-
-    console.log(
-      "========================================"
-    );
   }
 
   // ============================================================
@@ -1665,17 +2609,6 @@ const handleCopyLogsWithTime = async () => {
       }
 
       try {
-        console.log(
-          "DELETE ALL ADS:",
-          {
-            projectId,
-            hour:
-              Number(
-                broadcastHour
-              ),
-          }
-        );
-
         await deleteAdvertisementsByProjectHour(
           projectId,
           Number(
@@ -1888,14 +2821,6 @@ const handleCopyLogsWithTime = async () => {
         null
       );
 
-      console.log(
-        "ADD RANGE:",
-        {
-          ids,
-          detectionKey,
-        }
-      );
-
       toast.success(
         "✅ Advertisement segment added"
       );
@@ -1907,35 +2832,15 @@ const handleCopyLogsWithTime = async () => {
 
   async function handleSaveAllSegments() {
     try {
-      if (results.length === 0) {
+      if (
+        results.length === 0
+      ) {
         toast.warning(
           "No advertisements to save"
         );
 
         return;
       }
-
-      console.log(
-        "========================================"
-      );
-
-      console.log(
-        "SAVE ALL ADVERTISEMENTS"
-      );
-
-      console.log(
-        "Project ID:",
-        projectId
-      );
-
-      console.log(
-        "Results before save:",
-        results
-      );
-
-      console.log(
-        "========================================"
-      );
 
       for (
         const segment of results
@@ -1955,19 +2860,6 @@ const handleCopyLogsWithTime = async () => {
         if (
           segmentIds.length === 0
         ) {
-          console.error(
-            "SAVE ERROR: segmentIds is empty",
-            {
-              advertisementId:
-                segment.id,
-
-              oldDetectionKey:
-                segment.detection_key,
-
-              segment,
-            }
-          );
-
           throw new Error(
             `Cannot save advertisement ${segment.id}: segmentIds is empty`
           );
@@ -1984,94 +2876,35 @@ const handleCopyLogsWithTime = async () => {
         const detectionKey =
           `project-${projectId}-segments-${startSegmentId}-${endSegmentId}`;
 
-        console.log(
-          "========================================"
-        );
-
-        console.log(
-          "SAVING ADVERTISEMENT"
-        );
-
-        console.log(
-          "Advertisement ID:",
-          segment.id
-        );
-
-        console.log(
-          "Persisted:",
-          segment.persisted
-        );
-
-        console.log(
-          "Segment IDs:",
-          segmentIds
-        );
-
-        console.log(
-          "Old detection_key:",
-          segment.detection_key
-        );
-
-        console.log(
-          "NEW detection_key:",
-          detectionKey
-        );
-
-        console.log(
-          "Start:",
-          segment.start
-        );
-
-        console.log(
-          "End:",
-          segment.end
-        );
-
-        console.log(
-          "Status:",
-          "SAVED"
-        );
-
-        console.log(
-          "========================================"
-        );
+        // --------------------------------------------------------
+        // EXISTING DATABASE AD
+        // --------------------------------------------------------
 
         if (
           segment.persisted === true
         ) {
-          console.log(
-            "UPDATING EXISTING ADVERTISEMENT:",
-            segment.id
-          );
+          await updateAdvertisement(
+            segment.id,
+            {
+              text:
+                segment.text,
 
-          const updated =
-            await updateAdvertisement(
-              segment.id,
-              {
-                text:
-                  segment.text,
+              start:
+                segment.start,
 
-                start:
-                  segment.start,
+              end:
+                segment.end,
 
-                end:
-                  segment.end,
+              brand_name:
+                segment.brand_name ||
+                "",
 
-                brand_name:
-                  segment.brand_name ||
-                  "",
+              detection_key:
+                detectionKey,
 
-                detection_key:
-                  detectionKey,
-
-                status:
-                  "SAVED",
-              }
-            );
-
-          console.log(
-            "UPDATE SUCCESS:",
-            updated
+              status:
+                "SAVED",
+            }
           );
 
           setResults((prev) =>
@@ -2081,30 +2914,14 @@ const handleCopyLogsWithTime = async () => {
                 ? {
                     ...item,
 
-                    text:
-                      segment.text,
-
-                    start:
-                      segment.start,
-
-                    end:
-                      segment.end,
-
-                    brand_name:
-                      segment.brand_name ||
-                      "",
-
-                    segmentIds:
-                      segmentIds,
-
-                    detection_key:
-                      detectionKey,
-
                     status:
                       "SAVED",
 
                     persisted:
                       true,
+
+                    detection_key:
+                      detectionKey,
                   }
                 : item
             )
@@ -2117,9 +2934,9 @@ const handleCopyLogsWithTime = async () => {
           continue;
         }
 
-        console.log(
-          "CREATING NEW ADVERTISEMENT"
-        );
+        // --------------------------------------------------------
+        // NEW / JSON IMPORT / MANUALLY ADDED
+        // --------------------------------------------------------
 
         const created =
           await createAdvertisement({
@@ -2146,11 +2963,6 @@ const handleCopyLogsWithTime = async () => {
               "SAVED",
           });
 
-        console.log(
-          "CREATE SUCCESS:",
-          created
-        );
-
         const createdAd =
           created?.data ??
           created?.advertisement ??
@@ -2172,52 +2984,24 @@ const handleCopyLogsWithTime = async () => {
                     realAdvertisementId ??
                     item.id,
 
-                  text:
-                    segment.text,
-
-                  start:
-                    segment.start,
-
-                  end:
-                    segment.end,
-
-                  brand_name:
-                    segment.brand_name ||
-                    "",
-
-                  segmentIds:
-                    segmentIds,
-
-                  detection_key:
-                    detectionKey,
-
                   status:
                     "SAVED",
 
                   persisted:
                     true,
-              }
+
+                  detection_key:
+                    detectionKey,
+                }
               : item
           )
         );
 
         setLastSavedId(
           realAdvertisementId ??
-          segment.id
+            segment.id
         );
       }
-
-      console.log(
-        "========================================"
-      );
-
-      console.log(
-        "ALL ADVERTISEMENTS SAVED"
-      );
-
-      console.log(
-        "========================================"
-      );
 
       toast.success(
         "✅ Advertisements saved successfully"
@@ -2226,18 +3010,12 @@ const handleCopyLogsWithTime = async () => {
       await loadLogs({
         silent: true,
       });
-    } catch (error: any) {
-      console.error(
-        "========================================"
-      );
-
+    } catch (
+      error: any
+    ) {
       console.error(
         "SAVE ERROR:",
         error
-      );
-
-      console.error(
-        "========================================"
       );
 
       toast.error(
@@ -2262,70 +3040,21 @@ const handleCopyLogsWithTime = async () => {
         );
 
       if (!item) {
-        console.warn(
-          "DELETE: item not found:",
-          id
-        );
-
         return;
       }
 
-      console.log(
-        "========================================"
-      );
-
-      console.log(
-        "DELETE ADVERTISEMENT"
-      );
-
-      console.log(
-        "Advertisement ID:",
-        id
-      );
-
-      console.log(
-        "Status:",
-        item.status
-      );
-
-      console.log(
-        "Detection Key:",
-        item.detection_key
-      );
-
-      console.log(
-        "Segment IDs:",
-        item.segmentIds
-      );
-
-      console.log(
-        "Project ID:",
-        item.project_id
-      );
-
-      console.log(
-        "Item:",
-        item
-      );
-
-      console.log(
-        "========================================"
-      );
-
       try {
-        console.log(
-          "CALLING DELETE API:",
-          id
-        );
+        // IMPORTANT:
+        // JSON imported/manual NEW records have no
+        // database ID yet. Do NOT call delete API.
 
-        await deleteAdvertisement(
-          id
-        );
-
-        console.log(
-          "DELETE API SUCCESS:",
-          id
-        );
+        if (
+          item.persisted === true
+        ) {
+          await deleteAdvertisement(
+            id
+          );
+        }
 
         setResults(
           (prev) =>
@@ -2336,8 +3065,7 @@ const handleCopyLogsWithTime = async () => {
         );
 
         const itemSegmentIds =
-          item.segmentIds ??
-          [];
+          item.segmentIds ?? [];
 
         setDisabledLogs(
           (prev) =>
@@ -2367,12 +3095,9 @@ const handleCopyLogsWithTime = async () => {
         }
 
         toast.success(
-          `🗑 Advertisement ${id} deleted`
-        );
-
-        console.log(
-          "ADVERTISEMENT DELETED COMPLETELY:",
-          id
+          item.persisted === true
+            ? `🗑 Advertisement ${id} deleted`
+            : "🗑 Advertisement removed"
         );
       } catch (
         error: any
@@ -2512,11 +3237,6 @@ const handleCopyLogsWithTime = async () => {
         lastSavedId
       );
 
-      /*
-       * When pressing Last on mobile,
-       * automatically switch to Segments
-       * so the recently saved item is visible.
-       */
       if (isMobile) {
         setMobileTab(
           "segments"
@@ -2533,6 +3253,7 @@ const handleCopyLogsWithTime = async () => {
           {
             behavior:
               "smooth",
+
             block:
               "center",
           }
@@ -2695,15 +3416,6 @@ const handleCopyLogsWithTime = async () => {
         temporaryId
       );
 
-      console.log(
-        "ADD SINGLE:",
-        {
-          sourceSegmentId,
-          segmentIds,
-          detectionKey,
-        }
-      );
-
       toast.success(
         "✅ Segment added"
       );
@@ -2770,6 +3482,7 @@ const handleCopyLogsWithTime = async () => {
       ]?.scrollIntoView({
         behavior:
           "smooth",
+
         block:
           "center",
       });
@@ -2792,9 +3505,6 @@ const handleCopyLogsWithTime = async () => {
             : "logs"
       );
 
-      /*
-       * Close the More menu if it is open.
-       */
       setShowMenu(false);
     };
 
@@ -2804,7 +3514,6 @@ const handleCopyLogsWithTime = async () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-3 md:p-6">
-
       <ToastContainer
         position="top-right"
         autoClose={2000}
@@ -2815,26 +3524,19 @@ const handleCopyLogsWithTime = async () => {
       ======================================================== */}
 
       <div className="rounded-xl bg-white p-4 shadow-sm md:p-5">
-
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-
           <div>
-
             <h1 className="text-xl font-bold text-gray-800 md:text-2xl">
               🎧 Ad Editor
             </h1>
 
             <p className="mt-1 break-words text-sm text-gray-500">
-
               Project:{" "}
-
               <span className="font-medium text-gray-700">
                 {projectName ||
                   `Project #${projectId}`}
               </span>
-
             </p>
-
           </div>
 
           {/* ====================================================
@@ -2842,9 +3544,7 @@ const handleCopyLogsWithTime = async () => {
           ==================================================== */}
 
           <div className="w-full md:w-auto">
-
             <div className="block md:hidden">
-
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Broadcast Hour
               </label>
@@ -2860,7 +3560,6 @@ const handleCopyLogsWithTime = async () => {
                 }
                 className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               >
-
                 {hours.map(
                   (
                     hour
@@ -2881,19 +3580,15 @@ const handleCopyLogsWithTime = async () => {
                     </option>
                   )
                 )}
-
               </select>
-
             </div>
 
             <div className="hidden md:block">
-
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Broadcast Hour
               </div>
 
               <div className="flex max-w-[700px] gap-2 overflow-x-auto rounded-xl border border-gray-200 bg-gray-50 p-2">
-
                 {hours.map(
                   (
                     hour
@@ -2916,7 +3611,6 @@ const handleCopyLogsWithTime = async () => {
                           : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
                       }`}
                     >
-
                       {String(
                         hour
                       ).padStart(
@@ -2924,19 +3618,13 @@ const handleCopyLogsWithTime = async () => {
                         "0"
                       )}
                       :00
-
                     </button>
                   )
                 )}
-
               </div>
-
             </div>
-
           </div>
-
         </div>
-
       </div>
 
       {/* ========================================================
@@ -2944,49 +3632,91 @@ const handleCopyLogsWithTime = async () => {
       ======================================================== */}
 
       {isMobile ? (
-
-        /*
-         * ======================================================
-         * MOBILE CONTENT
-         *
-         * IMPORTANT:
-         * No top Logs / Segments tabs anymore.
-         *
-         * The footer button controls this view.
-         * ======================================================
-         */
-
         <div className="pb-48">
-
           {mobileTab ===
           "logs" ? (
-
             <div className="rounded-xl bg-white p-4 shadow-sm">
+              {/* LIVE LOG HEADER */}
 
-              <h2 className="mb-4 font-semibold text-gray-800">
-                Live Logs
-              </h2>
-                <button
-                type="button"
-                onClick={handleCopyAllLogs}
-                disabled={logs.length === 0}
-                title="Copy all logs"
-                className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Copy size={14} />
-                Copy
-              </button>
-              {/* COPY TIME + TEXT */}
-              <button
-                type="button"
-                onClick={handleCopyLogsWithTime}
-                disabled={logs.length === 0}
-                title="Copy logs with time"
-                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Clock size={14} />
-                Copy Time
-              </button>
+              <div className="mb-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-semibold text-gray-800">
+                    Live Logs
+                  </h2>
+
+                  {copyParts.length >
+                    0 && (
+                    <span className="text-xs text-gray-400">
+                      {
+                        copyParts.length
+                      }{" "}
+                      part
+                      {copyParts.length !==
+                      1
+                        ? "s"
+                        : ""}
+                    </span>
+                  )}
+                </div>
+
+                {/* COPY PART BUTTONS */}
+
+                {copyParts.length >
+                  0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {copyParts.map(
+                      (
+                        _,
+                        index
+                      ) => {
+                        const isCopied =
+                          copiedPart ===
+                          index;
+
+                        return (
+                          <button
+                            key={
+                              index
+                            }
+                            type="button"
+                            onClick={() =>
+                              handleCopyPart(
+                                index
+                              )
+                            }
+                            title={`Copy PART ${
+                              index + 1
+                            }`}
+                            className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all active:scale-[0.97] ${
+                              isCopied
+                                ? "border-green-200 bg-green-50 text-green-700"
+                                : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            {isCopied ? (
+                              <span>
+                                ✓
+                              </span>
+                            ) : (
+                              <Copy
+                                size={
+                                  14
+                                }
+                              />
+                            )}
+
+                            PART{" "}
+                            {
+                              index +
+                              1
+                            }
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+                )}
+              </div>
 
               <LiveLogs
                 logs={logs}
@@ -3030,29 +3760,20 @@ const handleCopyLogsWithTime = async () => {
                   handleAddSingle
                 }
               />
-
             </div>
-
           ) : (
-
             <div className="rounded-xl bg-white p-4 shadow-sm">
-
               <div className="mb-4 flex items-center justify-between">
-
                 <h2 className="font-semibold text-gray-800">
                   Selected Segments
                 </h2>
 
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
-
                   {
                     results.length
                   }{" "}
-
                   Selected
-
                 </span>
-
               </div>
 
               <SelectedSegments
@@ -3084,54 +3805,96 @@ const handleCopyLogsWithTime = async () => {
                   handleSaveAllSegments
                 }
               />
-
             </div>
-
           )}
-
         </div>
-
       ) : (
-
-        /* ======================================================
-           DESKTOP CONTENT
-           
-           DESKTOP REMAINS UNCHANGED.
-           Both panels are visible.
-        ====================================================== */
-
         <div className="grid grid-cols-12 gap-6 pb-48 pt-6">
-
           {/* LOGS */}
 
           <div className="col-span-5">
-
             <div className="rounded-xl bg-white p-5 shadow-sm">
+              {/* LIVE LOG HEADER */}
 
-              <h2 className="mb-4 font-semibold text-gray-800">
-                Live Logs
-              </h2>
-                <button
-            type="button"
-            onClick={handleCopyAllLogs}
-            disabled={logs.length === 0}
-            title="Copy all logs"
-            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Copy size={14} />
-            Copy
-          </button>
-          {/* COPY TIME + TEXT */}
-              <button
-                type="button"
-                onClick={handleCopyLogsWithTime}
-                disabled={logs.length === 0}
-                title="Copy logs with time"
-                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Clock size={14} />
-                Copy Time
-              </button>
+              <div className="mb-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-semibold text-gray-800">
+                    Live Logs
+                  </h2>
+
+                  {copyParts.length >
+                    0 && (
+                    <span className="text-xs text-gray-400">
+                      {
+                        copyParts.length
+                      }{" "}
+                      part
+                      {copyParts.length !==
+                      1
+                        ? "s"
+                        : ""}
+                    </span>
+                  )}
+                </div>
+
+                {/* COPY PART BUTTONS */}
+
+                {copyParts.length >
+                  0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {copyParts.map(
+                      (
+                        _,
+                        index
+                      ) => {
+                        const isCopied =
+                          copiedPart ===
+                          index;
+
+                        return (
+                          <button
+                            key={
+                              index
+                            }
+                            type="button"
+                            onClick={() =>
+                              handleCopyPart(
+                                index
+                              )
+                            }
+                            title={`Copy PART ${
+                              index + 1
+                            }`}
+                            className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all active:scale-[0.97] ${
+                              isCopied
+                                ? "border-green-200 bg-green-50 text-green-700"
+                                : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            {isCopied ? (
+                              <span>
+                                ✓
+                              </span>
+                            ) : (
+                              <Copy
+                                size={
+                                  14
+                                }
+                              />
+                            )}
+
+                            PART{" "}
+                            {
+                              index +
+                              1
+                            }
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+                )}
+              </div>
 
               <LiveLogs
                 logs={logs}
@@ -3175,33 +3938,24 @@ const handleCopyLogsWithTime = async () => {
                   handleAddSingle
                 }
               />
-
             </div>
-
           </div>
 
           {/* SEGMENTS */}
 
           <div className="col-span-7">
-
             <div className="rounded-xl bg-white p-5 shadow-sm">
-
               <div className="mb-4 flex items-center justify-between">
-
                 <h2 className="font-semibold text-gray-800">
                   Selected Segments
                 </h2>
 
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
-
                   {
                     results.length
                   }{" "}
-
                   Selected
-
                 </span>
-
               </div>
 
               <SelectedSegments
@@ -3233,53 +3987,165 @@ const handleCopyLogsWithTime = async () => {
                   handleSaveAllSegments
                 }
               />
-
             </div>
-
           </div>
-
         </div>
-
       )}
 
       {/* ========================================================
-          PROFESSIONAL FOOTER
+          JSON IMPORT MODAL
+      ======================================================== */}
+
+      {showJsonImport && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+      
+
+           
+
+            {/* BODY */}
+
+            <div className="space-y-4 p-5">
+              {/* FILE PICKER */}
+
+              <div>
+                <input
+                  ref={
+                    jsonFileRef
+                  }
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={
+                    handleJsonFileChange
+                  }
+                  className="hidden"
+                />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    jsonFileRef.current?.click()
+                  }
+                  className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-7 text-center transition hover:border-blue-400 hover:bg-blue-50"
+                >
+                  <Upload
+                    size={22}
+                    className="mb-2 text-gray-500"
+                  />
+
+                  <span className="text-sm font-semibold text-gray-700">
+                    {jsonFile
+                      ? jsonFile.name
+                      : "Choose JSON file"}
+                  </span>
+
+                  <span className="mt-1 text-xs text-gray-400">
+                    Click to browse .json files
+                  </span>
+                </button>
+              </div>
+
+              {/* OR */}
+
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-gray-200" />
+
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  OR PASTE JSON
+                </span>
+
+                <div className="h-px flex-1 bg-gray-200" />
+              </div>
+
+              {/* TEXTAREA */}
+
+              <textarea
+                value={
+                  jsonText
+                }
+                onChange={(e) =>
+                  setJsonText(
+                    e.target.value
+                  )
+                }
+                placeholder={`{
+  "advertisements": [
+    {
+      "start": "09:18:17",
+      "end": "09:18:45",
+      "actual_length": "00:00:28",
+      "brand": "OKADA MANILA / OKADA ONLINE CASINO",
+      "copyline": "Complete advertisement text here"
+    }
+  ]
+}`}
+                className="h-64 w-full resize-none rounded-xl border border-gray-300 bg-gray-50 p-4 font-mono text-xs leading-5 text-gray-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              />
+
+              {/* INFORMATION */}
+
+         
+            </div>
+
+            {/* FOOTER */}
+
+            <div className="flex items-center justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4">
+              <button
+                type="button"
+                onClick={
+                  closeJsonImport
+                }
+                disabled={
+                  jsonImporting
+                }
+                className="h-9 rounded-lg border border-gray-300 bg-white px-4 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={
+                  jsonImporting ||
+                  !jsonText.trim()
+                }
+                onClick={
+                  handleImportJson
+                }
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-gray-900 px-4 text-xs font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Upload size={14} />
+
+                {jsonImporting
+                  ? "Importing..."
+                  : "Import Advertisements"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          FOOTER
       ======================================================== */}
 
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur">
-
         <div className="mx-auto w-full max-w-[1800px] px-3 py-2 md:px-5 md:py-3">
-
           {/* ====================================================
-              MOBILE FOOTER
+              MOBILE
           ==================================================== */}
 
           {isMobile ? (
-
             <div className="space-y-2">
-
-              {/* MOBILE ACTIONS */}
-
               <div className="flex items-center gap-2">
-
-                {/* =================================================
-                    LOGS / SEGMENTS TOGGLE
-                    MOBILE ONLY
-                ================================================= */}
+                {/* LOGS / SEGMENTS */}
 
                 <button
                   onClick={
                     toggleMobileTab
                   }
                   className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-700 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-800 active:scale-[0.98]"
-                  aria-label={
-                    mobileTab ===
-                    "logs"
-                      ? "Switch to Segments"
-                      : "Switch to Logs"
-                  }
                 >
-
                   <span>
                     {mobileTab ===
                     "logs"
@@ -3297,12 +4163,9 @@ const handleCopyLogsWithTime = async () => {
                   <span className="text-[10px] opacity-70">
                     ⇄
                   </span>
-
                 </button>
 
-                {/* =================================================
-                    LAST
-                ================================================= */}
+                {/* LAST */}
 
                 <button
                   onClick={
@@ -3310,7 +4173,6 @@ const handleCopyLogsWithTime = async () => {
                   }
                   className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700 active:scale-[0.98]"
                 >
-
                   <span>
                     🎯
                   </span>
@@ -3318,12 +4180,9 @@ const handleCopyLogsWithTime = async () => {
                   <span>
                     Last
                   </span>
-
                 </button>
 
-                {/* =================================================
-                    REPROCESS
-                ================================================= */}
+                {/* REPROCESS */}
 
                 <button
                   onClick={
@@ -3331,7 +4190,6 @@ const handleCopyLogsWithTime = async () => {
                   }
                   className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
                 >
-
                   <RefreshCw
                     size={15}
                   />
@@ -3339,15 +4197,11 @@ const handleCopyLogsWithTime = async () => {
                   <span>
                     Reprocess
                   </span>
-
                 </button>
 
-                {/* =================================================
-                    MORE
-                ================================================= */}
+                {/* MORE */}
 
                 <div className="relative">
-
                   <button
                     onClick={() =>
                       setShowMenu(
@@ -3358,18 +4212,34 @@ const handleCopyLogsWithTime = async () => {
                       )
                     }
                     className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-700 transition hover:bg-gray-100"
-                    aria-label="More actions"
                   >
-
                     <MoreVertical
                       size={18}
                     />
-
                   </button>
 
                   {showMenu && (
+                    <div className="absolute bottom-11 right-0 w-60 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+                      {/* UPLOAD JSON */}
 
-                    <div className="absolute bottom-11 right-0 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+                      <button
+                        onClick={() => {
+                          setShowJsonImport(
+                            true
+                          );
+
+                          setShowMenu(
+                            false
+                          );
+                        }}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                      >
+                        <FileJson
+                          size={16}
+                        />
+
+                        Upload JSON
+                      </button>
 
                       {/* ADD */}
 
@@ -3389,13 +4259,11 @@ const handleCopyLogsWithTime = async () => {
                         }
                         className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-
                         <Plus
                           size={16}
                         />
 
                         Add Segment
-
                       </button>
 
                       {/* SAVE */}
@@ -3414,13 +4282,11 @@ const handleCopyLogsWithTime = async () => {
                         }
                         className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-
                         <Save
                           size={16}
                         />
 
                         Save
-
                       </button>
 
                       {/* DOWNLOAD */}
@@ -3439,18 +4305,16 @@ const handleCopyLogsWithTime = async () => {
                         }
                         className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-
                         <Download
                           size={16}
                         />
 
                         Download Excel
-
                       </button>
 
-                      {/* DELETE */}
-
                       <div className="border-t border-gray-100" />
+
+                      {/* DELETE */}
 
                       <button
                         onClick={() => {
@@ -3466,39 +4330,27 @@ const handleCopyLogsWithTime = async () => {
                         }
                         className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-
                         <Trash2
                           size={16}
                         />
 
                         Delete All
-
                       </button>
-
                     </div>
-
                   )}
-
                 </div>
-
               </div>
-
             </div>
-
           ) : (
-
             /* ==================================================
-               DESKTOP FOOTER
+               DESKTOP
             ================================================== */
 
             <div className="space-y-2">
-
               <div className="flex items-center justify-between gap-4">
-
-                {/* LEFT ACTION GROUP */}
+                {/* LEFT */}
 
                 <div className="flex items-center gap-2">
-
                   {/* LAST */}
 
                   <button
@@ -3507,7 +4359,6 @@ const handleCopyLogsWithTime = async () => {
                     }
                     className="flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700 active:scale-[0.98]"
                   >
-
                     <span>
                       🎯
                     </span>
@@ -3515,7 +4366,6 @@ const handleCopyLogsWithTime = async () => {
                     <span>
                       Last
                     </span>
-
                   </button>
 
                   {/* ADD */}
@@ -3539,22 +4389,35 @@ const handleCopyLogsWithTime = async () => {
                         : "cursor-not-allowed bg-gray-200 text-gray-400"
                     }`}
                   >
-
                     <Plus
                       size={14}
                     />
 
                     Add
-
                   </button>
 
+                  {/* UPLOAD JSON */}
+
+                  <button
+                    onClick={() =>
+                      setShowJsonImport(
+                        true
+                      )
+                    }
+                    className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
+                  >
+                    <FileJson
+                      size={14}
+                    />
+
+                    Upload JSON
+                  </button>
                 </div>
 
-                {/* RIGHT ACTION GROUP */}
+                {/* RIGHT */}
 
                 <div className="flex items-center gap-2">
-
-                  {/* REPROCESS */}
+                  {/* OLD REPROCESS */}
 
                   <button
                     onClick={
@@ -3562,13 +4425,11 @@ const handleCopyLogsWithTime = async () => {
                     }
                     className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
                   >
-
                     <RefreshCw
                       size={14}
                     />
 
                     Reprocess
-
                   </button>
 
                   {/* SAVE */}
@@ -3583,13 +4444,11 @@ const handleCopyLogsWithTime = async () => {
                     }
                     className="flex h-9 items-center gap-1.5 rounded-lg bg-green-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                   >
-
                     <Save
                       size={14}
                     />
 
                     Save
-
                   </button>
 
                   {/* DOWNLOAD */}
@@ -3604,13 +4463,11 @@ const handleCopyLogsWithTime = async () => {
                     }
                     className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                   >
-
                     <Download
                       size={14}
                     />
 
                     Download
-
                   </button>
 
                   {/* DELETE */}
@@ -3625,21 +4482,15 @@ const handleCopyLogsWithTime = async () => {
                     }
                     className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                   >
-
                     <Trash2
                       size={14}
                     />
 
                     Delete
-
                   </button>
-
                 </div>
-
               </div>
-
             </div>
-
           )}
 
           {/* ====================================================
@@ -3647,7 +4498,6 @@ const handleCopyLogsWithTime = async () => {
           ==================================================== */}
 
           <div className="mt-2 border-t border-gray-100 pt-2">
-
             <AudioPlayer
               file={file}
               setFile={setFile}
@@ -3664,13 +4514,9 @@ const handleCopyLogsWithTime = async () => {
                 handleTimeUpdate
               }
             />
-
           </div>
-
         </div>
-
       </div>
-
     </div>
   );
 }
