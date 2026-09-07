@@ -846,28 +846,6 @@ export default function SelectedSegments({
     setKeywordRow(null);
   }
 
-  /*
-   * IMPORTANT:
-   *
-   * KeywordModal returns:
-   *
-   * {
-   *   keyword: string;
-   *   duration: number | null;
-   *   brand_id: number;
-   *   brand_name: string;
-   * }
-   *
-   * But SelectedSegments.onSaveKeyword
-   * expects:
-   *
-   * {
-   *   text: string;
-   *   duration: number;
-   *   brand_name: string;
-   * }
-   */
-
   async function addKeyword(
     data: {
       keyword: string;
@@ -1138,6 +1116,34 @@ export default function SelectedSegments({
 
     setDurationSearch(
       ""
+    );
+  }
+
+  /*
+   * ============================================================
+   * CHANGE DURATION BY 1 SECOND
+   * ============================================================
+   */
+
+  function changeDurationBy(
+    row: Segment,
+    amount: number
+  ) {
+    const currentDuration =
+      getDuration(
+        row.start,
+        row.end
+      );
+
+    const newDuration =
+      Math.max(
+        1,
+        currentDuration + amount
+      );
+
+    changeDuration(
+      row,
+      newDuration
     );
   }
 
@@ -2985,7 +2991,7 @@ export default function SelectedSegments({
                     </div>
                   ) : (
 
-                    <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-end sm:gap-3">
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2 sm:flex sm:flex-wrap sm:gap-3">
 
                       {/* START */}
 
@@ -3025,18 +3031,100 @@ export default function SelectedSegments({
                           Duration
                         </span>
 
-                        <DurationDropdown
-                          row={row}
-                          duration={
-                            duration
-                          }
-                          overlapping={
-                            overlapping
-                          }
-                          isNew={
-                            isNew
-                          }
-                        />
+                        <div className="flex items-center gap-1">
+
+                          {/* BACKWARD 1 SECOND */}
+
+                          <button
+                            type="button"
+                            disabled={
+                              duration <=
+                              1
+                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+
+                              changeDurationBy(
+                                row,
+                                -1
+                              );
+                            }}
+                            className="
+                              flex
+                              h-10
+                              w-10
+                              shrink-0
+                              items-center
+                              justify-center
+                              rounded-lg
+                              border
+                              border-gray-300
+                              bg-white
+                              text-xs
+                              font-bold
+                              text-gray-700
+                              shadow-sm
+                              hover:bg-gray-100
+                              disabled:cursor-not-allowed
+                              disabled:opacity-40
+                            "
+                            title="Decrease duration by 1 second"
+                          >
+                            −1
+                          </button>
+
+                          {/* DURATION DROPDOWN */}
+
+                          <div className="min-w-0 flex-1">
+                            <DurationDropdown
+                              row={row}
+                              duration={
+                                duration
+                              }
+                              overlapping={
+                                overlapping
+                              }
+                              isNew={
+                                isNew
+                              }
+                            />
+                          </div>
+
+                          {/* FORWARD 1 SECOND */}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+
+                              changeDurationBy(
+                                row,
+                                1
+                              );
+                            }}
+                            className="
+                              flex
+                              h-10
+                              w-10
+                              shrink-0
+                              items-center
+                              justify-center
+                              rounded-lg
+                              border
+                              border-gray-300
+                              bg-white
+                              text-xs
+                              font-bold
+                              text-gray-700
+                              shadow-sm
+                              hover:bg-gray-100
+                            "
+                            title="Increase duration by 1 second"
+                          >
+                            +1
+                          </button>
+
+                        </div>
                       </div>
 
                       {/* END */}
@@ -3131,7 +3219,6 @@ export default function SelectedSegments({
         onAdd={
           addKeyword
         }
-        
       />
     </>
   );
