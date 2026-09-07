@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -39,15 +38,12 @@ import {
   type SystemUsage,
 } from "@/services/settings";
 
-
 // ============================================================
 // SETTINGS PAGE
 // ============================================================
 
 export default function SettingsPage() {
-
   const router = useRouter();
-
 
   // ==========================================================
   // USER
@@ -57,7 +53,6 @@ export default function SettingsPage() {
 
   const [loadingUser, setLoadingUser] =
     useState(true);
-
 
   // ==========================================================
   // WHISPER SETTINGS
@@ -69,14 +64,12 @@ export default function SettingsPage() {
   const [chunkSize, setChunkSize] =
     useState("300");
 
-
   // ==========================================================
   // RESTART
   // ==========================================================
 
   const [restarting, setRestarting] =
     useState(false);
-
 
   // ==========================================================
   // UPLOAD FEE
@@ -91,7 +84,6 @@ export default function SettingsPage() {
   const [savingUploadFee, setSavingUploadFee] =
     useState(false);
 
-
   // ==========================================================
   // BETA SETTING
   // ==========================================================
@@ -104,7 +96,6 @@ export default function SettingsPage() {
 
   const [savingBeta, setSavingBeta] =
     useState(false);
-
 
   // ==========================================================
   // SYSTEM USAGE
@@ -119,27 +110,21 @@ export default function SettingsPage() {
   const [usageError, setUsageError] =
     useState("");
 
-
   // ==========================================================
   // LOAD USER
   // ==========================================================
 
   useEffect(() => {
-
     const storedRole = getRole();
 
     if (storedRole) {
-
       setRole(
         storedRole.toUpperCase()
       );
-
     }
 
     setLoadingUser(false);
-
   }, []);
-
 
   // ==========================================================
   // ADMIN
@@ -148,13 +133,11 @@ export default function SettingsPage() {
   const isAdmin =
     role === "ADMIN";
 
-
   // ==========================================================
   // LOAD ADMIN SETTINGS
   // ==========================================================
 
   useEffect(() => {
-
     if (loadingUser) {
       return;
     }
@@ -166,21 +149,17 @@ export default function SettingsPage() {
     loadUploadFee();
     loadBetaSetting();
     loadSystemUsage();
-
   }, [
     loadingUser,
     isAdmin,
   ]);
-
 
   // ==========================================================
   // LOAD UPLOAD FEE
   // ==========================================================
 
   async function loadUploadFee() {
-
     try {
-
       setLoadingUploadFee(true);
 
       const value =
@@ -189,9 +168,7 @@ export default function SettingsPage() {
       setUploadFee(
         String(value)
       );
-
     } catch (error) {
-
       console.error(
         "Failed to load upload fee:",
         error
@@ -202,24 +179,17 @@ export default function SettingsPage() {
           ? error.message
           : "Failed to load upload fee."
       );
-
     } finally {
-
       setLoadingUploadFee(false);
-
     }
-
   }
-
 
   // ==========================================================
   // SAVE UPLOAD FEE
   // ==========================================================
 
   async function saveUploadFee() {
-
     if (!uploadFee.trim()) {
-
       toast.error(
         "Please enter an upload fee."
       );
@@ -227,13 +197,10 @@ export default function SettingsPage() {
       return;
     }
 
-
     const amount =
       Number(uploadFee);
 
-
     if (!Number.isFinite(amount)) {
-
       toast.error(
         "Upload fee must be a valid number."
       );
@@ -241,9 +208,7 @@ export default function SettingsPage() {
       return;
     }
 
-
     if (amount < 0) {
-
       toast.error(
         "Upload fee cannot be negative."
       );
@@ -251,9 +216,7 @@ export default function SettingsPage() {
       return;
     }
 
-
     try {
-
       setSavingUploadFee(true);
 
       const result =
@@ -269,9 +232,7 @@ export default function SettingsPage() {
       toast.success(
         "Upload fee updated successfully."
       );
-
     } catch (error) {
-
       console.error(
         "Failed to save upload fee:",
         error
@@ -282,24 +243,17 @@ export default function SettingsPage() {
           ? error.message
           : "Failed to save upload fee."
       );
-
     } finally {
-
       setSavingUploadFee(false);
-
     }
-
   }
-
 
   // ==========================================================
   // LOAD BETA SETTING
   // ==========================================================
 
   async function loadBetaSetting() {
-
     try {
-
       setLoadingBeta(true);
 
       const token =
@@ -309,20 +263,15 @@ export default function SettingsPage() {
             )
           : null;
 
-
       if (!token) {
-
         throw new Error(
           "Authentication token not found."
         );
-
       }
-
 
       const API_URL =
         process.env.NEXT_PUBLIC_API_URL ||
         "http://localhost:8000";
-
 
       const res =
         await fetch(
@@ -342,22 +291,17 @@ export default function SettingsPage() {
           }
         );
 
-
       const data =
         await res.json().catch(
           () => null
         );
 
-
       if (!res.ok) {
-
         throw new Error(
           data?.detail ||
           "Failed to load beta setting."
         );
-
       }
-
 
       const value =
         String(
@@ -365,20 +309,16 @@ export default function SettingsPage() {
           "false"
         ).toLowerCase();
 
-
       const enabled =
         value === "true" ||
         value === "1" ||
         value === "yes" ||
         value === "on";
 
-
       setBetaEnabled(
         enabled
       );
-
     } catch (error) {
-
       console.error(
         "Failed to load beta setting:",
         error
@@ -389,15 +329,10 @@ export default function SettingsPage() {
           ? error.message
           : "Failed to load beta setting."
       );
-
     } finally {
-
       setLoadingBeta(false);
-
     }
-
   }
-
 
   // ==========================================================
   // SAVE BETA SETTING
@@ -406,11 +341,8 @@ export default function SettingsPage() {
   async function saveBetaSetting(
     enabled: boolean
   ) {
-
     try {
-
       setSavingBeta(true);
-
 
       const token =
         typeof window !== "undefined"
@@ -419,20 +351,15 @@ export default function SettingsPage() {
             )
           : null;
 
-
       if (!token) {
-
         throw new Error(
           "Authentication token not found."
         );
-
       }
-
 
       const API_URL =
         process.env.NEXT_PUBLIC_API_URL ||
         "http://localhost:8000";
-
 
       const res =
         await fetch(
@@ -457,36 +384,28 @@ export default function SettingsPage() {
           }
         );
 
-
       const data =
         await res.json().catch(
           () => null
         );
 
-
       if (!res.ok) {
-
         throw new Error(
           data?.detail ||
           "Failed to update beta setting."
         );
-
       }
-
 
       setBetaEnabled(
         enabled
       );
-
 
       toast.success(
         enabled
           ? "Beta features enabled."
           : "Beta features disabled."
       );
-
     } catch (error) {
-
       console.error(
         "Failed to save beta setting:",
         error
@@ -497,22 +416,16 @@ export default function SettingsPage() {
           ? error.message
           : "Failed to update beta setting."
       );
-
     } finally {
-
       setSavingBeta(false);
-
     }
-
   }
-
 
   // ==========================================================
   // TOGGLE BETA
   // ==========================================================
 
   async function toggleBeta() {
-
     if (
       savingBeta ||
       loadingBeta
@@ -520,131 +433,103 @@ export default function SettingsPage() {
       return;
     }
 
-
     const newValue =
       !betaEnabled;
-
 
     await saveBetaSetting(
       newValue
     );
-
   }
-
 
   // ==========================================================
   // LOAD SYSTEM USAGE
   // ==========================================================
 
   async function loadSystemUsage() {
-
     if (!isAdmin) {
       return;
     }
 
-
     try {
-
       setLoadingUsage(true);
       setUsageError("");
-
 
       const usage =
         await getSystemUsage();
 
+      console.log(
+        "SYSTEM USAGE RESPONSE:",
+        usage
+      );
 
       setSystemUsage(
         usage
       );
-
     } catch (error) {
-
       console.error(
         "Failed to load system usage:",
         error
       );
-
 
       const message =
         error instanceof Error
           ? error.message
           : "Failed to load system usage.";
 
-
       setUsageError(
         message
       );
-
     } finally {
-
       setLoadingUsage(false);
-
     }
-
   }
-
 
   // ==========================================================
   // REFRESH SYSTEM USAGE
   // ==========================================================
 
   async function refreshSystemUsage() {
-
     await loadSystemUsage();
 
     toast.success(
       "System usage refreshed."
     );
-
   }
-
 
   // ==========================================================
   // RESTART API
   // ==========================================================
 
   async function restartAPI() {
-
     if (restarting) {
       return;
     }
 
-
     try {
-
       setRestarting(true);
-
 
       toast.info(
         "Restarting audio-api..."
       );
 
-
       const result =
         await restartApi();
 
-
       if (!result.success) {
-
         throw new Error(
           result.message ||
           "Restart failed."
         );
-
       }
-
 
       toast.success(
         result.message ||
         "API restart requested successfully."
       );
 
-
       /*
-       * The current API process is being restarted.
-       *
-       * Give PM2 time to restart the process
-       * before checking health.
+       * Give PM2 time to restart
+       * the current API process.
        */
 
       await new Promise(
@@ -655,26 +540,20 @@ export default function SettingsPage() {
           )
       );
 
-
       let online = false;
-
 
       for (
         let attempt = 0;
         attempt < 10;
         attempt++
       ) {
-
         try {
-
           await getApiHealth();
 
           online = true;
 
           break;
-
         } catch {
-
           await new Promise(
             (resolve) =>
               setTimeout(
@@ -682,142 +561,149 @@ export default function SettingsPage() {
                 1000
               )
           );
-
         }
-
       }
 
-
       if (online) {
-
         toast.success(
           "Backend is online again."
         );
 
         await loadSystemUsage();
-
       } else {
-
         toast.warning(
           "Restart requested, but backend health check is still unavailable."
         );
-
       }
-
     } catch (error) {
-
       console.error(
         "Restart failed:",
         error
       );
-
 
       toast.error(
         error instanceof Error
           ? error.message
           : "Restart failed."
       );
-
     } finally {
-
       setRestarting(false);
-
     }
-
   }
 
+  // ==========================================================
+  // SAFE NUMBER
+  // ==========================================================
+
+  function safeNumber(
+    value: unknown,
+    fallback = 0
+  ): number {
+    const number =
+      Number(value);
+
+    return Number.isFinite(number)
+      ? number
+      : fallback;
+  }
 
   // ==========================================================
   // FORMAT MB
   // ==========================================================
 
   function formatMB(
-    value: number
+    value: unknown
   ) {
+    const number =
+      safeNumber(value);
 
-    if (!Number.isFinite(value)) {
-      return "0 MB";
-    }
-
-
-    if (value >= 1024) {
-
+    if (number >= 1024) {
       return (
-        (value / 1024)
+        (number / 1024)
           .toFixed(2) +
         " GB"
       );
-
     }
 
-
     return (
-      value.toFixed(0) +
+      number.toFixed(0) +
       " MB"
     );
-
   }
-
 
   // ==========================================================
   // FORMAT GB
   // ==========================================================
 
   function formatGB(
-    value: number
+    value: unknown
   ) {
-
-    if (!Number.isFinite(value)) {
-      return "0 GB";
-    }
-
+    const number =
+      safeNumber(value);
 
     return (
-      value.toFixed(2) +
+      number.toFixed(2) +
       " GB"
     );
-
   }
 
+  // ==========================================================
+  // PERCENT
+  // ==========================================================
+
+  function formatPercent(
+    value: unknown
+  ) {
+    return (
+      safeNumber(value)
+        .toFixed(1) +
+      "%"
+    );
+  }
+
+  // ==========================================================
+  // PROGRESS PERCENT
+  // ==========================================================
+
+  function progressPercent(
+    value: unknown
+  ) {
+    return Math.min(
+      Math.max(
+        safeNumber(value),
+        0
+      ),
+      100
+    );
+  }
 
   // ==========================================================
   // LOADING USER
   // ==========================================================
 
   if (loadingUser) {
-
     return (
-
       <div className="min-h-screen bg-gray-100 p-8">
-
         <div className="max-w-6xl mx-auto">
 
           <h1 className="text-3xl font-bold">
             ⚙️ Settings
           </h1>
 
-
           <div className="mt-8 bg-white rounded-xl shadow p-6">
-
             Loading settings...
-
           </div>
 
         </div>
-
       </div>
-
     );
-
   }
-
 
   // ==========================================================
   // PAGE
   // ==========================================================
 
   return (
-
     <div className="min-h-screen bg-gray-100 p-8">
 
       <ToastContainer
@@ -825,13 +711,9 @@ export default function SettingsPage() {
         autoClose={3000}
       />
 
-
       <div className="max-w-6xl mx-auto">
 
-
-        {/* ====================================================
-            HEADER
-        ==================================================== */}
+        {/* HEADER */}
 
         <div className="flex items-center justify-between mb-8">
 
@@ -841,7 +723,6 @@ export default function SettingsPage() {
               ⚙️ Settings
             </h1>
 
-
             <p className="text-gray-500 mt-1">
               Configure system settings.
             </p>
@@ -850,9 +731,7 @@ export default function SettingsPage() {
 
         </div>
 
-
         <div className="grid gap-6">
-
 
           {/* ==================================================
               WHISPER MODEL
@@ -870,11 +749,9 @@ export default function SettingsPage() {
 
             </div>
 
-
             <label className="block mb-2">
               Model Size
             </label>
-
 
             <select
               value={model}
@@ -908,7 +785,6 @@ export default function SettingsPage() {
 
           </div>
 
-
           {/* ==================================================
               AUDIO PROCESSING
           ================================================== */}
@@ -925,11 +801,9 @@ export default function SettingsPage() {
 
             </div>
 
-
             <label className="block mb-2">
               Chunk Duration (seconds)
             </label>
-
 
             <input
               type="number"
@@ -951,10 +825,8 @@ export default function SettingsPage() {
 
           </div>
 
-
           {/* ==================================================
               BETA FEATURES
-              ADMIN ONLY
           ================================================== */}
 
           {isAdmin && (
@@ -981,14 +853,12 @@ export default function SettingsPage() {
 
                   </div>
 
-
                   <p className="text-sm text-gray-500 mt-1">
                     Enable or disable experimental
                     features in the system.
                   </p>
 
                 </div>
-
 
                 <button
                   type="button"
@@ -1058,7 +928,6 @@ export default function SettingsPage() {
 
               </div>
 
-
               <div className="mt-5 flex items-center justify-between">
 
                 <div>
@@ -1085,14 +954,12 @@ export default function SettingsPage() {
 
                   </p>
 
-
                   <p className="text-xs text-gray-400 mt-1">
                     This setting is saved in the
                     database.
                   </p>
 
                 </div>
-
 
                 {savingBeta && (
 
@@ -1108,10 +975,8 @@ export default function SettingsPage() {
 
           )}
 
-
           {/* ==================================================
               UPLOAD FEE
-              ADMIN ONLY
           ================================================== */}
 
           {isAdmin && (
@@ -1132,7 +997,6 @@ export default function SettingsPage() {
 
                   </div>
 
-
                   <p className="text-sm text-gray-500 mt-1">
                     Amount charged from the user's
                     wallet for each uploaded file.
@@ -1141,7 +1005,6 @@ export default function SettingsPage() {
                 </div>
 
               </div>
-
 
               <div className="flex flex-col md:flex-row gap-3">
 
@@ -1160,14 +1023,11 @@ export default function SettingsPage() {
                     ₱
                   </span>
 
-
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    value={
-                      uploadFee
-                    }
+                    value={uploadFee}
                     disabled={
                       loadingUploadFee
                     }
@@ -1189,7 +1049,6 @@ export default function SettingsPage() {
                   />
 
                 </div>
-
 
                 <button
                   type="button"
@@ -1218,7 +1077,6 @@ export default function SettingsPage() {
 
                   <Save className="w-4 h-4" />
 
-
                   {savingUploadFee
                     ? "Saving..."
                     : "Save Fee"}
@@ -1226,7 +1084,6 @@ export default function SettingsPage() {
                 </button>
 
               </div>
-
 
               {!loadingUploadFee && (
 
@@ -1239,6 +1096,7 @@ export default function SettingsPage() {
                 >
 
                   Current fee: ₱
+
                   {Number(
                     uploadFee || 0
                   ).toLocaleString(
@@ -1258,7 +1116,6 @@ export default function SettingsPage() {
             </div>
 
           )}
-
 
           {/* ==================================================
               KEYWORD MANAGEMENT
@@ -1280,14 +1137,12 @@ export default function SettingsPage() {
 
                 </div>
 
-
                 <p className="text-sm text-gray-500">
                   Manage keywords used for
                   advertisement detection.
                 </p>
 
               </div>
-
 
               <button
                 type="button"
@@ -1319,7 +1174,6 @@ export default function SettingsPage() {
 
           </div>
 
-
           {/* ==================================================
               BRAND MANAGEMENT
           ================================================== */}
@@ -1340,14 +1194,12 @@ export default function SettingsPage() {
 
                 </div>
 
-
                 <p className="text-sm text-gray-500">
                   Create, edit and delete
                   advertisement brands.
                 </p>
 
               </div>
-
 
               <button
                 type="button"
@@ -1379,10 +1231,8 @@ export default function SettingsPage() {
 
           </div>
 
-
           {/* ==================================================
               SYSTEM USAGE
-              ADMIN ONLY
           ================================================== */}
 
           {isAdmin && (
@@ -1403,14 +1253,12 @@ export default function SettingsPage() {
 
                   </div>
 
-
                   <p className="text-sm text-gray-500 mt-1">
                     Current server and backend process
                     resource usage.
                   </p>
 
                 </div>
-
 
                 <button
                   type="button"
@@ -1454,6 +1302,7 @@ export default function SettingsPage() {
 
               </div>
 
+              {/* ERROR */}
 
               {usageError && (
 
@@ -1470,30 +1319,27 @@ export default function SettingsPage() {
                     text-sm
                   "
                 >
-
                   {usageError}
-
                 </div>
 
               )}
 
+              {/* LOADING */}
 
               {loadingUsage &&
                 !systemUsage && (
 
                 <div className="py-10 text-center text-gray-500">
-
                   Loading system usage...
-
                 </div>
 
               )}
 
+              {/* USAGE CARDS */}
 
               {systemUsage && (
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
 
                   {/* CPU */}
 
@@ -1507,7 +1353,6 @@ export default function SettingsPage() {
 
                       </div>
 
-
                       <div>
 
                         <p className="text-sm text-gray-500">
@@ -1515,25 +1360,24 @@ export default function SettingsPage() {
                         </p>
 
                         <p className="text-2xl font-bold">
-                          {systemUsage.cpu_percent.toFixed(1)}%
+
+                          {formatPercent(
+                            systemUsage?.cpu_percent
+                          )}
+
                         </p>
 
                       </div>
 
                     </div>
 
-
                     <div className="mt-4 h-2 bg-gray-200 rounded-full overflow-hidden">
 
                       <div
                         className="h-full bg-blue-600 rounded-full"
                         style={{
-                          width: `${Math.min(
-                            Math.max(
-                              systemUsage.cpu_percent,
-                              0
-                            ),
-                            100
+                          width: `${progressPercent(
+                            systemUsage?.cpu_percent
                           )}%`,
                         }}
                       />
@@ -1541,7 +1385,6 @@ export default function SettingsPage() {
                     </div>
 
                   </div>
-
 
                   {/* MEMORY */}
 
@@ -1555,7 +1398,6 @@ export default function SettingsPage() {
 
                       </div>
 
-
                       <div>
 
                         <p className="text-sm text-gray-500">
@@ -1563,40 +1405,38 @@ export default function SettingsPage() {
                         </p>
 
                         <p className="text-2xl font-bold">
-                          {systemUsage.memory_percent.toFixed(1)}%
+
+                          {formatPercent(
+                            systemUsage?.memory_percent
+                          )}
+
                         </p>
 
                       </div>
 
                     </div>
 
-
                     <p className="text-sm text-gray-500 mt-4">
 
                       {formatMB(
-                        systemUsage.memory_used_mb
+                        systemUsage?.memory_used_mb
                       )}
 
                       {" / "}
 
                       {formatMB(
-                        systemUsage.memory_total_mb
+                        systemUsage?.memory_total_mb
                       )}
 
                     </p>
-
 
                     <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
 
                       <div
                         className="h-full bg-purple-600 rounded-full"
                         style={{
-                          width: `${Math.min(
-                            Math.max(
-                              systemUsage.memory_percent,
-                              0
-                            ),
-                            100
+                          width: `${progressPercent(
+                            systemUsage?.memory_percent
                           )}%`,
                         }}
                       />
@@ -1604,7 +1444,6 @@ export default function SettingsPage() {
                     </div>
 
                   </div>
-
 
                   {/* DISK */}
 
@@ -1618,7 +1457,6 @@ export default function SettingsPage() {
 
                       </div>
 
-
                       <div>
 
                         <p className="text-sm text-gray-500">
@@ -1626,40 +1464,38 @@ export default function SettingsPage() {
                         </p>
 
                         <p className="text-2xl font-bold">
-                          {systemUsage.disk_percent.toFixed(1)}%
+
+                          {formatPercent(
+                            systemUsage?.disk_percent
+                          )}
+
                         </p>
 
                       </div>
 
                     </div>
 
-
                     <p className="text-sm text-gray-500 mt-4">
 
                       {formatGB(
-                        systemUsage.disk_used_gb
+                        systemUsage?.disk_used_gb
                       )}
 
                       {" / "}
 
                       {formatGB(
-                        systemUsage.disk_total_gb
+                        systemUsage?.disk_total_gb
                       )}
 
                     </p>
-
 
                     <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
 
                       <div
                         className="h-full bg-orange-600 rounded-full"
                         style={{
-                          width: `${Math.min(
-                            Math.max(
-                              systemUsage.disk_percent,
-                              0
-                            ),
-                            100
+                          width: `${progressPercent(
+                            systemUsage?.disk_percent
                           )}%`,
                         }}
                       />
@@ -1672,8 +1508,9 @@ export default function SettingsPage() {
 
               )}
 
-
-              {/* PM2 */}
+              {/* ==================================================
+                  PM2
+              ================================================== */}
 
               {systemUsage?.pm2 && (
 
@@ -1694,7 +1531,10 @@ export default function SettingsPage() {
                           </p>
 
                           <p className="text-sm text-gray-500">
-                            {systemUsage.pm2.name}
+
+                            {systemUsage?.pm2?.name ??
+                              "audio-api"}
+
                           </p>
 
                         </div>
@@ -1703,9 +1543,9 @@ export default function SettingsPage() {
 
                     </div>
 
-
                     <div className="flex flex-wrap items-center gap-4 text-sm">
 
+                      {/* STATUS */}
 
                       <div>
 
@@ -1715,19 +1555,23 @@ export default function SettingsPage() {
 
                         <span
                           className={
-                            systemUsage.pm2.status === "online"
+                            systemUsage?.pm2?.status ===
+                            "online"
                               ? "font-semibold text-green-600"
                               : "font-semibold text-red-600"
                           }
                         >
 
                           ●{" "}
-                          {systemUsage.pm2.status}
+
+                          {systemUsage?.pm2?.status ??
+                            "unknown"}
 
                         </span>
 
                       </div>
 
+                      {/* PID */}
 
                       <div>
 
@@ -1737,13 +1581,14 @@ export default function SettingsPage() {
 
                         <span className="font-medium">
 
-                          {systemUsage.pm2.pid ??
+                          {systemUsage?.pm2?.pid ??
                             "—"}
 
                         </span>
 
                       </div>
 
+                      {/* RESTARTS */}
 
                       <div>
 
@@ -1753,12 +1598,15 @@ export default function SettingsPage() {
 
                         <span className="font-medium">
 
-                          {systemUsage.pm2.restarts}
+                          {safeNumber(
+                            systemUsage?.pm2?.restarts
+                          )}
 
                         </span>
 
                       </div>
 
+                      {/* CPU */}
 
                       <div>
 
@@ -1768,14 +1616,15 @@ export default function SettingsPage() {
 
                         <span className="font-medium">
 
-                          {Number(
-                            systemUsage.pm2.cpu
-                          ).toFixed(1)}%
+                          {formatPercent(
+                            systemUsage?.pm2?.cpu
+                          )}
 
                         </span>
 
                       </div>
 
+                      {/* RAM */}
 
                       <div>
 
@@ -1786,7 +1635,7 @@ export default function SettingsPage() {
                         <span className="font-medium">
 
                           {formatMB(
-                            systemUsage.pm2.memory_mb
+                            systemUsage?.pm2?.memory_mb
                           )}
 
                         </span>
@@ -1805,10 +1654,8 @@ export default function SettingsPage() {
 
           )}
 
-
           {/* ==================================================
               SYSTEM / RESTART
-              ADMIN ONLY
           ================================================== */}
 
           {isAdmin && (
@@ -1825,7 +1672,6 @@ export default function SettingsPage() {
 
               </div>
 
-
               <div className="flex flex-col md:flex-row justify-between md:items-center gap-5">
 
                 <div>
@@ -1834,31 +1680,30 @@ export default function SettingsPage() {
                     Backend API
                   </p>
 
-
                   <p
                     className={`
                       text-sm
                       ${
-                        systemUsage?.pm2?.status === "online"
+                        systemUsage?.pm2?.status ===
+                        "online"
                           ? "text-green-600"
                           : "text-gray-500"
                       }
                     `}
                   >
 
-                    {systemUsage?.pm2?.status === "online"
+                    {systemUsage?.pm2?.status ===
+                    "online"
                       ? "● Online"
                       : "● Status unavailable"}
 
                   </p>
-
 
                   <p className="text-xs text-gray-400 mt-1">
                     PM2 process: audio-api
                   </p>
 
                 </div>
-
 
                 <button
                   type="button"
@@ -1897,7 +1742,6 @@ export default function SettingsPage() {
                     `}
                   />
 
-
                   {restarting
                     ? "Restarting..."
                     : "Restart API"}
@@ -1915,8 +1759,5 @@ export default function SettingsPage() {
       </div>
 
     </div>
-
   );
-
 }
-
