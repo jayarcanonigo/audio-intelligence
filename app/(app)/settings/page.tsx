@@ -18,6 +18,7 @@ import {
   Activity,
   RefreshCw,
   RotateCw,
+  Upload,
 } from "lucide-react";
 
 import {
@@ -32,6 +33,8 @@ import { getRole } from "@/services/auth";
 import {
   getUploadFee,
   updateUploadFee,
+  getUploadLimit,
+  updateUploadLimit,
   getSystemUsage,
   restartApi,
   getApiHealth,
@@ -82,6 +85,19 @@ export default function SettingsPage() {
     useState(false);
 
   const [savingUploadFee, setSavingUploadFee] =
+    useState(false);
+
+  // ==========================================================
+  // UPLOAD LIMIT
+  // ==========================================================
+
+  const [uploadLimit, setUploadLimit] =
+    useState("10");
+
+  const [loadingUploadLimit, setLoadingUploadLimit] =
+    useState(false);
+
+  const [savingUploadLimit, setSavingUploadLimit] =
     useState(false);
 
   // ==========================================================
@@ -147,6 +163,7 @@ export default function SettingsPage() {
     }
 
     loadUploadFee();
+    loadUploadLimit();
     loadBetaSetting();
     loadSystemUsage();
   }, [
@@ -245,6 +262,99 @@ export default function SettingsPage() {
       );
     } finally {
       setSavingUploadFee(false);
+    }
+  }
+
+  // ==========================================================
+  // LOAD UPLOAD LIMIT
+  // ==========================================================
+
+  async function loadUploadLimit() {
+    try {
+      setLoadingUploadLimit(true);
+
+      const value =
+        await getUploadLimit();
+
+      setUploadLimit(
+        String(value)
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load upload limit:",
+        error
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load upload limit."
+      );
+    } finally {
+      setLoadingUploadLimit(false);
+    }
+  }
+
+  // ==========================================================
+  // SAVE UPLOAD LIMIT
+  // ==========================================================
+
+  async function saveUploadLimit() {
+    if (!uploadLimit.trim()) {
+      toast.error(
+        "Please enter an upload limit."
+      );
+
+      return;
+    }
+
+    const limit =
+      Number(uploadLimit);
+
+    if (!Number.isInteger(limit)) {
+      toast.error(
+        "Upload limit must be a whole number."
+      );
+
+      return;
+    }
+
+    if (limit < 1) {
+      toast.error(
+        "Upload limit must be at least 1."
+      );
+
+      return;
+    }
+
+    try {
+      setSavingUploadLimit(true);
+
+      const result =
+        await updateUploadLimit(limit);
+
+      setUploadLimit(
+        String(
+          result.limit
+        )
+      );
+
+      toast.success(
+        "Upload limit updated successfully."
+      );
+    } catch (error) {
+      console.error(
+        "Failed to save upload limit:",
+        error
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to save upload limit."
+      );
+    } finally {
+      setSavingUploadLimit(false);
     }
   }
 
@@ -526,11 +636,6 @@ export default function SettingsPage() {
         result.message ||
         "API restart requested successfully."
       );
-
-      /*
-       * Give PM2 time to restart
-       * the current API process.
-       */
 
       await new Promise(
         (resolve) =>
@@ -1029,7 +1134,8 @@ export default function SettingsPage() {
                     step="0.01"
                     value={uploadFee}
                     disabled={
-                      loadingUploadFee
+                      loadingUploadFee ||
+                      savingUploadFee
                     }
                     onChange={(e) =>
                       setUploadFee(
@@ -1108,6 +1214,134 @@ export default function SettingsPage() {
                   )}
 
                   {" "}per file
+
+                </p>
+
+              )}
+
+            </div>
+
+          )}
+
+          {/* ==================================================
+              UPLOAD LIMIT
+          ================================================== */}
+
+          {isAdmin && (
+
+            <div className="bg-white rounded-xl shadow p-6">
+
+              <div className="flex items-center justify-between mb-5">
+
+                <div>
+
+                  <div className="flex items-center gap-2">
+
+                    <Upload className="w-5 h-5 text-blue-600" />
+
+                    <h2 className="font-semibold text-lg">
+                      Upload Limit
+                    </h2>
+
+                  </div>
+
+                  <p className="text-sm text-gray-500 mt-1">
+                    Set the maximum number of uploads
+                    allowed per user.
+                  </p>
+
+                </div>
+
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-3">
+
+                <div className="flex-1">
+
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={uploadLimit}
+                    disabled={
+                      loadingUploadLimit ||
+                      savingUploadLimit
+                    }
+                    onChange={(e) =>
+                      setUploadLimit(
+                        e.target.value
+                      )
+                    }
+                    className="
+                      border
+                      rounded-lg
+                      px-3
+                      py-2
+                      w-full
+                      disabled:bg-gray-100
+                    "
+                    placeholder="10"
+                  />
+
+                </div>
+
+                <button
+                  type="button"
+                  onClick={
+                    saveUploadLimit
+                  }
+                  disabled={
+                    loadingUploadLimit ||
+                    savingUploadLimit
+                  }
+                  className="
+                    bg-blue-600
+                    hover:bg-blue-700
+                    disabled:opacity-50
+                    disabled:cursor-not-allowed
+                    text-white
+                    px-5
+                    py-2
+                    rounded-lg
+                    flex
+                    items-center
+                    justify-center
+                    gap-2
+                    min-w-[140px]
+                  "
+                >
+
+                  <Save className="w-4 h-4" />
+
+                  {savingUploadLimit
+                    ? "Saving..."
+                    : "Save Limit"}
+
+                </button>
+
+              </div>
+
+              {!loadingUploadLimit && (
+
+                <p
+                  className="
+                    text-xs
+                    text-gray-500
+                    mt-3
+                  "
+                >
+
+                  Current limit:{" "}
+
+                  <span className="font-semibold text-gray-700">
+                    {Number(
+                      uploadLimit || 0
+                    ).toLocaleString(
+                      "en-PH"
+                    )}
+                  </span>
+
+                  {" "}uploads per user
 
                 </p>
 

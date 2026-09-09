@@ -1,4 +1,3 @@
-
 // ============================================================
 // SYSTEM SETTINGS API
 // ============================================================
@@ -19,6 +18,21 @@ export interface SystemSetting {
     description?: string | null;
     created_at?: string;
     updated_at?: string;
+}
+
+
+// ============================================================
+// UPLOAD LIMIT TYPES
+// ============================================================
+
+export interface UploadLimitResponse {
+    id?: number | null;
+    key: string;
+    value: string;
+    limit: number;
+    description?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
 }
 
 
@@ -338,6 +352,142 @@ export async function updateUploadFee(
     }
 
     return response.json();
+}
+
+
+// ============================================================
+// GET UPLOAD LIMIT
+//
+// GET /system/settings/upload-limit
+//
+// Returns the maximum number of uploads allowed.
+// ============================================================
+
+export async function getUploadLimit(): Promise<number> {
+
+    const response = await fetch(
+        `${API_URL}/system/settings/upload-limit`,
+        {
+            method: "GET",
+
+            headers:
+                getAuthHeaders(),
+
+            cache:
+                "no-store",
+        }
+    );
+
+    if (!response.ok) {
+
+        let message =
+            "Failed to load upload limit.";
+
+        try {
+
+            const data =
+                await response.json();
+
+            message =
+                data.detail || message;
+
+        } catch {
+            // Ignore JSON parsing error
+        }
+
+        throw new Error(message);
+    }
+
+    const data: UploadLimitResponse =
+        await response.json();
+
+    const limit =
+        Number(data.limit);
+
+    if (!Number.isInteger(limit)) {
+
+        throw new Error(
+            "Invalid upload limit returned by server."
+        );
+    }
+
+    return limit;
+}
+
+
+// ============================================================
+// UPDATE UPLOAD LIMIT
+//
+// PUT /system/settings/upload-limit
+//
+// Example:
+//
+// {
+//     "value": "10",
+//     "description": "Maximum number of uploads allowed per user."
+// }
+// ============================================================
+
+export async function updateUploadLimit(
+    limit: number
+): Promise<UploadLimitResponse> {
+
+    if (!Number.isInteger(limit)) {
+
+        throw new Error(
+            "Upload limit must be a whole number."
+        );
+    }
+
+    if (limit < 1) {
+
+        throw new Error(
+            "Upload limit must be at least 1."
+        );
+    }
+
+    const response = await fetch(
+        `${API_URL}/system/settings/upload-limit`,
+        {
+            method: "PUT",
+
+            headers:
+                getAuthHeaders(),
+
+            body: JSON.stringify({
+                value:
+                    String(limit),
+
+                description:
+                    "Maximum number of uploads allowed per user.",
+            }),
+        }
+    );
+
+    if (!response.ok) {
+
+        let message =
+            "Failed to update upload limit.";
+
+        try {
+
+            const data =
+                await response.json();
+
+            message =
+                data.detail || message;
+
+        } catch {
+            // Ignore JSON parsing error
+        }
+
+        throw new Error(message);
+    }
+
+    const data: UploadLimitResponse =
+        await response.json();
+
+    return data;
 }
 
 

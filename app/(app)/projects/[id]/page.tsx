@@ -37,11 +37,19 @@ import {
   type UploadStatus,
 } from "@/services/api";
 
-const MAX_UPLOAD_PANELS = 3;
+import {
+  getUploadLimit,
+} from "@/services/settings";
 
 /*
- * These statuses count toward the maximum
- * of 3 active uploads.
+ * Fallback value used only if the
+ * upload-limit setting cannot be loaded.
+ */
+const DEFAULT_UPLOAD_LIMIT = 3;
+
+/*
+ * These statuses count toward the
+ * maximum number of active uploads.
  */
 const ACTIVE_UPLOAD_STATUSES = [
   "STARTING",
@@ -72,6 +80,18 @@ export default function ProjectPage() {
   const projectName =
     searchParams.get("name") ||
     `Project #${projectId}`;
+
+  // ============================================================
+  // UPLOAD LIMIT
+  // ============================================================
+
+  const [uploadLimit, setUploadLimit] =
+    useState<number>(
+      DEFAULT_UPLOAD_LIMIT,
+    );
+
+  const [loadingUploadLimit, setLoadingUploadLimit] =
+    useState(true);
 
   // ============================================================
   // UPLOAD PANELS
@@ -108,6 +128,61 @@ export default function ProjectPage() {
 
   const [deletingUploadId, setDeletingUploadId] =
     useState<number | null>(null);
+
+  // ============================================================
+  // LOAD UPLOAD LIMIT
+  //
+  // Gets the configured upload limit from:
+  //
+  // GET /system/settings/upload-limit
+  //
+  // Example:
+  // {
+  //   "key": "upload_limit",
+  //   "value": "10",
+  //   "limit": 10
+  // }
+  // ============================================================
+
+  const loadUploadLimit =
+    useCallback(async () => {
+      try {
+        setLoadingUploadLimit(true);
+
+        const limit =
+          await getUploadLimit();
+
+        if (
+          Number.isInteger(limit) &&
+          limit >= 1
+        ) {
+          setUploadLimit(limit);
+
+          /*
+           * If the administrator reduced
+           * the upload limit, make sure the
+           * number of visible panels does not
+           * exceed the new limit.
+           */
+          setUploadPanels(
+            (prev) =>
+              prev.slice(0, limit),
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load upload limit:",
+          error,
+        );
+
+        /*
+         * Keep DEFAULT_UPLOAD_LIMIT as
+         * fallback if the setting fails.
+         */
+      } finally {
+        setLoadingUploadLimit(false);
+      }
+    }, []);
 
   // ============================================================
   // LOAD UPLOAD HISTORY
@@ -230,8 +305,10 @@ export default function ProjectPage() {
 
   useEffect(() => {
     loadUploadStatuses(true);
+    loadUploadLimit();
   }, [
     loadUploadStatuses,
+    loadUploadLimit,
   ]);
 
   // ============================================================
@@ -328,11 +405,22 @@ export default function ProjectPage() {
 
   // ============================================================
   // CAN ADD UPLOAD
+  //
+  // Uses the upload limit from Settings.
+  //
+  // Example:
+  // uploadLimit = 10
+  //
+  // Active Uploads:
+  // 0 / 10
+  // 1 / 10
+  // ...
+  // 10 / 10
   // ============================================================
 
   const canAddUpload =
     activeUploadCount <
-    MAX_UPLOAD_PANELS;
+    uploadLimit;
 
   // ============================================================
   // AUTO REFRESH ACTIVE UPLOADS
@@ -371,17 +459,22 @@ export default function ProjectPage() {
 
   const addUploadPanel = () => {
     if (
+      loadingUploadLimit ||
       activeUploadCount >=
-      MAX_UPLOAD_PANELS
+        uploadLimit
     ) {
       return;
     }
 
     setUploadPanels(
       (prev) => {
+        /*
+         * Do not create more panels
+         * than the configured limit.
+         */
         if (
           prev.length >=
-          MAX_UPLOAD_PANELS
+          uploadLimit
         ) {
           return prev;
         }
@@ -998,13 +1091,15 @@ export default function ProjectPage() {
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold ${
               activeUploadCount >=
-              MAX_UPLOAD_PANELS
+              uploadLimit
                 ? "bg-red-50 text-red-700"
                 : "bg-emerald-50 text-emerald-700"
             }`}
           >
             {activeUploadCount} /{" "}
-            {MAX_UPLOAD_PANELS}
+            {loadingUploadLimit
+              ? "..."
+              : uploadLimit}
           </span>
 
         </div>
@@ -1090,7 +1185,7 @@ export default function ProjectPage() {
           ==================================================== */}
 
           {uploadPanels.length <
-            MAX_UPLOAD_PANELS && (
+            uploadLimit && (
             <div className="flex flex-col items-center justify-center pb-8 pt-1">
 
               <button
@@ -1099,7 +1194,8 @@ export default function ProjectPage() {
                   addUploadPanel
                 }
                 disabled={
-                  !canAddUpload
+                  !canAddUpload ||
+                  loadingUploadLimit
                 }
                 className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
               >
@@ -1125,21 +1221,24 @@ export default function ProjectPage() {
                 {" / "}
 
                 {
-                  MAX_UPLOAD_PANELS
+                  loadingUploadLimit
+                    ? "..."
+                    : uploadLimit
                 }
 
               </p>
 
-              {!canAddUpload && (
-                <p className="mt-1 text-xs text-red-500">
-                  Maximum of{" "}
-                  {
-                    MAX_UPLOAD_PANELS
-                  }{" "}
-                  uploads are currently
-                  processing.
-                </p>
-              )}
+              {!canAddUpload &&
+                !loadingUploadLimit && (
+                  <p className="mt-1 text-xs text-red-500">
+                    Maximum of{" "}
+                    {
+                      uploadLimit
+                    }{" "}
+                    uploads are currently
+                    processing.
+                  </p>
+                )}
 
             </div>
           )}
