@@ -1346,12 +1346,12 @@ export default function ProjectsPage() {
                         Open Project
                       </Link>
 
-                      <Link
-                        href={`/projects/${project.id}/ads`}
-                        className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                      >
-                        Edit Ads
-                      </Link>
+                     <Link
+                href={`/ad-editor/${project.id}?name=${encodeURIComponent(projectName)}`}
+                className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Edit Ads
+              </Link>
 
                       <button
                         type="button"
