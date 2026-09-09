@@ -1,29 +1,120 @@
 "use client";
 
-import { useState, useEffect, useId } from "react";
-import { uploadAudio, getUploadStatus } from "@/services/api";
+import {
+  useState,
+  useEffect,
+  useId,
+} from "react";
+
+import {
+  uploadAudio,
+  getUploadStatus,
+} from "@/services/api";
 
 interface Props {
   projectId: number;
   onComplete?: () => void;
+  onUploadStart?: (hour: string) => void;
+  unavailableHours?: string[];
 }
 
 export default function UploadPanel({
   projectId,
   onComplete,
+  onUploadStart,
+  unavailableHours = [],
 }: Props) {
   const fileInputId = useId();
 
-  const [file, setFile] = useState<File | null>(null);
-  const [uploadTime, setUploadTime] = useState("01");
-  const [sessionId, setSessionId] = useState("");
-  const [status, setStatus] = useState<any>(null);
+  const [file, setFile] =
+    useState<File | null>(null);
 
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
+  const [uploadTime, setUploadTime] =
+    useState("01");
+
+  const [sessionId, setSessionId] =
+    useState("");
+
+  const [status, setStatus] =
+    useState<any>(null);
+
+  const [uploading, setUploading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  // ============================================================
+  // AVAILABLE BROADCAST HOURS
+  //
+  // Hours contained in unavailableHours are hidden.
+  // ============================================================
+
+  const availableHours =
+    Array.from(
+      { length: 24 },
+      (_, index) =>
+        String(index + 1).padStart(
+          2,
+          "0",
+        ),
+    ).filter(
+      (hour) =>
+        !unavailableHours.includes(
+          hour,
+        ),
+    );
+
+  // ============================================================
+  // MAKE SURE SELECTED HOUR IS STILL AVAILABLE
+  // ============================================================
+
+  useEffect(() => {
+    if (
+      availableHours.length === 0
+    ) {
+      return;
+    }
+
+    if (
+      !availableHours.includes(
+        uploadTime,
+      )
+    ) {
+      setUploadTime(
+        availableHours[0],
+      );
+    }
+  }, [
+    availableHours,
+    uploadTime,
+  ]);
+
+  // ============================================================
+  // UPLOAD
+  // ============================================================
 
   async function handleUpload() {
-    if (!file || uploading) return;
+    if (
+      !file ||
+      uploading ||
+      availableHours.length === 0
+    ) {
+      return;
+    }
+
+    // Extra protection against stale UI.
+    if (
+      unavailableHours.includes(
+        uploadTime,
+      )
+    ) {
+      setError(
+        `Broadcast hour ${uploadTime}:00 is already used.`,
+      );
+
+      return;
+    }
 
     try {
       setUploading(true);
@@ -31,34 +122,56 @@ export default function UploadPanel({
       setStatus(null);
 
       /*
-       * The backend upload endpoint is responsible for:
+       * The backend is responsible for:
        *
        * 1. Getting the logged-in user
-       * 2. Getting the current upload fee
+       * 2. Getting upload fee
        * 3. Checking wallet balance
-       * 4. Deducting the upload fee
-       * 5. Creating the wallet transaction
-       * 6. Starting the upload
+       * 4. Deducting upload fee
+       * 5. Creating wallet transaction
+       * 6. Starting upload
        *
-       * Therefore, DO NOT call debitWallet() here.
+       * DO NOT call debitWallet() here.
        */
 
-      const result = await uploadAudio(
-        projectId,
-        file,
-        uploadTime
+      const selectedHour =
+        uploadTime;
+
+      const result =
+        await uploadAudio(
+          projectId,
+          file,
+          selectedHour,
+        );
+
+      // Tell parent immediately that this hour was selected.
+      onUploadStart?.(
+        selectedHour,
       );
 
-      setSessionId(result.session_id);
+      setSessionId(
+        result.session_id,
+      );
     } catch (error: any) {
-      console.error("Upload failed:", error);
+      console.error(
+        "Upload failed:",
+        error,
+      );
 
-      let message = "Upload failed.";
+      let message =
+        "Upload failed.";
 
-      if (error?.response?.data?.detail) {
-        message = error.response.data.detail;
-      } else if (error?.message) {
-        message = error.message;
+      if (
+        error?.response?.data
+          ?.detail
+      ) {
+        message =
+          error.response.data.detail;
+      } else if (
+        error?.message
+      ) {
+        message =
+          error.message;
       }
 
       setError(message);
@@ -66,34 +179,77 @@ export default function UploadPanel({
     }
   }
 
-  // Monitor upload status
+  // ============================================================
+  // MONITOR UPLOAD STATUS
+  // ============================================================
+
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      return;
+    }
 
-    const timer = setInterval(async () => {
-      try {
-        const data = await getUploadStatus(sessionId);
+    const timer =
+      window.setInterval(
+        async () => {
+          try {
+            const data =
+              await getUploadStatus(
+                sessionId,
+              );
 
-        setStatus(data);
+            setStatus(data);
 
-        if (
-          data.status === "completed" ||
-          data.status === "error"
-        ) {
-          clearInterval(timer);
-          setUploading(false);
-          onComplete?.();
-        }
-      } catch (error) {
-        console.error("Status check failed", error);
+            const normalizedStatus =
+              String(
+                data.status || "",
+              ).toUpperCase();
 
-        clearInterval(timer);
-        setUploading(false);
-      }
-    }, 2000);
+            /*
+             * Terminal statuses.
+             */
 
-    return () => clearInterval(timer);
-  }, [sessionId, onComplete]);
+            if (
+              normalizedStatus ===
+                "COMPLETED" ||
+              normalizedStatus ===
+                "CANCELLED" ||
+              normalizedStatus ===
+                "FAILED" ||
+              normalizedStatus ===
+                "ERROR"
+            ) {
+              clearInterval(timer);
+
+              setUploading(false);
+
+              onComplete?.();
+            }
+          } catch (error) {
+            console.error(
+              "Status check failed",
+              error,
+            );
+
+            clearInterval(timer);
+
+            setUploading(false);
+
+            onComplete?.();
+          }
+        },
+        2000,
+      );
+
+    return () =>
+      clearInterval(timer);
+  }, [
+    sessionId,
+    onComplete,
+  ]);
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   return (
     <div className="space-y-6">
@@ -117,7 +273,11 @@ export default function UploadPanel({
           accept="audio/*"
           className="hidden"
           onChange={(e) => {
-            setFile(e.target.files?.[0] || null);
+            setFile(
+              e.target.files?.[0] ||
+                null,
+            );
+
             setError("");
           }}
         />
@@ -152,31 +312,71 @@ export default function UploadPanel({
           Broadcast Time
         </label>
 
-        <select
-          value={uploadTime}
-          onChange={(e) => setUploadTime(e.target.value)}
-          disabled={uploading}
-          className="w-48 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100"
-        >
-          {Array.from({ length: 24 }, (_, index) => {
-            const hour = String(index + 1).padStart(2, "0");
+        {availableHours.length ===
+        0 ? (
+          <div className="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+            <p className="text-sm font-medium text-red-700">
+              All broadcast hours are
+              currently used.
+            </p>
 
-            return (
-              <option key={hour} value={hour}>
-                {hour}:00
-              </option>
-            );
-          })}
-        </select>
+            <p className="mt-1 text-xs text-red-600">
+              Cancelled or failed
+              uploads will make their
+              hour available again.
+            </p>
+          </div>
+        ) : (
+          <select
+            value={uploadTime}
+            onChange={(e) =>
+              setUploadTime(
+                e.target.value,
+              )
+            }
+            disabled={uploading}
+            className="w-48 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100"
+          >
+            {availableHours.map(
+              (hour) => (
+                <option
+                  key={hour}
+                  value={hour}
+                >
+                  {hour}:00
+                </option>
+              ),
+            )}
+          </select>
+        )}
+
+        {availableHours.length >
+          0 && (
+          <p className="mt-2 text-xs text-gray-400">
+            Hours already uploaded are
+            hidden.
+          </p>
+        )}
       </div>
 
       {/* ================= UPLOAD BUTTON ================= */}
 
       <button
-        onClick={handleUpload}
-        disabled={!file || uploading}
+        type="button"
+        onClick={
+          handleUpload
+        }
+        disabled={
+          !file ||
+          uploading ||
+          availableHours.length ===
+            0
+        }
         className={`rounded-xl px-6 py-3 font-semibold text-white shadow transition ${
-          !file || uploading
+          !file ||
+          uploading ||
+          availableHours.length ===
+            0
             ? "cursor-not-allowed bg-gray-400"
             : "bg-green-600 hover:bg-green-700"
         }`}
@@ -199,11 +399,34 @@ export default function UploadPanel({
 
             <span
               className={`rounded-full px-3 py-1 text-sm font-medium ${
-                status.status === "completed"
+                String(
+                  status.status ||
+                    "",
+                ).toUpperCase() ===
+                "COMPLETED"
                   ? "bg-green-100 text-green-700"
-                  : status.status === "processing"
+                  : String(
+                        status.status ||
+                          "",
+                      ).toUpperCase() ===
+                      "PROCESSING"
                   ? "bg-blue-100 text-blue-700"
-                  : status.status === "error"
+                  : String(
+                        status.status ||
+                          "",
+                      ).toUpperCase() ===
+                      "CANCELLED"
+                  ? "bg-gray-100 text-gray-700"
+                  : String(
+                        status.status ||
+                          "",
+                      ).toUpperCase() ===
+                        "FAILED" ||
+                    String(
+                      status.status ||
+                        "",
+                    ).toUpperCase() ===
+                      "ERROR"
                   ? "bg-red-100 text-red-700"
                   : "bg-yellow-100 text-yellow-700"
               }`}
@@ -216,12 +439,18 @@ export default function UploadPanel({
           <div className="mb-2 flex justify-between text-sm text-gray-600">
 
             <span>
-              Chunk {status.current_chunk} /{" "}
-              {status.total_chunks}
+              Chunk{" "}
+              {status.current_chunk ??
+                0}{" "}
+              /{" "}
+              {status.total_chunks ??
+                0}
             </span>
 
             <span>
-              {status.progress_percent || 0}%
+              {status.progress_percent ||
+                0}
+              %
             </span>
 
           </div>
@@ -231,7 +460,10 @@ export default function UploadPanel({
             <div
               className="h-3 rounded-full bg-blue-600 transition-all duration-500"
               style={{
-                width: `${status.progress_percent || 0}%`,
+                width: `${
+                  status.progress_percent ||
+                  0
+                }%`,
               }}
             />
 

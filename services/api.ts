@@ -1,3 +1,4 @@
+
 import {
   getAccessToken,
   getTokenType,
@@ -34,6 +35,47 @@ export interface Advertisement {
 }
 
 // ============================================================
+// UPLOAD STATUS TYPE
+// ============================================================
+
+export interface UploadStatus {
+  id: number;
+
+  project_id: number;
+
+  filename: string;
+
+  broadcast_hour: number | null;
+
+  status:
+    | "STARTING"
+    | "PROCESSING"
+    | "CANCELLING"
+    | "COMPLETED"
+    | "FAILED"
+    | "CANCELLED"
+    | string;
+
+  progress: number;
+
+  current_chunk: number;
+
+  total_chunks: number;
+
+  segments_saved: number;
+
+  message: string | null;
+
+  session_id?: string | null;
+
+  user_id?: number;
+
+  created_at: string;
+
+  updated_at: string;
+}
+
+// ============================================================
 // AUTH HEADERS
 // ============================================================
 
@@ -46,8 +88,7 @@ function getAuthHeaders(): HeadersInit {
   }
 
   return {
-    Authorization:
-      `${tokenType} ${token}`,
+    Authorization: `${tokenType} ${token}`,
   };
 }
 
@@ -59,15 +100,14 @@ async function authFetch(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const headers =
-    new Headers(options.headers);
+  const headers = new Headers(
+    options.headers
+  );
 
   const authHeaders =
     getAuthHeaders();
 
-  Object.entries(
-    authHeaders
-  ).forEach(
+  Object.entries(authHeaders).forEach(
     ([key, value]) => {
       if (value) {
         headers.set(
@@ -96,14 +136,13 @@ async function authFetch(
     "================================"
   );
 
-  const response =
-    await fetch(
-      url,
-      {
-        ...options,
-        headers,
-      }
-    );
+  const response = await fetch(
+    url,
+    {
+      ...options,
+      headers,
+    }
+  );
 
   console.log(
     "================================"
@@ -127,9 +166,7 @@ async function authFetch(
   // UNAUTHORIZED
   // ==========================================================
 
-  if (
-    response.status === 401
-  ) {
+  if (response.status === 401) {
     if (
       typeof window !==
       "undefined"
@@ -199,8 +236,7 @@ function normalizeAdvertisement(
       null,
 
     status:
-      item.status ===
-      "SAVED"
+      item.status === "SAVED"
         ? "SAVED"
         : "NEW",
   };
@@ -969,9 +1005,44 @@ export async function uploadAudio(
     file
   );
 
+  // IMPORTANT:
+  // Backend expects "broadcast_hour".
+  // Do NOT send "start_hour".
   formData.append(
-    "start_hour",
+    "broadcast_hour",
     startHour
+  );
+
+  console.log(
+    "================================"
+  );
+
+  console.log(
+    "UPLOAD AUDIO API"
+  );
+
+  console.log(
+    "PROJECT ID:",
+    projectId
+  );
+
+  console.log(
+    "FILE:",
+    file.name
+  );
+
+  console.log(
+    "SIZE:",
+    file.size
+  );
+
+  console.log(
+    "BROADCAST HOUR:",
+    startHour
+  );
+
+  console.log(
+    "================================"
   );
 
   const res =
@@ -1032,11 +1103,19 @@ export async function uploadAudio(
     );
   }
 
-  return res.json();
+  const data =
+    await res.json();
+
+  console.log(
+    "UPLOAD STARTED:",
+    data
+  );
+
+  return data;
 }
 
 // ============================================================
-// UPLOAD STATUS
+// LIVE UPLOAD STATUS
 // ============================================================
 
 export async function getUploadStatus(
@@ -1058,6 +1137,247 @@ export async function getUploadStatus(
   }
 
   return res.json();
+}
+
+// ============================================================
+// PERSISTENT UPLOAD STATUS HISTORY
+// ============================================================
+
+export async function getUploadStatuses(
+  projectId: number
+): Promise<UploadStatus[]> {
+  const res =
+    await authFetch(
+      `${API_URL}/upload/statuses/${projectId}`
+    );
+
+  if (!res.ok) {
+    const error =
+      await res.text();
+
+    throw new Error(
+      error ||
+        "Failed to load upload statuses"
+    );
+  }
+
+  const data =
+    await res.json();
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data;
+}
+
+// ============================================================
+// GET SINGLE PERSISTENT UPLOAD STATUS
+// ============================================================
+
+export async function getUploadStatusRecord(
+  uploadStatusId: number
+): Promise<UploadStatus> {
+  const res =
+    await authFetch(
+      `${API_URL}/upload/status-record/${uploadStatusId}`
+    );
+
+  if (!res.ok) {
+    const error =
+      await res.text();
+
+    throw new Error(
+      error ||
+        "Failed to load upload status record"
+    );
+  }
+
+  return res.json();
+}
+
+// ============================================================
+// CANCEL ACTIVE UPLOAD
+// ============================================================
+
+export async function cancelUpload(
+  uploadStatusId: number
+) {
+  console.log(
+    "================================"
+  );
+
+  console.log(
+    "CANCEL UPLOAD API"
+  );
+
+  console.log(
+    "Upload Status ID:",
+    uploadStatusId
+  );
+
+  console.log(
+    "URL:",
+    `${API_URL}/upload/status-record/${uploadStatusId}/cancel`
+  );
+
+  console.log(
+    "================================"
+  );
+
+  // IMPORTANT:
+  // Backend cancellation endpoint is POST:
+  //
+  // POST /upload/status-record/{id}/cancel
+  //
+  // The previous frontend code incorrectly used:
+  //
+  // DELETE /upload/status-record/{id}
+  //
+
+  const res =
+    await authFetch(
+      `${API_URL}/upload/status-record/${uploadStatusId}/cancel`,
+      {
+        method: "POST",
+      }
+    );
+
+  if (!res.ok) {
+    let message =
+      "Failed to cancel upload";
+
+    try {
+      const contentType =
+        res.headers.get(
+          "content-type"
+        ) || "";
+
+      if (
+        contentType.includes(
+          "application/json"
+        )
+      ) {
+        const data =
+          await res.json();
+
+        message =
+          data?.detail ||
+          data?.message ||
+          message;
+      } else {
+        const text =
+          await res.text();
+
+        if (text) {
+          message = text;
+        }
+      }
+    } catch {
+      // Keep default message.
+    }
+
+    throw new Error(
+      message
+    );
+  }
+
+  const data =
+    await res.json();
+
+  console.log(
+    "CANCEL UPLOAD SUCCESS:",
+    data
+  );
+
+  return data;
+}
+
+// ============================================================
+// DELETE UPLOAD HISTORY
+// ============================================================
+
+export async function deleteUploadHistory(
+  uploadStatusId: number
+) {
+  console.log(
+    "================================"
+  );
+
+  console.log(
+    "DELETE UPLOAD HISTORY API"
+  );
+
+  console.log(
+    "Upload Status ID:",
+    uploadStatusId
+  );
+
+  console.log(
+    "URL:",
+    `${API_URL}/upload/status-history/${uploadStatusId}`
+  );
+
+  console.log(
+    "================================"
+  );
+
+  const res =
+    await authFetch(
+      `${API_URL}/upload/status-history/${uploadStatusId}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+  if (!res.ok) {
+    let message =
+      "Failed to delete upload history";
+
+    try {
+      const contentType =
+        res.headers.get(
+          "content-type"
+        ) || "";
+
+      if (
+        contentType.includes(
+          "application/json"
+        )
+      ) {
+        const data =
+          await res.json();
+
+        message =
+          data?.detail ||
+          data?.message ||
+          message;
+      } else {
+        const text =
+          await res.text();
+
+        if (text) {
+          message = text;
+        }
+      }
+    } catch {
+      // Keep default message.
+    }
+
+    throw new Error(
+      message
+    );
+  }
+
+  const data =
+    await res.json();
+
+  console.log(
+    "DELETE UPLOAD HISTORY SUCCESS:",
+    data
+  );
+
+  return data;
 }
 
 // ============================================================
