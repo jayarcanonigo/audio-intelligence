@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -75,9 +76,7 @@ function secondsToTime(totalSeconds: number): string {
   const seconds = Math.max(0, Math.round(totalSeconds));
 
   const hours = Math.floor(seconds / 3600);
-
   const minutes = Math.floor((seconds % 3600) / 60);
-
   const remainingSeconds = seconds % 60;
 
   return [
@@ -111,7 +110,10 @@ function calculateDuration(
   const startSeconds = timeToSeconds(start);
   const endSeconds = timeToSeconds(end);
 
-  return Math.max(0, Math.round(endSeconds - startSeconds));
+  return Math.max(
+    0,
+    Math.round(endSeconds - startSeconds),
+  );
 }
 
 function calculateEndTime(
@@ -150,9 +152,7 @@ function getHourFromTime(value?: string | null): string {
 
 function dateKey(date: Date): string {
   const year = date.getFullYear();
-
   const month = String(date.getMonth() + 1).padStart(2, "0");
-
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
@@ -197,11 +197,16 @@ function getCalendarDays(monthDate: Date): Date[] {
    ============================================================ */
 
 function getProjectName(project: Project): string {
-  return project.name || project.project_name || "Untitled Project";
+  return (
+    project.name ||
+    project.project_name ||
+    "Untitled Project"
+  );
 }
 
 function getProjectDate(project: Project): Date | null {
-  const value = project.created_at || project.upload_time;
+  const value =
+    project.created_at || project.upload_time;
 
   if (!value) return null;
 
@@ -218,7 +223,9 @@ function getProjectDate(project: Project): Date | null {
    AD HELPERS
    ============================================================ */
 
-function isSavedAdvertisement(ad: SavedAdView): boolean {
+function isSavedAdvertisement(
+  ad: SavedAdView,
+): boolean {
   return (
     ad.status === "SAVED" ||
     ad.is_saved === true ||
@@ -230,8 +237,12 @@ function isSavedAdvertisement(ad: SavedAdView): boolean {
    UPLOAD HELPERS
    ============================================================ */
 
-function getUploadStatusLabel(status?: string): string {
-  switch (String(status || "").toUpperCase()) {
+function getUploadStatusLabel(
+  status?: string,
+): string {
+  switch (
+    String(status || "").toUpperCase()
+  ) {
     case "STARTING":
       return "STARTING";
 
@@ -258,8 +269,13 @@ function getUploadStatusLabel(status?: string): string {
   }
 }
 
-function formatBroadcastHour(hour?: number | null): string {
-  if (hour === null || hour === undefined) {
+function formatBroadcastHour(
+  hour?: number | null,
+): string {
+  if (
+    hour === null ||
+    hour === undefined
+  ) {
     return "--:--";
   }
 
@@ -273,17 +289,23 @@ function getLatestUploadFromHistory(
     return undefined;
   }
 
-  return [...statuses].sort((first, second) => {
-    const firstTime = new Date(
-      first.created_at || first.updated_at || 0,
-    ).getTime();
+  return [...statuses].sort(
+    (first, second) => {
+      const firstTime = new Date(
+        first.created_at ||
+          first.updated_at ||
+          0,
+      ).getTime();
 
-    const secondTime = new Date(
-      second.created_at || second.updated_at || 0,
-    ).getTime();
+      const secondTime = new Date(
+        second.created_at ||
+          second.updated_at ||
+          0,
+      ).getTime();
 
-    return secondTime - firstTime;
-  })[0];
+      return secondTime - firstTime;
+    },
+  )[0];
 }
 
 /* ============================================================
@@ -291,14 +313,23 @@ function getLatestUploadFromHistory(
    ============================================================ */
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<
+    Project[]
+  >([]);
 
-  const [savedAdsByProject, setSavedAdsByProject] = useState<
+  const [
+    savedAdsByProject,
+    setSavedAdsByProject,
+  ] = useState<
     Record<string, SavedAdView[]>
   >({});
 
-  const [uploadStatusesByProject, setUploadStatusesByProject] =
-    useState<Record<string, UploadStatus[]>>({});
+  const [
+    uploadStatusesByProject,
+    setUploadStatusesByProject,
+  ] = useState<
+    Record<string, UploadStatus[]>
+  >({});
 
   /*
    * Upload History is HIDDEN by default.
@@ -306,32 +337,50 @@ export default function ProjectsPage() {
    * A project only becomes expanded when its value
    * is explicitly set to true.
    */
-  const [expandedUploadHistory, setExpandedUploadHistory] =
-    useState<Record<string, boolean>>({});
-
-  const [loading, setLoading] = useState(true);
-
-  const [loadingAds, setLoadingAds] = useState<Record<string, boolean>>(
+  const [
+    expandedUploadHistory,
+    setExpandedUploadHistory,
+  ] = useState<Record<string, boolean>>(
     {},
   );
 
-  const [loadingUploadStatuses, setLoadingUploadStatuses] = useState<
+  const [loading, setLoading] =
+    useState(true);
+
+  const [
+    loadingAds,
+    setLoadingAds,
+  ] = useState<
     Record<string, boolean>
   >({});
 
-  const [downloading, setDownloading] = useState<string | number | null>(
-    null,
-  );
+  const [
+    loadingUploadStatuses,
+    setLoadingUploadStatuses,
+  ] = useState<
+    Record<string, boolean>
+  >({});
 
-  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [
+    downloading,
+    setDownloading,
+  ] = useState<
+    string | number | null
+  >(null);
 
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [calendarDate, setCalendarDate] =
+    useState(new Date());
+
+  const [selectedDate, setSelectedDate] =
+    useState<string | null>(null);
 
   /* ============================================================
      LOAD SAVED ADS
      ============================================================ */
 
-  async function loadSavedAds(projectId: number) {
+  async function loadSavedAds(
+    projectId: number,
+  ) {
     const projectKey = String(projectId);
 
     try {
@@ -340,15 +389,20 @@ export default function ProjectsPage() {
         [projectKey]: true,
       }));
 
-      const advertisements = await getAdvertisements(projectId);
+      const advertisements =
+        await getAdvertisements(projectId);
 
-      const savedAdvertisements = Array.isArray(advertisements)
-        ? advertisements.filter(isSavedAdvertisement)
-        : [];
+      const savedAdvertisements =
+        Array.isArray(advertisements)
+          ? advertisements.filter(
+              isSavedAdvertisement,
+            )
+          : [];
 
       setSavedAdsByProject((previous) => ({
         ...previous,
-        [projectKey]: savedAdvertisements,
+        [projectKey]:
+          savedAdvertisements,
       }));
     } catch (error) {
       console.error(
@@ -372,16 +426,21 @@ export default function ProjectsPage() {
      LOAD UPLOAD HISTORY
      ============================================================ */
 
-  async function loadUploadStatuses(projectId: number) {
+  async function loadUploadStatuses(
+    projectId: number,
+  ) {
     const projectKey = String(projectId);
 
     try {
-      setLoadingUploadStatuses((previous) => ({
-        ...previous,
-        [projectKey]: true,
-      }));
+      setLoadingUploadStatuses(
+        (previous) => ({
+          ...previous,
+          [projectKey]: true,
+        }),
+      );
 
-      const statuses = await getUploadStatuses(projectId);
+      const statuses =
+        await getUploadStatuses(projectId);
 
       console.log(
         `UPLOAD HISTORY - PROJECT ${projectId}:`,
@@ -389,46 +448,63 @@ export default function ProjectsPage() {
       );
 
       const sortedStatuses = [
-        ...(Array.isArray(statuses) ? statuses : []),
+        ...(Array.isArray(statuses)
+          ? statuses
+          : []),
       ].sort((first, second) => {
-        const firstHour = Number(first.broadcast_hour ?? 999);
+        const firstHour = Number(
+          first.broadcast_hour ?? 999,
+        );
 
-        const secondHour = Number(second.broadcast_hour ?? 999);
+        const secondHour = Number(
+          second.broadcast_hour ?? 999,
+        );
 
         if (firstHour !== secondHour) {
           return firstHour - secondHour;
         }
 
         const firstTime = new Date(
-          first.created_at || first.updated_at || 0,
+          first.created_at ||
+            first.updated_at ||
+            0,
         ).getTime();
 
         const secondTime = new Date(
-          second.created_at || second.updated_at || 0,
+          second.created_at ||
+            second.updated_at ||
+            0,
         ).getTime();
 
         return secondTime - firstTime;
       });
 
-      setUploadStatusesByProject((previous) => ({
-        ...previous,
-        [projectKey]: sortedStatuses,
-      }));
+      setUploadStatusesByProject(
+        (previous) => ({
+          ...previous,
+          [projectKey]:
+            sortedStatuses,
+        }),
+      );
     } catch (error) {
       console.error(
         `Failed to load upload history for project ${projectId}:`,
         error,
       );
 
-      setUploadStatusesByProject((previous) => ({
-        ...previous,
-        [projectKey]: [],
-      }));
+      setUploadStatusesByProject(
+        (previous) => ({
+          ...previous,
+          [projectKey]: [],
+        }),
+      );
     } finally {
-      setLoadingUploadStatuses((previous) => ({
-        ...previous,
-        [projectKey]: false,
-      }));
+      setLoadingUploadStatuses(
+        (previous) => ({
+          ...previous,
+          [projectKey]: false,
+        }),
+      );
     }
   }
 
@@ -440,22 +516,31 @@ export default function ProjectsPage() {
     try {
       setLoading(true);
 
-      const response = await getProjects();
+      const response =
+        await getProjects();
 
-      const projectList = Array.isArray(response)
-        ? response
-        : response?.projects || [];
+      const projectList =
+        Array.isArray(response)
+          ? response
+          : response?.projects || [];
 
       setProjects(projectList);
 
       await Promise.all(
-        projectList.flatMap((project: Project) => [
-          loadSavedAds(project.id),
-          loadUploadStatuses(project.id),
-        ]),
+        projectList.flatMap(
+          (project: Project) => [
+            loadSavedAds(project.id),
+            loadUploadStatuses(
+              project.id,
+            ),
+          ],
+        ),
       );
     } catch (error) {
-      console.error("Failed to load projects:", error);
+      console.error(
+        "Failed to load projects:",
+        error,
+      );
 
       setProjects([]);
     } finally {
@@ -479,10 +564,13 @@ export default function ProjectsPage() {
     const dates = new Set<string>();
 
     projects.forEach((project) => {
-      const projectDate = getProjectDate(project);
+      const projectDate =
+        getProjectDate(project);
 
       if (projectDate) {
-        dates.add(dateKey(projectDate));
+        dates.add(
+          dateKey(projectDate),
+        );
       }
     });
 
@@ -498,13 +586,17 @@ export default function ProjectsPage() {
       return projects;
     }
 
-    return projects.filter((project) => {
-      const projectDate = getProjectDate(project);
+    return projects.filter(
+      (project) => {
+        const projectDate =
+          getProjectDate(project);
 
-      return projectDate
-        ? dateKey(projectDate) === selectedDate
-        : false;
-    });
+        return projectDate
+          ? dateKey(projectDate) ===
+              selectedDate
+          : false;
+      },
+    );
   }, [projects, selectedDate]);
 
   /* ============================================================
@@ -512,7 +604,8 @@ export default function ProjectsPage() {
      ============================================================ */
 
   const calendarDays = useMemo(
-    () => getCalendarDays(calendarDate),
+    () =>
+      getCalendarDays(calendarDate),
     [calendarDate],
   );
 
@@ -543,39 +636,58 @@ export default function ProjectsPage() {
 
     setCalendarDate(today);
 
-    setSelectedDate(dateKey(today));
+    setSelectedDate(
+      dateKey(today),
+    );
   }
 
   function clearDateFilter() {
     setSelectedDate(null);
   }
 
-  function selectCalendarDate(date: Date) {
-    setSelectedDate(dateKey(date));
+  function selectCalendarDate(
+    date: Date,
+  ) {
+    setSelectedDate(
+      dateKey(date),
+    );
   }
 
   /* ============================================================
      SAVED ADS BY HOUR
      ============================================================ */
 
-  function getHourlyCounts(projectId: string | number) {
+  function getHourlyCounts(
+    projectId: string | number,
+  ) {
     const advertisements =
-      savedAdsByProject[String(projectId)] || [];
+      savedAdsByProject[
+        String(projectId)
+      ] || [];
 
-    const counts: Record<string, number> = {};
+    const counts: Record<
+      string,
+      number
+    > = {};
 
     advertisements.forEach((ad) => {
-      const startTime = ad.start_time || ad.start;
+      const startTime =
+        ad.start_time || ad.start;
 
-      const hour = getHourFromTime(startTime);
+      const hour =
+        getHourFromTime(startTime);
 
       if (!hour) return;
 
-      counts[hour] = (counts[hour] || 0) + 1;
+      counts[hour] =
+        (counts[hour] || 0) + 1;
     });
 
-    return Object.entries(counts).sort(([first], [second]) =>
-      first.localeCompare(second),
+    return Object.entries(
+      counts,
+    ).sort(
+      ([first], [second]) =>
+        first.localeCompare(second),
     );
   }
 
@@ -583,13 +695,18 @@ export default function ProjectsPage() {
      DOWNLOAD SAVED ADS
      ============================================================ */
 
-  async function downloadSavedAds(project: Project) {
+  async function downloadSavedAds(
+    project: Project,
+  ) {
     const projectId = project.id;
 
-    const projectName = getProjectName(project);
+    const projectName =
+      getProjectName(project);
 
     const advertisements =
-      savedAdsByProject[String(projectId)] || [];
+      savedAdsByProject[
+        String(projectId)
+      ] || [];
 
     if (!advertisements.length) {
       return;
@@ -606,67 +723,97 @@ export default function ProjectsPage() {
         "COMPLETE TEXT",
       ];
 
-      const rows = advertisements.map((ad) => {
-        const start = ad.start_time || ad.start || "";
+      const rows =
+        advertisements.map((ad) => {
+          const start =
+            ad.start_time ||
+            ad.start ||
+            "";
 
-        const duration = calculateDuration(
-          start,
-          ad.end_time || ad.end,
-          ad.duration || ad.actual_length,
-        );
+          const duration =
+            calculateDuration(
+              start,
+              ad.end_time ||
+                ad.end,
+              ad.duration ||
+                ad.actual_length,
+            );
 
-        const end =
-          ad.end_time ||
-          ad.end ||
-          calculateEndTime(start, duration);
+          const end =
+            ad.end_time ||
+            ad.end ||
+            calculateEndTime(
+              start,
+              duration,
+            );
 
-        const brand =
-          ad.brand ||
-          ad.brand_name ||
-          "Unknown Advertisement";
+          const brand =
+            ad.brand ||
+            ad.brand_name ||
+            "Unknown Advertisement";
 
-        const completeText = cleanText(
-          ad.text ||
-            ad.complete_text ||
-            ad.copyline ||
-            "",
-        );
+          const completeText =
+            cleanText(
+              ad.text ||
+                ad.complete_text ||
+                ad.copyline ||
+                "",
+            );
 
-        return [
-          start,
-          end,
-          `${duration}s`,
-          brand,
-          completeText,
-        ];
-      });
+          return [
+            start,
+            end,
+            `${duration}s`,
+            brand,
+            completeText,
+          ];
+        });
 
-      const csvRows = [headers, ...rows].map((row) =>
+      const csvRows = [
+        headers,
+        ...rows,
+      ].map((row) =>
         row
           .map((value) => {
-            const text = String(value ?? "");
+            const text =
+              String(value ?? "");
 
-            return `"${text.replace(/"/g, '""')}"`;
+            return `"${text.replace(
+              /"/g,
+              '""',
+            )}"`;
           })
           .join(","),
       );
 
-      const csvContent = csvRows.join("\n");
+      const csvContent =
+        csvRows.join("\n");
 
-      const blob = new Blob([csvContent], {
-        type: "text/csv;charset=utf-8;",
-      });
+      const blob = new Blob(
+        [csvContent],
+        {
+          type: "text/csv;charset=utf-8;",
+        },
+      );
 
-      const url = URL.createObjectURL(blob);
+      const url =
+        URL.createObjectURL(blob);
 
-      const link = document.createElement("a");
+      const link =
+        document.createElement("a");
 
       link.href = url;
 
       link.download =
         `${projectName
-          .replace(/[^a-z0-9]+/gi, "_")
-          .replace(/^_+|_+$/g, "")}_saved_ads.csv`;
+          .replace(
+            /[^a-z0-9]+/gi,
+            "_",
+          )
+          .replace(
+            /^_+|_+$/g,
+            "",
+          )}_saved_ads.csv`;
 
       document.body.appendChild(link);
 
@@ -685,13 +832,19 @@ export default function ProjectsPage() {
     }
   }
 
-  const selectedDateLabel = selectedDate
-    ? parseDateKey(selectedDate).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "";
+  const selectedDateLabel =
+    selectedDate
+      ? parseDateKey(
+          selectedDate,
+        ).toLocaleDateString(
+          undefined,
+          {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          },
+        )
+      : "";
 
   /* ============================================================
      RENDER
@@ -763,7 +916,9 @@ export default function ProjectsPage() {
               {selectedDate && (
                 <button
                   type="button"
-                  onClick={clearDateFilter}
+                  onClick={
+                    clearDateFilter
+                  }
                   className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   <X size={15} />
@@ -777,27 +932,38 @@ export default function ProjectsPage() {
             <div className="mb-5 flex items-center justify-between">
               <button
                 type="button"
-                onClick={goToPreviousMonth}
+                onClick={
+                  goToPreviousMonth
+                }
                 className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100"
                 aria-label="Previous month"
               >
-                <ChevronLeft size={20} />
+                <ChevronLeft
+                  size={20}
+                />
               </button>
 
               <h3 className="text-lg font-semibold text-slate-900">
-                {calendarDate.toLocaleDateString(undefined, {
-                  month: "long",
-                  year: "numeric",
-                })}
+                {calendarDate.toLocaleDateString(
+                  undefined,
+                  {
+                    month: "long",
+                    year: "numeric",
+                  },
+                )}
               </h3>
 
               <button
                 type="button"
-                onClick={goToNextMonth}
+                onClick={
+                  goToNextMonth
+                }
                 className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100"
                 aria-label="Next month"
               >
-                <ChevronRight size={20} />
+                <ChevronRight
+                  size={20}
+                />
               </button>
             </div>
 
@@ -821,67 +987,79 @@ export default function ProjectsPage() {
             </div>
 
             <div className="mt-2 grid grid-cols-7 gap-1">
-              {calendarDays.map((day) => {
-                const dayKey = dateKey(day);
+              {calendarDays.map(
+                (day) => {
+                  const dayKey =
+                    dateKey(day);
 
-                const isCurrentMonth =
-                  day.getMonth() === calendarDate.getMonth();
+                  const isCurrentMonth =
+                    day.getMonth() ===
+                    calendarDate.getMonth();
 
-                const isSelected =
-                  selectedDate === dayKey;
+                  const isSelected =
+                    selectedDate ===
+                    dayKey;
 
-                const isToday = isSameDate(
-                  day,
-                  new Date(),
-                );
+                  const isToday =
+                    isSameDate(
+                      day,
+                      new Date(),
+                    );
 
-                const hasProjects =
-                  projectDates.has(dayKey);
+                  const hasProjects =
+                    projectDates.has(
+                      dayKey,
+                    );
 
-                return (
-                  <button
-                    type="button"
-                    key={dayKey}
-                    onClick={() =>
-                      selectCalendarDate(day)
-                    }
-                    className={[
-                      "relative flex min-h-16 flex-col items-center justify-start rounded-lg p-2 text-sm transition",
-                      isCurrentMonth
-                        ? "text-slate-700"
-                        : "text-slate-300",
-                      isSelected
-                        ? "bg-slate-900 text-white"
-                        : "hover:bg-slate-100",
-                      isToday && !isSelected
-                        ? "ring-2 ring-slate-400 ring-inset"
-                        : "",
-                    ].join(" ")}
-                  >
-                    <span
+                  return (
+                    <button
+                      type="button"
+                      key={dayKey}
+                      onClick={() =>
+                        selectCalendarDate(
+                          day,
+                        )
+                      }
                       className={[
-                        "flex h-7 w-7 items-center justify-center rounded-full font-medium",
-                        isToday && !isSelected
-                          ? "bg-slate-200"
+                        "relative flex min-h-16 flex-col items-center justify-start rounded-lg p-2 text-sm transition",
+                        isCurrentMonth
+                          ? "text-slate-700"
+                          : "text-slate-300",
+                        isSelected
+                          ? "bg-slate-900 text-white"
+                          : "hover:bg-slate-100",
+                        isToday &&
+                        !isSelected
+                          ? "ring-2 ring-slate-400 ring-inset"
                           : "",
                       ].join(" ")}
                     >
-                      {day.getDate()}
-                    </span>
-
-                    {hasProjects && (
                       <span
                         className={[
-                          "mt-1 h-1.5 w-1.5 rounded-full",
-                          isSelected
-                            ? "bg-white"
-                            : "bg-slate-700",
+                          "flex h-7 w-7 items-center justify-center rounded-full font-medium",
+                          isToday &&
+                          !isSelected
+                            ? "bg-slate-200"
+                            : "",
                         ].join(" ")}
-                      />
-                    )}
-                  </button>
-                );
-              })}
+                      >
+                        {day.getDate()}
+                      </span>
+
+                      {hasProjects && (
+                        <span
+                          className={[
+                            "mt-1 h-1.5 w-1.5 rounded-full",
+                            isSelected
+                              ? "bg-white"
+                              : "bg-slate-700",
+                          ].join(" ")}
+                        />
+                      )}
+                    </button>
+                  );
+                },
+              )}
             </div>
 
             {selectedDate && (
@@ -889,12 +1067,16 @@ export default function ProjectsPage() {
                 <span className="text-slate-600">
                   Showing projects for{" "}
                   <strong className="text-slate-900">
-                    {selectedDateLabel}
+                    {
+                      selectedDateLabel
+                    }
                   </strong>
                 </span>
 
                 <span className="font-semibold text-slate-900">
-                  {filteredProjects.length}
+                  {
+                    filteredProjects.length
+                  }
                 </span>
               </div>
             )}
@@ -913,7 +1095,8 @@ export default function ProjectsPage() {
               Loading projects...
             </p>
           </div>
-        ) : filteredProjects.length === 0 ? (
+        ) : filteredProjects.length ===
+          0 ? (
           /* ====================================================
              EMPTY
              ==================================================== */
@@ -939,7 +1122,9 @@ export default function ProjectsPage() {
             {selectedDate ? (
               <button
                 type="button"
-                onClick={clearDateFilter}
+                onClick={
+                  clearDateFilter
+                }
                 className="mt-5 inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 <X size={16} />
@@ -965,415 +1150,556 @@ export default function ProjectsPage() {
               <p className="text-sm text-slate-500">
                 Showing{" "}
                 <span className="font-semibold text-slate-900">
-                  {filteredProjects.length}
+                  {
+                    filteredProjects.length
+                  }
                 </span>{" "}
                 project
-                {filteredProjects.length !== 1 ? "s" : ""}
+                {filteredProjects.length !==
+                1
+                  ? "s"
+                  : ""}
               </p>
             </div>
 
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {filteredProjects.map((project) => {
-                const projectId = String(project.id);
+              {filteredProjects.map(
+                (project) => {
+                  const projectId =
+                    String(
+                      project.id,
+                    );
 
-                const projectName =
-                  getProjectName(project);
+                  const projectName =
+                    getProjectName(
+                      project,
+                    );
 
-                const savedAds =
-                  savedAdsByProject[projectId] || [];
+                  const savedAds =
+                    savedAdsByProject[
+                      projectId
+                    ] || [];
 
-                const hourlyCounts =
-                  getHourlyCounts(project.id);
+                  const hourlyCounts =
+                    getHourlyCounts(
+                      project.id,
+                    );
 
-                const projectDate =
-                  getProjectDate(project);
+                  const projectDate =
+                    getProjectDate(
+                      project,
+                    );
 
-                const uploadHistory =
-                  uploadStatusesByProject[projectId] || [];
+                  const uploadHistory =
+                    uploadStatusesByProject[
+                      projectId
+                    ] || [];
 
-                const latestUpload =
-                  getLatestUploadFromHistory(
-                    uploadHistory,
-                  );
+                  const latestUpload =
+                    getLatestUploadFromHistory(
+                      uploadHistory,
+                    );
 
-                const processingUpload =
-                  uploadHistory.find((upload) => {
-                    const status = String(
-                      upload.status || "",
+                  const latestStatus =
+                    String(
+                      latestUpload?.status ||
+                        "",
                     ).toUpperCase();
 
-                    return status === "PROCESSING";
-                  });
+                  /*
+                   * HIDDEN BY DEFAULT
+                   *
+                   * Only true means expanded.
+                   */
+                  const isUploadHistoryExpanded =
+                    expandedUploadHistory[
+                      projectId
+                    ] === true;
 
-                const latestStatus = String(
-                  latestUpload?.status || "",
-                ).toUpperCase();
+                  return (
+                    <div
+                      key={projectId}
+                      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      {/* ==================================================
+                          PROJECT HEADER
+                          ================================================== */}
 
-                /*
-                 * HIDDEN BY DEFAULT
-                 *
-                 * Only true means expanded.
-                 */
-                const isUploadHistoryExpanded =
-                  expandedUploadHistory[projectId] === true;
+                      <div className="border-b border-slate-200 p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h2 className="truncate text-lg font-bold text-slate-900">
+                              {
+                                projectName
+                              }
+                            </h2>
 
-                return (
-                  <div
-                    key={projectId}
-                    className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    {/* ==================================================
-                        PROJECT HEADER
-                        ================================================== */}
+                            <p className="mt-1 text-xs text-slate-500">
+                              Project ID:{" "}
+                              {
+                                project.id
+                              }
+                            </p>
+                          </div>
+                        </div>
+                      </div>
 
-                    <div className="border-b border-slate-200 p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h2 className="truncate text-lg font-bold text-slate-900">
-                            {projectName}
-                          </h2>
+                      {/* ==================================================
+                          PROJECT COUNTS
+                          ================================================== */}
 
-                          <p className="mt-1 text-xs text-slate-500">
-                            Project ID: {project.id}
+                      <div className="grid grid-cols-2 gap-3 p-5">
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <div className="mb-1 flex items-center gap-2 text-slate-500">
+                            <Layers
+                              size={15}
+                            />
+
+                            <span className="text-xs">
+                              Segments
+                            </span>
+                          </div>
+
+                          <p className="text-xl font-bold text-slate-900">
+                            {project.total_segments ??
+                              project.segment_count ??
+                              0}
                           </p>
-                        </div>                        
-                      </div>
-                    </div>
-
-                    {/* ==================================================
-                        PROJECT COUNTS
-                        ================================================== */}
-
-                    <div className="grid grid-cols-2 gap-3 p-5">
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <div className="mb-1 flex items-center gap-2 text-slate-500">
-                          <Layers size={15} />
-
-                          <span className="text-xs">
-                            Segments
-                          </span>
                         </div>
 
-                        <p className="text-xl font-bold text-slate-900">
-                          {project.total_segments ??
-                            project.segment_count ??
-                            0}
-                        </p>
-                      </div>
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <div className="mb-1 flex items-center gap-2 text-slate-500">
+                            <BookmarkCheck
+                              size={15}
+                            />
 
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <div className="mb-1 flex items-center gap-2 text-slate-500">
-                          <BookmarkCheck size={15} />
+                            <span className="text-xs">
+                              Saved Ads
+                            </span>
+                          </div>
 
-                          <span className="text-xs">
-                            Saved Ads
-                          </span>
+                          <p className="text-xl font-bold text-slate-900">
+                            {loadingAds[
+                              projectId
+                            ]
+                              ? "..."
+                              : savedAds.length}
+                          </p>
                         </div>
-
-                        <p className="text-xl font-bold text-slate-900">
-                          {loadingAds[projectId]
-                            ? "..."
-                            : savedAds.length}
-                        </p>
                       </div>
-                    </div>
 
-                    {/* ==================================================
-                        UPLOAD HISTORY
-                        HIDDEN BY DEFAULT
-                        ================================================== */}
+                      {/* ==================================================
+                          UPLOAD HISTORY
+                          HIDDEN BY DEFAULT
+                          ================================================== */}
 
-                    <div className="px-5 pb-5">
-                      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                        {/* HISTORY HEADER */}
+                      <div className="px-5 pb-5">
+                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+
+                          {/* HISTORY HEADER */}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExpandedUploadHistory(
+                                (
+                                  previous,
+                                ) => ({
+                                  ...previous,
+                                  [projectId]:
+                                    !isUploadHistoryExpanded,
+                                }),
+                              );
+                            }}
+                            className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-slate-50"
+                            aria-expanded={
+                              isUploadHistoryExpanded
+                            }
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100">
+                                <Upload
+                                  size={14}
+                                  className="text-slate-600"
+                                />
+                              </div>
+
+                              <div>
+                                <p className="text-xs font-semibold text-slate-800">
+                                  Upload History
+                                </p>
+
+                                <p className="text-[10px] text-slate-400">
+                                  Uploads and saved ads by broadcast hour
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {loadingUploadStatuses[
+                                projectId
+                              ] && (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-slate-600" />
+                              )}
+
+                              <ChevronRight
+                                size={16}
+                                className={[
+                                  "text-slate-400 transition-transform duration-200",
+                                  isUploadHistoryExpanded
+                                    ? "rotate-90"
+                                    : "",
+                                ].join(" ")}
+                              />
+                            </div>
+                          </button>
+
+                          {/* ==================================================
+                              HISTORY CONTENT
+                              ================================================== */}
+
+                          {isUploadHistoryExpanded && (
+                            <>
+                              {(() => {
+                                /*
+                                 * Only show COMPLETED and PROCESSING
+                                 */
+
+                                const visibleUploads =
+                                  uploadHistory.filter(
+                                    (
+                                      upload,
+                                    ) => {
+                                      const status =
+                                        String(
+                                          upload.status ||
+                                            "",
+                                        ).toUpperCase();
+
+                                      return (
+                                        status ===
+                                          "COMPLETED" ||
+                                        status ===
+                                          "PROCESSING"
+                                      );
+                                    },
+                                  );
+
+                                /*
+                                 * We still show the section when there
+                                 * are saved ads even if there are no
+                                 * visible uploads.
+                                 */
+
+                                if (
+                                  visibleUploads.length ===
+                                    0 &&
+                                  hourlyCounts.length ===
+                                    0
+                                ) {
+                                  return (
+                                    <div className="border-t border-slate-100 px-4 py-5 text-center">
+                                      <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-50">
+                                        <Upload
+                                          size={14}
+                                          className="text-slate-300"
+                                        />
+                                      </div>
+
+                                      <p className="text-xs font-medium text-slate-500">
+                                        No history
+                                      </p>
+
+                                      <p className="mt-0.5 text-[10px] text-slate-400">
+                                        Completed,
+                                        processing,
+                                        or saved
+                                        advertisements
+                                        will appear
+                                        here.
+                                      </p>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div className="divide-y divide-slate-100 border-t border-slate-100">
+
+                                    {/* ==================================================
+                                        UPLOAD HISTORY ITEMS
+                                        ================================================== */}
+
+                                    {visibleUploads.map(
+                                      (
+                                        upload,
+                                        index,
+                                      ) => {
+                                        const status =
+                                          String(
+                                            upload.status ||
+                                              "",
+                                          ).toUpperCase();
+
+                                        const isProcessing =
+                                          status ===
+                                          "PROCESSING";
+
+                                        const uploadKey =
+                                          upload.id ??
+                                          upload.session_id ??
+                                          `${projectId}-${index}`;
+
+                                        return (
+                                          <div
+                                            key={
+                                              uploadKey
+                                            }
+                                            className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
+                                          >
+                                            {/* HOUR */}
+
+                                            <div className="w-[62px] shrink-0">
+                                              <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                                                Hour
+                                              </p>
+
+                                              <p className="mt-0.5 text-xs font-bold tabular-nums text-slate-700">
+                                                {formatBroadcastHour(
+                                                  upload.broadcast_hour,
+                                                )}
+                                              </p>
+                                            </div>
+
+                                            {/* DIVIDER */}
+
+                                            <div className="h-8 w-px shrink-0 bg-slate-200" />
+
+                                            {/* FILE NAME */}
+
+                                            <div className="min-w-0 flex-1">
+                                              <p
+                                                className="truncate text-xs font-semibold text-slate-800"
+                                                title={
+                                                  upload.filename
+                                                }
+                                              >
+                                                {
+                                                  upload.filename
+                                                }
+                                              </p>
+
+                                              <p className="mt-0.5 text-[10px] text-slate-400">
+                                                Audio file
+                                              </p>
+                                            </div>
+
+                                            {/* STATUS */}
+
+                                            <div className="shrink-0">
+                                              {isProcessing ? (
+                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
+                                                  <span className="relative flex h-1.5 w-1.5">
+                                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+
+                                                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                                  </span>
+
+                                                  Processing
+                                                </span>
+                                              ) : (
+                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+
+                                                  Completed
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      },
+                                    )}
+
+                                    {/* ==================================================
+                                        SAVED ADS BY BROADCAST HOUR
+                                        ================================================== */}
+
+                                    {hourlyCounts.length >
+                                      0 && (
+                                      <>
+                                        <div className="border-t border-slate-200 bg-slate-50 px-4 py-2.5">
+                                          <div className="flex items-center gap-2">
+                                            <BookmarkCheck
+                                              size={14}
+                                              className="text-slate-500"
+                                            />
+
+                                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                              Saved Ads by Broadcast Hour
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        {hourlyCounts.map(
+                                          ([
+                                            hour,
+                                            count,
+                                          ]) => (
+                                            <div
+                                              key={`saved-${hour}`}
+                                              className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
+                                            >
+                                              {/* BROADCAST HOUR */}
+
+                                              <div className="w-[62px] shrink-0">
+                                                <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                                                  Hour
+                                                </p>
+
+                                                <p className="mt-0.5 text-xs font-bold tabular-nums text-slate-700">
+                                                  {
+                                                    hour
+                                                  }
+                                                </p>
+                                              </div>
+
+                                              {/* DIVIDER */}
+
+                                              <div className="h-8 w-px shrink-0 bg-slate-200" />
+
+                                              {/* SAVED ADS */}
+
+                                              <div className="min-w-0 flex-1">
+                                                <p className="text-xs font-semibold text-slate-800">
+                                                  Saved advertisements
+                                                </p>
+
+                                                <p className="mt-0.5 text-[10px] text-slate-400">
+                                                  Ads saved from this broadcast hour
+                                                </p>
+                                              </div>
+
+                                              {/* COUNT */}
+
+                                              <div className="shrink-0">
+                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700">
+                                                  <BookmarkCheck
+                                                    size={
+                                                      11
+                                                    }
+                                                  />
+
+                                                  {
+                                                    count
+                                                  }{" "}
+                                                  saved
+                                                </span>
+                                              </div>
+                                            </div>
+                                          ),
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ==================================================
+                          PROJECT DETAILS
+                          ================================================== */}
+
+                      <div className="flex-1 px-5 pb-5">
+                        <div className="space-y-2 text-xs text-slate-500">
+                          {projectDate && (
+                            <div className="flex items-center gap-2">
+                              <CalendarDays
+                                size={14}
+                              />
+
+                              <span>
+                                Created{" "}
+                                {projectDate.toLocaleDateString(
+                                  undefined,
+                                  {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  },
+                                )}
+                              </span>
+                            </div>
+                          )}
+
+                          {project.upload_time && (
+                            <div className="flex items-center gap-2">
+                              <Clock
+                                size={14}
+                              />
+
+                              <span>
+                                Uploaded{" "}
+                                {
+                                  project.upload_time
+                                }
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ==================================================
+                          ACTIONS
+                          ================================================== */}
+
+                      <div className="grid grid-cols-2 gap-2 border-t border-slate-200 p-4">
+                        <Link
+                          href={`/projects/${project.id}`}
+                          className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          Open Project
+                        </Link>
+
+                        <Link
+                          href={`/ad-editor/${project.id}?name=${encodeURIComponent(
+                            projectName,
+                          )}`}
+                          className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          Edit Ads
+                        </Link>
 
                         <button
                           type="button"
-                          onClick={() => {
-                            setExpandedUploadHistory(
-                              (previous) => ({
-                                ...previous,
-                                [projectId]:
-                                  !isUploadHistoryExpanded,
-                              }),
-                            );
-                          }}
-                          className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-slate-50"
-                          aria-expanded={
-                            isUploadHistoryExpanded
+                          onClick={() =>
+                            downloadSavedAds(
+                              project,
+                            )
                           }
+                          disabled={
+                            downloading ===
+                              project.id ||
+                            savedAds.length ===
+                              0
+                          }
+                          className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100">
-                              <Upload
-                                size={14}
-                                className="text-slate-600"
-                              />
-                            </div>
+                          <Download
+                            size={16}
+                          />
 
-                            <div>
-                              <p className="text-xs font-semibold text-slate-800">
-                                Upload History
-                              </p>
-
-                              <p className="text-[10px] text-slate-400">
-                                Completed and processing uploads
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {loadingUploadStatuses[projectId] && (
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-slate-600" />
-                            )}
-
-                            <ChevronRight
-                              size={16}
-                              className={[
-                                "text-slate-400 transition-transform duration-200",
-                                isUploadHistoryExpanded
-                                  ? "rotate-90"
-                                  : "",
-                              ].join(" ")}
-                            />
-                          </div>
+                          {downloading ===
+                          project.id
+                            ? "Downloading..."
+                            : "Download Saved Ads"}
                         </button>
-
-                        {/* ==================================================
-                            HISTORY CONTENT
-                            ONLY RENDER WHEN EXPANDED
-                            ================================================== */}
-
-                        {isUploadHistoryExpanded && (
-                          <>
-                            {(() => {
-                              /*
-                               * Only show COMPLETED and PROCESSING
-                               */
-                              const visibleUploads =
-                                uploadHistory.filter(
-                                  (upload) => {
-                                    const status = String(
-                                      upload.status || "",
-                                    ).toUpperCase();
-
-                                    return (
-                                      status === "COMPLETED" ||
-                                      status === "PROCESSING"
-                                    );
-                                  },
-                                );
-
-                              if (visibleUploads.length === 0) {
-                                return (
-                                  <div className="border-t border-slate-100 px-4 py-5 text-center">
-                                    <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-50">
-                                      <Upload
-                                        size={14}
-                                        className="text-slate-300"
-                                      />
-                                    </div>
-
-                                    <p className="text-xs font-medium text-slate-500">
-                                      No uploads
-                                    </p>
-
-                                    <p className="mt-0.5 text-[10px] text-slate-400">
-                                      Completed or processing uploads
-                                      will appear here.
-                                    </p>
-                                  </div>
-                                );
-                              }
-
-                              return (
-                                <div className="divide-y divide-slate-100 border-t border-slate-100">
-                                  {visibleUploads.map(
-                                    (upload, index) => {
-                                      const status =
-                                        String(
-                                          upload.status || "",
-                                        ).toUpperCase();
-
-                                      const isProcessing =
-                                        status === "PROCESSING";
-
-                                      const uploadKey =
-                                        upload.id ??
-                                        upload.session_id ??
-                                        `${projectId}-${index}`;
-
-                                      return (
-                                        <div
-                                          key={uploadKey}
-                                          className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
-                                        >
-                                          {/* HOUR */}
-
-                                          <div className="w-[62px] shrink-0">
-                                            <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
-                                              Hour
-                                            </p>
-
-                                            <p className="mt-0.5 text-xs font-bold tabular-nums text-slate-700">
-                                              {formatBroadcastHour(
-                                                upload.broadcast_hour,
-                                              )}
-                                            </p>
-                                          </div>
-
-                                          {/* DIVIDER */}
-
-                                          <div className="h-8 w-px shrink-0 bg-slate-200" />
-
-                                          {/* FILE NAME */}
-
-                                          <div className="min-w-0 flex-1">
-                                            <p
-                                              className="truncate text-xs font-semibold text-slate-800"
-                                              title={
-                                                upload.filename
-                                              }
-                                            >
-                                              {upload.filename}
-                                            </p>
-
-                                            <p className="mt-0.5 text-[10px] text-slate-400">
-                                              Audio file
-                                            </p>
-                                          </div>
-
-                                          {/* STATUS */}
-
-                                          <div className="shrink-0">
-                                            {isProcessing ? (
-                                              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
-                                                <span className="relative flex h-1.5 w-1.5">
-                                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-
-                                                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" />
-                                                </span>
-
-                                                Processing
-                                              </span>
-                                            ) : (
-                                              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-
-                                                Completed
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      );
-                                    },
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </>
-                        )}
                       </div>
                     </div>
-
-                    {/* ==================================================
-                        SAVED ADS BY HOUR
-                        ================================================== */}
-
-                    <div className="flex-1 px-5 pb-5">
-                      {hourlyCounts.length > 0 && (
-                        <div className="mb-4">
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                            Saved Ads by Hour
-                          </p>
-
-                          <div className="flex flex-wrap gap-2">
-                            {hourlyCounts.map(
-                              ([hour, count]) => (
-                                <span
-                                  key={hour}
-                                  className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
-                                >
-                                  {hour} · {count}
-                                </span>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-2 text-xs text-slate-500">
-                        {projectDate && (
-                          <div className="flex items-center gap-2">
-                            <CalendarDays size={14} />
-
-                            <span>
-                              Created{" "}
-                              {projectDate.toLocaleDateString(
-                                undefined,
-                                {
-                                  year: "numeric",
-                                  month: "short",
-                                  day: "numeric",
-                                },
-                              )}
-                            </span>
-                          </div>
-                        )}
-
-                        {project.upload_time && (
-                          <div className="flex items-center gap-2">
-                            <Clock size={14} />
-
-                            <span>
-                              Uploaded{" "}
-                              {project.upload_time}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* ==================================================
-                        ACTIONS
-                        ================================================== */}
-
-                    <div className="grid grid-cols-2 gap-2 border-t border-slate-200 p-4">
-                      <Link
-                        href={`/projects/${project.id}`}
-                        className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                      >
-                        Open Project
-                      </Link>
-
-                     <Link
-                href={`/ad-editor/${project.id}?name=${encodeURIComponent(projectName)}`}
-                className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Edit Ads
-              </Link>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          downloadSavedAds(project)
-                        }
-                        disabled={
-                          downloading === project.id ||
-                          savedAds.length === 0
-                        }
-                        className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Download size={16} />
-
-                        {downloading === project.id
-                          ? "Downloading..."
-                          : "Download Saved Ads"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                },
+              )}
             </div>
           </>
         )}

@@ -113,9 +113,11 @@ export default function AdEditorPage() {
     useRef<Record<number, HTMLDivElement | null>>(
       {}
     );
+const urlHour = searchParams.get("hour");
 
   const [broadcastHour, setBroadcastHour] =
-    useState<string>("1");
+    useState<string>(urlHour || "1");
+  
 
   const [hours, setHours] =
     useState<number[]>([]);
@@ -612,42 +614,57 @@ export default function AdEditorPage() {
     broadcastHour,
   ]);
 
-  // ============================================================
-  // LOAD HOURS
-  // ============================================================
+// ============================================================
+// LOAD HOURS
+// ============================================================
 
-  useEffect(() => {
-    async function loadHours() {
-      try {
-        const data =
-          await getSegmentHours(
-            projectId
-          );
+useEffect(() => {
+  async function loadHours() {
+    try {
+      const data = await getSegmentHours(projectId);
 
-        setHours(data);
+      setHours(data);
+
+      const urlHour = searchParams.get("hour");
+
+      // --------------------------------------------------------
+      // URL hour has priority
+      // Example:
+      // /ad-editor/19?name=newproject&hour=4
+      // => broadcastHour = "4"
+      // --------------------------------------------------------
+      if (urlHour) {
+        const parsedHour = Number(urlHour);
 
         if (
-          data.length > 0
+          Number.isFinite(parsedHour) &&
+          data.includes(parsedHour)
         ) {
-          setBroadcastHour(
-            String(
-              data[0]
-            )
-          );
+          setBroadcastHour(String(parsedHour));
+          return;
         }
-      } catch (error) {
-        console.error(
-          "Failed loading segment hours",
-          error
-        );
       }
-    }
 
-    if (projectId) {
-      loadHours();
+      // --------------------------------------------------------
+      // No valid URL hour -> use first available hour
+      // --------------------------------------------------------
+      if (data.length > 0) {
+        setBroadcastHour(String(data[0]));
+      } else {
+        setBroadcastHour("1");
+      }
+    } catch (error) {
+      console.error(
+        "Failed loading segment hours",
+        error
+      );
     }
-  }, [projectId]);
+  }
 
+  if (projectId) {
+    loadHours();
+  }
+}, [projectId, searchParams]);
   // ============================================================
   // TRANSCRIPT SEGMENTS
   // ============================================================
