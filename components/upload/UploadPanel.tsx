@@ -47,32 +47,26 @@ export default function UploadPanel({
   // ============================================================
   // AVAILABLE BROADCAST HOURS
   //
+  // Only hours 06 through 24 are available.
+  //
   // Hours contained in unavailableHours are hidden.
   // ============================================================
 
-  const availableHours =
-    Array.from(
-      { length: 24 },
-      (_, index) =>
-        String(index + 1).padStart(
-          2,
-          "0",
-        ),
-    ).filter(
-      (hour) =>
-        !unavailableHours.includes(
-          hour,
-        ),
-    );
+  const availableHours = Array.from(
+    { length: 19 },
+    (_, index) =>
+      String(index + 6).padStart(2, "0"),
+  ).filter(
+    (hour) =>
+      !unavailableHours.includes(hour),
+  );
 
   // ============================================================
   // MAKE SURE SELECTED HOUR IS STILL AVAILABLE
   // ============================================================
 
   useEffect(() => {
-    if (
-      availableHours.length === 0
-    ) {
+    if (availableHours.length === 0) {
       return;
     }
 
@@ -353,8 +347,8 @@ export default function UploadPanel({
         {availableHours.length >
           0 && (
           <p className="mt-2 text-xs text-gray-400">
-            Hours already uploaded are
-            hidden.
+            Hours 01:00–05:00 are not
+            available for upload.
           </p>
         )}
       </div>
