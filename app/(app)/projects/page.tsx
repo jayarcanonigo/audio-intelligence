@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -1058,11 +1059,16 @@ export default function ProjectsPage() {
         upload.status || "",
       ).toUpperCase();
 
+    /*
+     * PROCESSING and STARTING
+     * cannot be deleted.
+     *
+     * CANCELLING CAN be deleted.
+     */
     if (
       status ===
         "PROCESSING" ||
-      status === "STARTING" ||
-      status === "CANCELLING"
+      status === "STARTING"
     ) {
       window.alert(
         "This hour cannot be deleted while the upload is still processing.",
@@ -1094,7 +1100,8 @@ export default function ProjectsPage() {
           `File: ${
             upload.filename ||
             "Unknown"
-          }\n\n` +
+          }\n` +
+          `Status: ${status}\n\n` +
           `Saved Ads: ${savedAdsForHour.length}\n\n` +
           `This will permanently delete the transcript segments, saved advertisements, and upload history for this broadcast hour.\n\n` +
           `This action cannot be undone.`,
@@ -1763,6 +1770,33 @@ export default function ProjectsPage() {
                       projectId
                     ] === true;
 
+                  /*
+                   * Show COMPLETED,
+                   * PROCESSING and
+                   * CANCELLING.
+                   */
+                  const visibleUploadHistory =
+                    uploadHistory.filter(
+                      (
+                        upload,
+                      ) => {
+                        const status =
+                          String(
+                            upload.status ||
+                              "",
+                          ).toUpperCase();
+
+                        return (
+                          status ===
+                            "COMPLETED" ||
+                          status ===
+                            "PROCESSING" ||
+                          status ===
+                            "CANCELLING"
+                        );
+                      },
+                    );
+
                   return (
                     <div
                       key={
@@ -1903,24 +1937,7 @@ export default function ProjectsPage() {
                           {isUploadHistoryExpanded && (
                             <div className="border-t border-slate-100">
 
-                              {uploadHistory.filter(
-                                (
-                                  upload,
-                                ) => {
-                                  const status =
-                                    String(
-                                      upload.status ||
-                                        "",
-                                    ).toUpperCase();
-
-                                  return (
-                                    status ===
-                                      "COMPLETED" ||
-                                    status ===
-                                      "PROCESSING"
-                                  );
-                                },
-                              ).length ===
+                              {visibleUploadHistory.length ===
                               0 ? (
 
                                 <div className="px-4 py-5 text-center">
@@ -1938,7 +1955,7 @@ export default function ProjectsPage() {
                                   </p>
 
                                   <p className="mt-0.5 text-[10px] text-slate-400">
-                                    Completed or processing uploads will appear here.
+                                    Completed, processing, or cancelling uploads will appear here.
                                   </p>
                                 </div>
 
@@ -1946,225 +1963,249 @@ export default function ProjectsPage() {
 
                                 <div className="divide-y divide-slate-100">
 
-                                  {uploadHistory
-                                    .filter(
-                                      (
-                                        upload,
-                                      ) => {
-                                        const status =
-                                          String(
-                                            upload.status ||
-                                              "",
-                                          ).toUpperCase();
+                                  {visibleUploadHistory.map(
+                                    (
+                                      upload,
+                                      index,
+                                    ) => {
 
-                                        return (
-                                          status ===
-                                            "COMPLETED" ||
-                                          status ===
-                                            "PROCESSING"
+                                      const status =
+                                        String(
+                                          upload.status ||
+                                            "",
+                                        ).toUpperCase();
+
+                                      const isProcessing =
+                                        status ===
+                                        "PROCESSING";
+
+                                      const isStarting =
+                                        status ===
+                                        "STARTING";
+
+                                      const isCancelling =
+                                        status ===
+                                        "CANCELLING";
+
+                                      const uploadKey =
+                                        upload.id ??
+                                        upload.session_id ??
+                                        `${projectId}-${index}`;
+
+                                      const hour =
+                                        Number(
+                                          upload.broadcast_hour,
                                         );
-                                      },
-                                    )
-                                    .map(
-                                      (
-                                        upload,
-                                        index,
-                                      ) => {
 
-                                        const status =
-                                          String(
-                                            upload.status ||
-                                              "",
-                                          ).toUpperCase();
+                                      const savedAdsForHour =
+                                        getSavedAdsForHour(
+                                          savedAds,
+                                          hour,
+                                        );
 
-                                        const isProcessing =
-                                          status ===
-                                          "PROCESSING";
+                                      const savedAdCount =
+                                        savedAdsForHour.length;
 
-                                        const uploadKey =
-                                          upload.id ??
-                                          upload.session_id ??
-                                          `${projectId}-${index}`;
+                                      const viewUrl =
+                                        `/ad-editor/${project.id}?name=${encodeURIComponent(
+                                          projectName,
+                                        )}&hour=${hour}`;
 
-                                        const hour =
-                                          Number(
-                                            upload.broadcast_hour,
-                                          );
+                                      const deleteKey =
+                                        `${projectId}-${hour}`;
 
-                                        const savedAdsForHour =
-                                          getSavedAdsForHour(
-                                            savedAds,
-                                            hour,
-                                          );
+                                      const isDeleting =
+                                        deletingHour ===
+                                        deleteKey;
 
-                                        const savedAdCount =
-                                          savedAdsForHour.length;
+                                      /*
+                                       * Only PROCESSING
+                                       * and STARTING are
+                                       * protected.
+                                       *
+                                       * CANCELLING can
+                                       * be deleted.
+                                       */
+                                      const cannotDelete =
+                                        isDeleting ||
+                                        isProcessing ||
+                                        isStarting;
 
-                                        const viewUrl =
-                                          `/ad-editor/${project.id}?name=${encodeURIComponent(
-                                            projectName,
-                                          )}&hour=${hour}`;
+                                      return (
+                                        <div
+                                          key={
+                                            uploadKey
+                                          }
+                                          className="px-4 py-4"
+                                        >
 
-                                        const deleteKey =
-                                          `${projectId}-${hour}`;
+                                          <div className="flex flex-col gap-3">
 
-                                        const isDeleting =
-                                          deletingHour ===
-                                          deleteKey;
+                                            {/* TOP */}
 
-                                        return (
-                                          <div
-                                            key={
-                                              uploadKey
-                                            }
-                                            className="px-4 py-4"
-                                          >
+                                            <div className="flex items-start gap-3">
 
-                                            <div className="flex flex-col gap-3">
+                                              <div className="w-[68px] shrink-0">
+                                                <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                                                  Hour
+                                                </p>
 
-                                              {/* TOP */}
-
-                                              <div className="flex items-start gap-3">
-
-                                                <div className="w-[68px] shrink-0">
-                                                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
-                                                    Hour
-                                                  </p>
-
-                                                  <p className="mt-1 text-sm font-bold tabular-nums text-slate-700">
-                                                    {formatBroadcastHour(
-                                                      upload.broadcast_hour,
-                                                    )}
-                                                  </p>
-                                                </div>
-
-                                                <div className="mt-1 h-10 w-px shrink-0 bg-slate-200" />
-
-                                                <div className="min-w-0 flex-1">
-                                                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
-                                                    Audio File
-                                                  </p>
-
-                                                  <p
-                                                    className="mt-1 break-words text-sm font-semibold leading-5 text-slate-800"
-                                                    title={
-                                                      upload.filename ||
-                                                      "Unknown file"
-                                                    }
-                                                  >
-                                                    {upload.filename ||
-                                                      "Unknown file"}
-                                                  </p>
-
-                                                  <p className="mt-1 text-[10px] text-slate-400">
-                                                    Broadcast Hour{" "}
-                                                    {formatBroadcastHour(
-                                                      upload.broadcast_hour,
-                                                    )}
-                                                  </p>
-                                                </div>
-
-                                                <div className="shrink-0 pt-4">
-
-                                                  {isProcessing ? (
-                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] font-semibold text-amber-700">
-                                                      <span className="relative flex h-1.5 w-1.5">
-                                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-
-                                                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" />
-                                                      </span>
-
-                                                      Processing
-                                                    </span>
-                                                  ) : (
-                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-700">
-                                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-
-                                                      Completed
-                                                    </span>
+                                                <p className="mt-1 text-sm font-bold tabular-nums text-slate-700">
+                                                  {formatBroadcastHour(
+                                                    upload.broadcast_hour,
                                                   )}
-
-                                                </div>
+                                                </p>
                                               </div>
 
-                                              {/* ACTIONS */}
+                                              <div className="mt-1 h-10 w-px shrink-0 bg-slate-200" />
 
-                                              <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                                              <div className="min-w-0 flex-1">
+                                                <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                                                  Audio File
+                                                </p>
 
-                                                <div
-                                                  className={[
-                                                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-semibold",
-                                                    savedAdCount >
-                                                    0
-                                                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                                      : "border-slate-200 bg-slate-100 text-slate-500",
-                                                  ].join(
-                                                    " ",
+                                                <p
+                                                  className="mt-1 break-words text-sm font-semibold leading-5 text-slate-800"
+                                                  title={
+                                                    upload.filename ||
+                                                    "Unknown file"
+                                                  }
+                                                >
+                                                  {upload.filename ||
+                                                    "Unknown file"}
+                                                </p>
+
+                                                <p className="mt-1 text-[10px] text-slate-400">
+                                                  Broadcast Hour{" "}
+                                                  {formatBroadcastHour(
+                                                    upload.broadcast_hour,
                                                   )}
-                                                >
-                                                  <BookmarkCheck
-                                                    size={
-                                                      12
-                                                    }
-                                                  />
+                                                </p>
+                                              </div>
 
-                                                  {savedAdCount >
-                                                  0
-                                                    ? `${savedAdCount} Saved Ad${
-                                                        savedAdCount ===
-                                                        1
-                                                          ? ""
-                                                          : "s"
-                                                      }`
-                                                    : "No Saved Ads"}
-                                                </div>
+                                              <div className="shrink-0 pt-4">
 
-                                                <Link
-                                                  href={
-                                                    viewUrl
-                                                  }
-                                                  className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 transition hover:bg-slate-100"
-                                                >
-                                                  <Eye
-                                                    size={
-                                                      13
-                                                    }
-                                                  />
+                                                {isProcessing ? (
+                                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] font-semibold text-amber-700">
+                                                    <span className="relative flex h-1.5 w-1.5">
+                                                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
 
-                                                  View
-                                                </Link>
+                                                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                                    </span>
 
-                                                <button
-                                                  type="button"
-                                                  disabled={
-                                                    isDeleting ||
-                                                    isProcessing
-                                                  }
-                                                  onClick={() =>
-                                                    handleDeleteHour(
-                                                      project,
-                                                      upload,
-                                                    )
-                                                  }
-                                                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                                >
-                                                  <Trash2
-                                                    size={
-                                                      13
-                                                    }
-                                                  />
+                                                    Processing
+                                                  </span>
+                                                ) : isCancelling ? (
+                                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-[10px] font-semibold text-orange-700">
+                                                    <span className="relative flex h-1.5 w-1.5">
+                                                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
 
-                                                  {isDeleting
-                                                    ? "Deleting..."
-                                                    : "Delete Hour"}
-                                                </button>
+                                                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-orange-500" />
+                                                    </span>
+
+                                                    Cancelling
+                                                  </span>
+                                                ) : (
+                                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-700">
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+
+                                                    Completed
+                                                  </span>
+                                                )}
 
                                               </div>
                                             </div>
+
+                                            {/* CANCELLING MESSAGE */}
+
+                                            {isCancelling &&
+                                              upload.message && (
+                                                <div className="rounded-lg border border-orange-100 bg-orange-50 px-3 py-2">
+                                                  <p className="text-[10px] leading-4 text-orange-700">
+                                                    {
+                                                      upload.message
+                                                    }
+                                                  </p>
+                                                </div>
+                                              )}
+
+                                            {/* ACTIONS */}
+
+                                            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+
+                                              <div
+                                                className={[
+                                                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-semibold",
+                                                  savedAdCount >
+                                                  0
+                                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                                    : "border-slate-200 bg-slate-100 text-slate-500",
+                                                ].join(
+                                                  " ",
+                                                )}
+                                              >
+                                                <BookmarkCheck
+                                                  size={
+                                                    12
+                                                  }
+                                                />
+
+                                                {savedAdCount >
+                                                0
+                                                  ? `${savedAdCount} Saved Ad${
+                                                      savedAdCount ===
+                                                      1
+                                                        ? ""
+                                                        : "s"
+                                                    }`
+                                                  : "No Saved Ads"}
+                                              </div>
+
+                                              <Link
+                                                href={
+                                                  viewUrl
+                                                }
+                                                className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 transition hover:bg-slate-100"
+                                              >
+                                                <Eye
+                                                  size={
+                                                    13
+                                                  }
+                                                />
+
+                                                View
+                                              </Link>
+
+                                              <button
+                                                type="button"
+                                                disabled={
+                                                  cannotDelete
+                                                }
+                                                onClick={() =>
+                                                  handleDeleteHour(
+                                                    project,
+                                                    upload,
+                                                  )
+                                                }
+                                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                              >
+                                                <Trash2
+                                                  size={
+                                                    13
+                                                  }
+                                                />
+
+                                                {isDeleting
+                                                  ? "Deleting..."
+                                                  : "Delete Hour"}
+                                              </button>
+
+                                            </div>
                                           </div>
-                                        );
-                                      },
-                                    )}
+                                        </div>
+                                      );
+                                    },
+                                  )}
                                 </div>
                               )}
                             </div>
