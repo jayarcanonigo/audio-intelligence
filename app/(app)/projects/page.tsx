@@ -596,12 +596,6 @@ export default function ProjectsPage() {
     string | null
   >(null);
 
-  /*
-   * Calendar starts at current month,
-   * then moves to the most recently
-   * created project's month after
-   * projects are loaded.
-   */
   const [
     calendarDate,
     setCalendarDate,
@@ -609,12 +603,6 @@ export default function ProjectsPage() {
     new Date(),
   );
 
-  /*
-   * null = all projects.
-   *
-   * It starts null because we need to
-   * determine the latest project first.
-   */
   const [
     selectedDate,
     setSelectedDate,
@@ -630,12 +618,6 @@ export default function ProjectsPage() {
     try {
       setLoading(true);
 
-      /*
-       * ONLY load project list.
-       *
-       * No advertisements.
-       * No upload history.
-       */
       const response =
         await getProjects();
 
@@ -649,10 +631,6 @@ export default function ProjectsPage() {
         projectList,
       );
 
-      /*
-       * Find the most recently
-       * created project.
-       */
       if (projectList.length > 0) {
         const sortedProjects = [
           ...projectList,
@@ -684,10 +662,6 @@ export default function ProjectsPage() {
           );
 
         if (latestDate) {
-          /*
-           * Automatically open the
-           * latest project's date.
-           */
           setCalendarDate(
             latestDate,
           );
@@ -1138,10 +1112,16 @@ export default function ProjectsPage() {
         deleteKey,
       );
 
+      /*
+       * deleteProjectHour accepts:
+       *   projectId
+       *   hour
+       *
+       * Do not pass upload.id.
+       */
       await deleteProjectHour(
         projectId,
         hour,
-        upload.id,
       );
 
       /*
@@ -1179,14 +1159,11 @@ export default function ProjectsPage() {
 
       /*
        * Reload lightweight project list.
-       *
-       * This will also recalculate
-       * the latest created date.
        */
       await loadProjects();
 
       /*
-       * If the history is still open,
+       * If history is still open,
        * load it again.
        */
       if (
@@ -1475,10 +1452,6 @@ export default function ProjectsPage() {
                       new Date(),
                     );
 
-                  /*
-                   * Only project names
-                   * are displayed.
-                   */
                   const projectsForDay =
                     projects.filter(
                       (project) => {

@@ -30,7 +30,7 @@ export default function UploadPanel({
     useState<File | null>(null);
 
   const [uploadTime, setUploadTime] =
-    useState("01");
+    useState("06");
 
   const [sessionId, setSessionId] =
     useState("");
