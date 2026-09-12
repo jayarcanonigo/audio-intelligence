@@ -39,7 +39,6 @@ import {
   Copy,
   Upload,
   FileJson,
-  X,
 } from "lucide-react";
 
 import {
@@ -113,11 +112,14 @@ export default function AdEditorPage() {
     useRef<Record<number, HTMLDivElement | null>>(
       {}
     );
-const urlHour = searchParams.get("hour");
+
+  const urlHour =
+    searchParams.get("hour");
 
   const [broadcastHour, setBroadcastHour] =
-    useState<string>(urlHour || "1");
-  
+    useState<string>(
+      urlHour || "1"
+    );
 
   const [hours, setHours] =
     useState<number[]>([]);
@@ -125,7 +127,6 @@ const urlHour = searchParams.get("hour");
   const [refreshing, setRefreshing] =
     useState(false);
 
-  // ============================================================
   const [isMobile, setIsMobile] =
     useState(false);
 
@@ -138,8 +139,10 @@ const urlHour = searchParams.get("hour");
 
   const MAX_COPY_CHARS = 10000;
 
-  const [copiedPart, setCopiedPart] =
-    useState<number | null>(null);
+  const [
+    copiedPartGroup,
+    setCopiedPartGroup,
+  ] = useState<number | null>(null);
 
   // ============================================================
   // JSON IMPORT STATE
@@ -440,48 +443,6 @@ const urlHour = searchParams.get("hour");
                     ad.detection_key ??
                     null;
 
-                  console.log(
-                    "========================================"
-                  );
-
-                  console.log(
-                    "LOAD DATABASE ADVERTISEMENT"
-                  );
-
-                  console.log(
-                    "Advertisement ID:",
-                    ad.id
-                  );
-
-                  console.log(
-                    "Database detection_key:",
-                    ad.detection_key
-                  );
-
-                  console.log(
-                    "Advertisement start:",
-                    ad.start_time
-                  );
-
-                  console.log(
-                    "Advertisement end:",
-                    ad.end_time
-                  );
-
-                  console.log(
-                    "Recovered segmentIds:",
-                    segmentIds
-                  );
-
-                  console.log(
-                    "Final detection_key:",
-                    finalDetectionKey
-                  );
-
-                  console.log(
-                    "========================================"
-                  );
-
                   return {
                     id:
                       ad.id,
@@ -614,57 +575,70 @@ const urlHour = searchParams.get("hour");
     broadcastHour,
   ]);
 
-// ============================================================
-// LOAD HOURS
-// ============================================================
+  // ============================================================
+  // LOAD HOURS
+  // ============================================================
 
-useEffect(() => {
-  async function loadHours() {
-    try {
-      const data = await getSegmentHours(projectId);
+  useEffect(() => {
+    async function loadHours() {
+      try {
+        const data =
+          await getSegmentHours(
+            projectId
+          );
 
-      setHours(data);
+        setHours(data);
 
-      const urlHour = searchParams.get("hour");
+        const urlHour =
+          searchParams.get(
+            "hour"
+          );
 
-      // --------------------------------------------------------
-      // URL hour has priority
-      // Example:
-      // /ad-editor/19?name=newproject&hour=4
-      // => broadcastHour = "4"
-      // --------------------------------------------------------
-      if (urlHour) {
-        const parsedHour = Number(urlHour);
+        if (urlHour) {
+          const parsedHour =
+            Number(urlHour);
 
-        if (
-          Number.isFinite(parsedHour) &&
-          data.includes(parsedHour)
-        ) {
-          setBroadcastHour(String(parsedHour));
-          return;
+          if (
+            Number.isFinite(
+              parsedHour
+            ) &&
+            data.includes(
+              parsedHour
+            )
+          ) {
+            setBroadcastHour(
+              String(
+                parsedHour
+              )
+            );
+
+            return;
+          }
         }
-      }
 
-      // --------------------------------------------------------
-      // No valid URL hour -> use first available hour
-      // --------------------------------------------------------
-      if (data.length > 0) {
-        setBroadcastHour(String(data[0]));
-      } else {
-        setBroadcastHour("1");
+        if (data.length > 0) {
+          setBroadcastHour(
+            String(data[0])
+          );
+        } else {
+          setBroadcastHour("1");
+        }
+      } catch (error) {
+        console.error(
+          "Failed loading segment hours",
+          error
+        );
       }
-    } catch (error) {
-      console.error(
-        "Failed loading segment hours",
-        error
-      );
     }
-  }
 
-  if (projectId) {
-    loadHours();
-  }
-}, [projectId, searchParams]);
+    if (projectId) {
+      loadHours();
+    }
+  }, [
+    projectId,
+    searchParams,
+  ]);
+
   // ============================================================
   // TRANSCRIPT SEGMENTS
   // ============================================================
@@ -702,6 +676,9 @@ useEffect(() => {
 
   // ============================================================
   // COPY PARTS
+  //
+  // The transcript is split into maximum 10,000-character
+  // sections first.
   // ============================================================
 
   const copyParts =
@@ -831,19 +808,65 @@ useEffect(() => {
     }, [logs]);
 
   // ============================================================
-  // COPY ONE PART
+  // COPY PART GROUPS
+  //
+  // Example:
+  //
+  // PART 1 + PART 2
+  // PART 3 + PART 4
+  // PART 5
+  //
+  // If there are 6 parts:
+  //
+  // PART 1 + PART 2
+  // PART 3 + PART 4
+  // PART 5 + PART 6
   // ============================================================
 
-  const handleCopyPart =
-    async (
-      partIndex: number
-    ) => {
-      const part =
-        copyParts[
-          partIndex
-        ];
+  const copyPartGroups =
+    useMemo(() => {
+      const groups: {
+        startIndex: number;
+        parts: string[];
+      }[] = [];
 
-      if (!part) {
+      for (
+        let i = 0;
+        i < copyParts.length;
+        i += 2
+      ) {
+        groups.push({
+          startIndex: i,
+          parts: copyParts.slice(
+            i,
+            i + 2
+          ),
+        });
+      }
+
+      return groups;
+    }, [copyParts]);
+
+  // ============================================================
+  // COPY PART GROUP
+  // ============================================================
+
+  const handleCopyPartGroup =
+    async (
+      groupIndex: number
+    ) => {
+      const startIndex =
+        groupIndex * 2;
+
+      const partsToCopy =
+        copyParts.slice(
+          startIndex,
+          startIndex + 2
+        );
+
+      if (
+        partsToCopy.length === 0
+      ) {
         toast.warning(
           "No transcript available"
         );
@@ -853,27 +876,38 @@ useEffect(() => {
 
       try {
         await navigator.clipboard.writeText(
-          part
+          partsToCopy.join("\n")
         );
 
-        setCopiedPart(
-          partIndex
+        setCopiedPartGroup(
+          groupIndex
         );
 
-        toast.success(
-          `📋 PART ${
-            partIndex + 1
-          } copied`
-        );
+        const firstPart =
+          startIndex + 1;
+
+        const lastPart =
+          startIndex +
+          partsToCopy.length;
+
+        if (
+          partsToCopy.length === 2
+        ) {
+          toast.success(
+            `📋 PART ${firstPart} & ${lastPart} copied`
+          );
+        } else {
+          toast.success(
+            `📋 PART ${firstPart} copied`
+          );
+        }
 
         window.setTimeout(
           () => {
-            setCopiedPart(
-              (
-                current
-              ) =>
+            setCopiedPartGroup(
+              (current) =>
                 current ===
-                partIndex
+                groupIndex
                   ? null
                   : current
             );
@@ -884,14 +918,12 @@ useEffect(() => {
         error
       ) {
         console.error(
-          "Failed to copy part:",
+          "Failed to copy part group:",
           error
         );
 
         toast.error(
-          `Failed to copy PART ${
-            partIndex + 1
-          }`
+          "Failed to copy transcript"
         );
       }
     };
@@ -955,7 +987,6 @@ useEffect(() => {
         return null;
       }
 
-      // HH:MM:SS
       const match =
         str.match(
           /^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?$/
@@ -985,7 +1016,6 @@ useEffect(() => {
         );
       }
 
-      // MM:SS
       const shortMatch =
         str.match(
           /^(\d{1,3}):(\d{2})(?:\.(\d+))?$/
@@ -1014,7 +1044,6 @@ useEffect(() => {
         );
       }
 
-      // Numeric seconds
       const numeric =
         Number(str);
 
@@ -1198,20 +1227,6 @@ useEffect(() => {
           return;
         }
 
-        // --------------------------------------------------------
-        // SUPPORT:
-        //
-        // [...]
-        //
-        // {
-        //   "advertisements": [...]
-        // }
-        //
-        // {
-        //   "ads": [...]
-        // }
-        // --------------------------------------------------------
-
         let advertisements:
           any[] = [];
 
@@ -1261,10 +1276,6 @@ useEffect(() => {
         const errors:
           string[] = [];
 
-        // --------------------------------------------------------
-        // EXISTING OCCUPIED RANGES
-        // --------------------------------------------------------
-
         const occupiedRanges =
           results
             .map(
@@ -1300,10 +1311,6 @@ useEffect(() => {
               start: number;
               end: number;
             }[];
-
-        // --------------------------------------------------------
-        // PROCESS EACH AD
-        // --------------------------------------------------------
 
         for (
           let index = 0;
@@ -1367,10 +1374,6 @@ useEffect(() => {
               endValue
             );
 
-          // ------------------------------------------------------
-          // VALIDATION
-          // ------------------------------------------------------
-
           if (
             startSeconds ===
             null
@@ -1420,10 +1423,6 @@ useEffect(() => {
             continue;
           }
 
-          // ------------------------------------------------------
-          // CHECK OVERLAP WITH EXISTING ADS
-          // ------------------------------------------------------
-
           const overlapsExisting =
             occupiedRanges.some(
               (
@@ -1446,16 +1445,6 @@ useEffect(() => {
 
             continue;
           }
-
-          // ------------------------------------------------------
-          // MATCH TRANSCRIPT SEGMENTS
-          //
-          // overlap rule:
-          //
-          // segmentEnd > adStart
-          // AND
-          // segmentStart < adEnd
-          // ------------------------------------------------------
 
           const sourceSegments =
             transcriptSegments.filter(
@@ -1516,21 +1505,10 @@ useEffect(() => {
                   a - b
               );
 
-          // ------------------------------------------------------
-          // DETECTION KEY
-          // ------------------------------------------------------
-
           const detectionKey =
             makeDetectionKey(
               segmentIds
             );
-
-          // ------------------------------------------------------
-          // TEMPORARY ID
-          //
-          // Negative ID makes it clear that this is not a
-          // database advertisement yet.
-          // ------------------------------------------------------
 
           const temporaryId =
             -(
@@ -1619,10 +1597,6 @@ useEffect(() => {
           });
         }
 
-        // --------------------------------------------------------
-        // NO VALID ADS
-        // --------------------------------------------------------
-
         if (
           newAds.length ===
           0
@@ -1638,20 +1612,12 @@ useEffect(() => {
           return;
         }
 
-        // --------------------------------------------------------
-        // ADD TO SELECTED SEGMENTS
-        // --------------------------------------------------------
-
         setResults(
           (prev) => [
             ...prev,
             ...newAds,
           ]
         );
-
-        // --------------------------------------------------------
-        // DISABLE SOURCE TRANSCRIPT SEGMENTS
-        // --------------------------------------------------------
 
         setDisabledLogs(
           (
@@ -1672,10 +1638,6 @@ useEffect(() => {
           ]
         );
 
-        // --------------------------------------------------------
-        // SELECT LAST IMPORTED
-        // --------------------------------------------------------
-
         if (
           newAds.length >
           0
@@ -1688,15 +1650,7 @@ useEffect(() => {
           );
         }
 
-        // --------------------------------------------------------
-        // CLOSE
-        // --------------------------------------------------------
-
         closeJsonImport();
-
-        // --------------------------------------------------------
-        // RESULT MESSAGE
-        // --------------------------------------------------------
 
         if (
           errors.length >
@@ -1755,7 +1709,7 @@ useEffect(() => {
     };
 
   // ============================================================
-  // OLD REPROCESS
+  // REPROCESS
   // ============================================================
 
   const handleReprocessAds =
@@ -1769,38 +1723,11 @@ useEffect(() => {
                 broadcastHour
               );
 
-        console.log(
-          "================================"
-        );
-
-        console.log(
-          "REPROCESS START"
-        );
-
-        console.log(
-          "Project ID:",
-          projectId
-        );
-
-        console.log(
-          "Hour:",
-          hour
-        );
-
-        console.log(
-          "================================"
-        );
-
         const result =
           await reprocessAdvertisements(
             projectId,
             hour
           );
-
-        console.log(
-          "REPROCESS RAW RESULT:",
-          result
-        );
 
         const data =
           result?.data ??
@@ -2893,10 +2820,6 @@ useEffect(() => {
         const detectionKey =
           `project-${projectId}-segments-${startSegmentId}-${endSegmentId}`;
 
-        // --------------------------------------------------------
-        // EXISTING DATABASE AD
-        // --------------------------------------------------------
-
         if (
           segment.persisted === true
         ) {
@@ -2950,10 +2873,6 @@ useEffect(() => {
 
           continue;
         }
-
-        // --------------------------------------------------------
-        // NEW / JSON IMPORT / MANUALLY ADDED
-        // --------------------------------------------------------
 
         const created =
           await createAdvertisement({
@@ -3061,10 +2980,6 @@ useEffect(() => {
       }
 
       try {
-        // IMPORTANT:
-        // JSON imported/manual NEW records have no
-        // database ID yet. Do NOT call delete API.
-
         if (
           item.persisted === true
         ) {
@@ -3526,6 +3441,81 @@ useEffect(() => {
     };
 
   // ============================================================
+  // COPY BUTTONS UI
+  // ============================================================
+
+  const CopyPartButtons = () => {
+    if (
+      copyPartGroups.length === 0
+    ) {
+      return null;
+    }
+
+    return (
+      <div className="mt-3 flex flex-wrap gap-2">
+        {copyPartGroups.map(
+          (
+            group,
+            groupIndex
+          ) => {
+            const firstPart =
+              group.startIndex + 1;
+
+            const lastPart =
+              group.startIndex +
+              group.parts.length;
+
+            const isCopied =
+              copiedPartGroup ===
+              groupIndex;
+
+            const hasTwoParts =
+              group.parts.length === 2;
+
+            return (
+              <button
+                key={
+                  groupIndex
+                }
+                type="button"
+                onClick={() =>
+                  handleCopyPartGroup(
+                    groupIndex
+                  )
+                }
+                title={
+                  hasTwoParts
+                    ? `Copy PART ${firstPart} and PART ${lastPart}`
+                    : `Copy PART ${firstPart}`
+                }
+                className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all active:scale-[0.97] ${
+                  isCopied
+                    ? "border-green-200 bg-green-50 text-green-700"
+                    : "border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                }`}
+              >
+                {isCopied ? (
+                  <span className="font-bold">
+                    ✓
+                  </span>
+                ) : (
+                  <Copy
+                    size={14}
+                  />
+                )}
+
+                {hasTwoParts
+                  ? `PART ${firstPart} & ${lastPart}`
+                  : `PART ${firstPart}`}
+              </button>
+            );
+          }
+        )}
+      </div>
+    );
+  };
+
+  // ============================================================
   // RENDER
   // ============================================================
 
@@ -3556,9 +3546,7 @@ useEffect(() => {
             </p>
           </div>
 
-          {/* ====================================================
-              BROADCAST HOUR
-          ==================================================== */}
+          {/* BROADCAST HOUR */}
 
           <div className="w-full md:w-auto">
             <div className="block md:hidden">
@@ -3676,63 +3664,7 @@ useEffect(() => {
                   )}
                 </div>
 
-                {/* COPY PART BUTTONS */}
-
-                {copyParts.length >
-                  0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {copyParts.map(
-                      (
-                        _,
-                        index
-                      ) => {
-                        const isCopied =
-                          copiedPart ===
-                          index;
-
-                        return (
-                          <button
-                            key={
-                              index
-                            }
-                            type="button"
-                            onClick={() =>
-                              handleCopyPart(
-                                index
-                              )
-                            }
-                            title={`Copy PART ${
-                              index + 1
-                            }`}
-                            className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all active:scale-[0.97] ${
-                              isCopied
-                                ? "border-green-200 bg-green-50 text-green-700"
-                                : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                            }`}
-                          >
-                            {isCopied ? (
-                              <span>
-                                ✓
-                              </span>
-                            ) : (
-                              <Copy
-                                size={
-                                  14
-                                }
-                              />
-                            )}
-
-                            PART{" "}
-                            {
-                              index +
-                              1
-                            }
-                          </button>
-                        );
-                      }
-                    )}
-                  </div>
-                )}
+                <CopyPartButtons />
               </div>
 
               <LiveLogs
@@ -3831,8 +3763,6 @@ useEffect(() => {
 
           <div className="col-span-5">
             <div className="rounded-xl bg-white p-5 shadow-sm">
-              {/* LIVE LOG HEADER */}
-
               <div className="mb-4">
                 <div className="flex items-center justify-between">
                   <h2 className="font-semibold text-gray-800">
@@ -3854,63 +3784,7 @@ useEffect(() => {
                   )}
                 </div>
 
-                {/* COPY PART BUTTONS */}
-
-                {copyParts.length >
-                  0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {copyParts.map(
-                      (
-                        _,
-                        index
-                      ) => {
-                        const isCopied =
-                          copiedPart ===
-                          index;
-
-                        return (
-                          <button
-                            key={
-                              index
-                            }
-                            type="button"
-                            onClick={() =>
-                              handleCopyPart(
-                                index
-                              )
-                            }
-                            title={`Copy PART ${
-                              index + 1
-                            }`}
-                            className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all active:scale-[0.97] ${
-                              isCopied
-                                ? "border-green-200 bg-green-50 text-green-700"
-                                : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                            }`}
-                          >
-                            {isCopied ? (
-                              <span>
-                                ✓
-                              </span>
-                            ) : (
-                              <Copy
-                                size={
-                                  14
-                                }
-                              />
-                            )}
-
-                            PART{" "}
-                            {
-                              index +
-                              1
-                            }
-                          </button>
-                        );
-                      }
-                    )}
-                  </div>
-                )}
+                <CopyPartButtons />
               </div>
 
               <LiveLogs
@@ -4016,12 +3890,6 @@ useEffect(() => {
       {showJsonImport && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-      
-
-           
-
-            {/* BODY */}
-
             <div className="space-y-4 p-5">
               {/* FILE PICKER */}
 
@@ -4098,10 +3966,6 @@ useEffect(() => {
 }`}
                 className="h-64 w-full resize-none rounded-xl border border-gray-300 bg-gray-50 p-4 font-mono text-xs leading-5 text-gray-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
               />
-
-              {/* INFORMATION */}
-
-         
             </div>
 
             {/* FOOTER */}
@@ -4434,7 +4298,7 @@ useEffect(() => {
                 {/* RIGHT */}
 
                 <div className="flex items-center gap-2">
-                  {/* OLD REPROCESS */}
+                  {/* REPROCESS */}
 
                   <button
                     onClick={

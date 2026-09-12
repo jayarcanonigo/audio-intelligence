@@ -63,58 +63,35 @@ type SavedAdView = {
    TIME HELPERS
 ============================================================ */
 
-function timeToSeconds(
-  value?: string | null,
-): number {
+function timeToSeconds(value?: string | null): number {
   if (!value) return 0;
 
-  const parts = value
-    .split(":")
-    .map(Number);
+  const parts = value.split(":").map(Number);
 
   if (parts.length === 3) {
-    return (
-      parts[0] * 3600 +
-      parts[1] * 60 +
-      parts[2]
-    );
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
   }
 
   if (parts.length === 2) {
-    return (
-      parts[0] * 60 +
-      parts[1]
-    );
+    return parts[0] * 60 + parts[1];
   }
 
   return Number(value) || 0;
 }
 
-function secondsToTime(
-  totalSeconds: number,
-): string {
-  const seconds = Math.max(
-    0,
-    Math.round(totalSeconds),
-  );
+function secondsToTime(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
 
-  const hours = Math.floor(
-    seconds / 3600,
-  );
+  const hours = Math.floor(seconds / 3600);
 
-  const minutes = Math.floor(
-    (seconds % 3600) / 60,
-  );
+  const minutes = Math.floor((seconds % 3600) / 60);
 
-  const remainingSeconds =
-    seconds % 60;
+  const remainingSeconds = seconds % 60;
 
   return [
     String(hours).padStart(2, "0"),
     String(minutes).padStart(2, "0"),
-    String(
-      remainingSeconds,
-    ).padStart(2, "0"),
+    String(remainingSeconds).padStart(2, "0"),
   ].join(":");
 }
 
@@ -128,18 +105,13 @@ function calculateDuration(
     duration !== null &&
     duration !== ""
   ) {
-    const parsedDuration =
-      Number(duration);
+    const parsedDuration = Number(duration);
 
     if (
-      !Number.isNaN(
-        parsedDuration,
-      ) &&
+      !Number.isNaN(parsedDuration) &&
       parsedDuration > 0
     ) {
-      return Math.round(
-        parsedDuration,
-      );
+      return Math.round(parsedDuration);
     }
   }
 
@@ -150,8 +122,7 @@ function calculateDuration(
   return Math.max(
     0,
     Math.round(
-      timeToSeconds(end) -
-        timeToSeconds(start),
+      timeToSeconds(end) - timeToSeconds(start),
     ),
   );
 }
@@ -168,9 +139,7 @@ function calculateEndTime(
   );
 }
 
-function cleanText(
-  value?: string | null,
-): string {
+function cleanText(value?: string | null): string {
   return String(value ?? "")
     .replace(/\s+/g, " ")
     .trim();
@@ -181,8 +150,7 @@ function cleanText(
 ============================================================ */
 
 function dateKey(date: Date): string {
-  const year =
-    date.getFullYear();
+  const year = date.getFullYear();
 
   const month = String(
     date.getMonth() + 1,
@@ -195,16 +163,12 @@ function dateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function parseDateKey(
-  value: string,
-): Date {
+function parseDateKey(value: string): Date {
   const [
     year,
     month,
     day,
-  ] = value
-    .split("-")
-    .map(Number);
+  ] = value.split("-").map(Number);
 
   return new Date(
     year,
@@ -217,43 +181,34 @@ function isSameDate(
   first: Date,
   second: Date,
 ): boolean {
-  return (
-    dateKey(first) ===
-    dateKey(second)
-  );
+  return dateKey(first) === dateKey(second);
 }
 
 function getCalendarDays(
   monthDate: Date,
 ): Date[] {
-  const firstDayOfMonth =
-    new Date(
-      monthDate.getFullYear(),
-      monthDate.getMonth(),
-      1,
-    );
+  const firstDayOfMonth = new Date(
+    monthDate.getFullYear(),
+    monthDate.getMonth(),
+    1,
+  );
 
   const firstDayIndex =
     firstDayOfMonth.getDay();
 
-  const calendarStart =
-    new Date(
-      monthDate.getFullYear(),
-      monthDate.getMonth(),
-      1 - firstDayIndex,
-    );
+  const calendarStart = new Date(
+    monthDate.getFullYear(),
+    monthDate.getMonth(),
+    1 - firstDayIndex,
+  );
 
   return Array.from(
     { length: 42 },
     (_, index) => {
-      const day =
-        new Date(
-          calendarStart,
-        );
+      const day = new Date(calendarStart);
 
       day.setDate(
-        calendarStart.getDate() +
-          index,
+        calendarStart.getDate() + index,
       );
 
       return day;
@@ -286,14 +241,9 @@ function getProjectDate(
     return null;
   }
 
-  const date =
-    new Date(value);
+  const date = new Date(value);
 
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
+  if (Number.isNaN(date.getTime())) {
     return null;
   }
 
@@ -316,46 +266,34 @@ function isSavedAdvertisement(
 
 function getSavedAdsForHour(
   advertisements: SavedAdView[],
-  broadcastHour?:
-    | number
-    | null,
+  broadcastHour?: number | null,
 ): SavedAdView[] {
   if (
-    broadcastHour ===
-      undefined ||
+    broadcastHour === undefined ||
     broadcastHour === null
   ) {
     return [];
   }
 
-  const expectedHour =
-    String(
-      Number(
-        broadcastHour,
-      ),
-    ).padStart(2, "0");
+  const expectedHour = String(
+    Number(broadcastHour),
+  ).padStart(2, "0");
 
-  return advertisements.filter(
-    (ad) => {
-      const start =
-        ad.start_time ||
-        ad.start;
+  return advertisements.filter((ad) => {
+    const start =
+      ad.start_time || ad.start;
 
-      if (!start) {
-        return false;
-      }
+    if (!start) {
+      return false;
+    }
 
-      const hour =
-        start.split(":")[0];
+    const hour = start.split(":")[0];
 
-      return (
-        String(
-          Number(hour),
-        ).padStart(2, "0") ===
-        expectedHour
-      );
-    },
-  );
+    return (
+      String(Number(hour)).padStart(2, "0") ===
+      expectedHour
+    );
+  });
 }
 
 /* ============================================================
@@ -372,10 +310,7 @@ function formatBroadcastHour(
     return "--:--";
   }
 
-  return `${String(hour).padStart(
-    2,
-    "0",
-  )}:00`;
+  return `${String(hour).padStart(2, "0")}:00`;
 }
 
 /* ============================================================
@@ -387,15 +322,11 @@ async function createCsvDownload(
   advertisements: SavedAdView[],
   projectId: number,
   setDownloading: React.Dispatch<
-    React.SetStateAction<
-      string | number | null
-    >
+    React.SetStateAction<string | number | null>
   >,
 ) {
   try {
-    setDownloading(
-      projectId,
-    );
+    setDownloading(projectId);
 
     const headers = [
       "START",
@@ -405,53 +336,50 @@ async function createCsvDownload(
       "COMPLETE TEXT",
     ];
 
-    const rows =
-      advertisements.map(
-        (ad) => {
-          const start =
-            ad.start_time ||
-            ad.start ||
-            "";
+    const rows = advertisements.map((ad) => {
+      const start =
+        ad.start_time ||
+        ad.start ||
+        "";
 
-          const duration =
-            calculateDuration(
-              start,
-              ad.end_time ||
-                ad.end,
-              ad.duration ||
-                ad.actual_length,
-            );
+      const duration =
+        calculateDuration(
+          start,
+          ad.end_time ||
+            ad.end,
+          ad.duration ||
+            ad.actual_length,
+        );
 
-          const end =
-            ad.end_time ||
-            ad.end ||
-            calculateEndTime(
-              start,
-              duration,
-            );
+      const end =
+        ad.end_time ||
+        ad.end ||
+        calculateEndTime(
+          start,
+          duration,
+        );
 
-          const brand =
-            ad.brand ||
-            ad.brand_name ||
-            "Unknown Advertisement";
+      const brand =
+        ad.brand ||
+        ad.brand_name ||
+        "Unknown Advertisement";
 
-          const completeText =
-            cleanText(
-              ad.text ||
-                ad.complete_text ||
-                ad.copyline ||
-                "",
-            );
+      const completeText =
+        cleanText(
+          ad.text ||
+            ad.complete_text ||
+            ad.copyline ||
+            "",
+        );
 
-          return [
-            start,
-            end,
-            `${duration}s`,
-            brand,
-            completeText,
-          ];
-        },
-      );
+      return [
+        start,
+        end,
+        `${duration}s`,
+        brand,
+        completeText,
+      ];
+    });
 
     const csvRows = [
       headers,
@@ -459,10 +387,7 @@ async function createCsvDownload(
     ].map((row) =>
       row
         .map((value) => {
-          const text =
-            String(
-              value ?? "",
-            );
+          const text = String(value ?? "");
 
           return `"${text.replace(
             /"/g,
@@ -472,23 +397,18 @@ async function createCsvDownload(
         .join(","),
     );
 
-    const blob =
-      new Blob(
-        [csvRows.join("\n")],
-        {
-          type: "text/csv;charset=utf-8;",
-        },
-      );
+    const blob = new Blob(
+      [csvRows.join("\n")],
+      {
+        type: "text/csv;charset=utf-8;",
+      },
+    );
 
     const url =
-      URL.createObjectURL(
-        blob,
-      );
+      URL.createObjectURL(blob);
 
     const link =
-      document.createElement(
-        "a",
-      );
+      document.createElement("a");
 
     link.href = url;
 
@@ -503,19 +423,13 @@ async function createCsvDownload(
           "",
         )}_saved_ads.csv`;
 
-    document.body.appendChild(
-      link,
-    );
+    document.body.appendChild(link);
 
     link.click();
 
-    document.body.removeChild(
-      link,
-    );
+    document.body.removeChild(link);
 
-    URL.revokeObjectURL(
-      url,
-    );
+    URL.revokeObjectURL(url);
   } finally {
     setDownloading(null);
   }
@@ -535,20 +449,14 @@ export default function ProjectsPage() {
     savedAdsByProject,
     setSavedAdsByProject,
   ] = useState<
-    Record<
-      string,
-      SavedAdView[]
-    >
+    Record<string, SavedAdView[]>
   >({});
 
   const [
     uploadStatusesByProject,
     setUploadStatusesByProject,
   ] = useState<
-    Record<
-      string,
-      UploadStatus[]
-    >
+    Record<string, UploadStatus[]>
   >({});
 
   const [
@@ -567,49 +475,39 @@ export default function ProjectsPage() {
     loadingAds,
     setLoadingAds,
   ] = useState<
-    Record<
-      string,
-      boolean
-    >
+    Record<string, boolean>
   >({});
 
   const [
     loadingUploadStatuses,
     setLoadingUploadStatuses,
   ] = useState<
-    Record<
-      string,
-      boolean
-    >
+    Record<string, boolean>
   >({});
 
   const [
     downloading,
     setDownloading,
-  ] = useState<
-    string | number | null
-  >(null);
+  ] = useState<string | number | null>(
+    null,
+  );
 
   const [
     deletingHour,
     setDeletingHour,
-  ] = useState<
-    string | null
-  >(null);
+  ] = useState<string | null>(
+    null,
+  );
 
   const [
     calendarDate,
     setCalendarDate,
-  ] = useState(
-    new Date(),
-  );
+  ] = useState(new Date());
 
   const [
     selectedDate,
     setSelectedDate,
-  ] = useState<
-    string | null
-  >(null);
+  ] = useState<string | null>(null);
 
   /* ============================================================
      LOAD PROJECTS
@@ -625,34 +523,28 @@ export default function ProjectsPage() {
       const projectList =
         Array.isArray(response)
           ? response
-          : response?.projects ||
-            [];
+          : response?.projects || [];
 
-      setProjects(
-        projectList,
-      );
+      setProjects(projectList);
 
       if (projectList.length > 0) {
-        const sortedProjects = [
-          ...projectList,
-        ].sort(
-          (first, second) => {
-            const firstDate =
-              getProjectDate(
-                first,
-              )?.getTime() || 0;
+        const sortedProjects =
+          [...projectList].sort(
+            (first, second) => {
+              const firstDate =
+                getProjectDate(first)
+                  ?.getTime() || 0;
 
-            const secondDate =
-              getProjectDate(
-                second,
-              )?.getTime() || 0;
+              const secondDate =
+                getProjectDate(second)
+                  ?.getTime() || 0;
 
-            return (
-              secondDate -
-              firstDate
-            );
-          },
-        );
+              return (
+                secondDate -
+                firstDate
+              );
+            },
+          );
 
         const latestProject =
           sortedProjects[0];
@@ -668,9 +560,7 @@ export default function ProjectsPage() {
           );
 
           setSelectedDate(
-            dateKey(
-              latestDate,
-            ),
+            dateKey(latestDate),
           );
         }
       }
@@ -718,8 +608,7 @@ export default function ProjectsPage() {
       setLoadingAds(
         (previous) => ({
           ...previous,
-          [projectKey]:
-            true,
+          [projectKey]: true,
         }),
       );
 
@@ -764,8 +653,7 @@ export default function ProjectsPage() {
       setLoadingAds(
         (previous) => ({
           ...previous,
-          [projectKey]:
-            false,
+          [projectKey]: false,
         }),
       );
     }
@@ -793,8 +681,7 @@ export default function ProjectsPage() {
       setLoadingUploadStatuses(
         (previous) => ({
           ...previous,
-          [projectKey]:
-            true,
+          [projectKey]: true,
         }),
       );
 
@@ -881,8 +768,7 @@ export default function ProjectsPage() {
       setLoadingUploadStatuses(
         (previous) => ({
           ...previous,
-          [projectKey]:
-            false,
+          [projectKey]: false,
         }),
       );
     }
@@ -939,16 +825,11 @@ export default function ProjectsPage() {
       return projects.filter(
         (project) => {
           const projectDate =
-            getProjectDate(
-              project,
-            );
+            getProjectDate(project);
 
           return (
-            projectDate !==
-              null &&
-            dateKey(
-              projectDate,
-            ) ===
+            projectDate !== null &&
+            dateKey(projectDate) ===
               selectedDate
           );
         },
@@ -976,8 +857,7 @@ export default function ProjectsPage() {
       (previous) =>
         new Date(
           previous.getFullYear(),
-          previous.getMonth() -
-            1,
+          previous.getMonth() - 1,
           1,
         ),
     );
@@ -988,20 +868,16 @@ export default function ProjectsPage() {
       (previous) =>
         new Date(
           previous.getFullYear(),
-          previous.getMonth() +
-            1,
+          previous.getMonth() + 1,
           1,
         ),
     );
   }
 
   function goToToday() {
-    const today =
-      new Date();
+    const today = new Date();
 
-    setCalendarDate(
-      today,
-    );
+    setCalendarDate(today);
 
     setSelectedDate(
       dateKey(today),
@@ -1009,9 +885,7 @@ export default function ProjectsPage() {
   }
 
   function clearDateFilter() {
-    setSelectedDate(
-      null,
-    );
+    setSelectedDate(null);
   }
 
   function selectCalendarDate(
@@ -1034,9 +908,7 @@ export default function ProjectsPage() {
       project.id;
 
     const projectName =
-      getProjectName(
-        project,
-      );
+      getProjectName(project);
 
     const hour = Number(
       upload.broadcast_hour,
@@ -1059,15 +931,8 @@ export default function ProjectsPage() {
         upload.status || "",
       ).toUpperCase();
 
-    /*
-     * PROCESSING and STARTING
-     * cannot be deleted.
-     *
-     * CANCELLING CAN be deleted.
-     */
     if (
-      status ===
-        "PROCESSING" ||
+      status === "PROCESSING" ||
       status === "STARTING"
     ) {
       window.alert(
@@ -1119,23 +984,11 @@ export default function ProjectsPage() {
         deleteKey,
       );
 
-      /*
-       * deleteProjectHour accepts:
-       *   projectId
-       *   hour
-       *
-       * Do not pass upload.id.
-       */
       await deleteProjectHour(
         projectId,
         hour,
       );
 
-      /*
-       * Clear cached data for this
-       * project so it will reload
-       * when needed.
-       */
       setSavedAdsByProject(
         (previous) => {
           const next = {
@@ -1164,15 +1017,8 @@ export default function ProjectsPage() {
         },
       );
 
-      /*
-       * Reload lightweight project list.
-       */
       await loadProjects();
 
-      /*
-       * If history is still open,
-       * load it again.
-       */
       if (
         expandedUploadHistory[
           projectKey
@@ -1200,9 +1046,7 @@ export default function ProjectsPage() {
           : "Failed to delete this hour.",
       );
     } finally {
-      setDeletingHour(
-        null,
-      );
+      setDeletingHour(null);
     }
   }
 
@@ -1217,9 +1061,7 @@ export default function ProjectsPage() {
       project.id;
 
     const projectName =
-      getProjectName(
-        project,
-      );
+      getProjectName(project);
 
     try {
       const advertisements =
@@ -1278,29 +1120,28 @@ export default function ProjectsPage() {
   ============================================================ */
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-7xl">
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-5 sm:py-6 lg:px-6">
 
         {/* ======================================================
             HEADER
         ====================================================== */}
 
-        <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
+        <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
               Projects
             </h1>
 
-            <p className="mt-1 text-sm text-slate-500">
-              Manage your uploaded audio
-              projects and saved
-              advertisements.
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500 sm:text-sm">
+              Manage your uploaded audio projects
+              and saved advertisements.
             </p>
           </div>
 
           <Link
             href="/projects/new"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700 sm:w-auto"
           >
             <Plus size={18} />
             New Project
@@ -1311,106 +1152,92 @@ export default function ProjectsPage() {
             CALENDAR
         ====================================================== */}
 
-        <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:mb-6">
 
-          <div className="flex flex-col gap-4 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+          {/* CALENDAR HEADER */}
 
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-slate-100 p-2">
-                <CalendarDays
-                  size={20}
-                  className="text-slate-700"
-                />
+          <div className="border-b border-slate-200 p-3 sm:p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 sm:flex">
+                  <CalendarDays
+                    size={20}
+                    className="text-slate-700"
+                  />
+                </div>
+
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-slate-900 sm:text-base">
+                    Project Calendar
+                  </h2>
+
+                  <p className="mt-0.5 text-[11px] text-slate-500 sm:text-xs">
+                    Select a date to filter projects.
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <h2 className="font-semibold text-slate-900">
-                  Project Calendar
-                </h2>
-
-                <p className="text-xs text-slate-500">
-                  Showing the most recently created project date.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-
-              <button
-                type="button"
-                onClick={
-                  goToToday
-                }
-                className={[
-                  "rounded-lg border px-3 py-2 text-sm font-medium transition",
-                  selectedDate ===
-                    dateKey(
-                      new Date(),
-                    )
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-200 text-slate-700 hover:bg-slate-50",
-                ].join(" ")}
-              >
-                Today
-              </button>
-
-              {selectedDate && (
+              <div className="flex w-full gap-2 sm:w-auto">
                 <button
                   type="button"
-                  onClick={
-                    clearDateFilter
-                  }
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  onClick={goToToday}
+                  className={[
+                    "min-h-10 flex-1 rounded-lg border px-3 text-xs font-semibold transition sm:flex-none sm:text-sm",
+                    selectedDate ===
+                    dateKey(new Date())
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-200 text-slate-700 hover:bg-slate-50",
+                  ].join(" ")}
                 >
-                  <X size={15} />
-                  Clear
+                  Today
                 </button>
-              )}
+
+                {selectedDate && (
+                  <button
+                    type="button"
+                    onClick={clearDateFilter}
+                    className="inline-flex min-h-10 flex-1 items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 sm:flex-none sm:text-sm"
+                  >
+                    <X size={15} />
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="p-4">
+          <div className="p-2.5 sm:p-4">
 
             {/* MONTH NAVIGATION */}
 
-            <div className="mb-5 flex items-center justify-between">
-
+            <div className="mb-3 flex items-center justify-between sm:mb-5">
               <button
                 type="button"
-                onClick={
-                  goToPreviousMonth
-                }
-                className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100"
+                onClick={goToPreviousMonth}
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"
                 aria-label="Previous month"
               >
-                <ChevronLeft
-                  size={20}
-                />
+                <ChevronLeft size={20} />
               </button>
 
-              <h3 className="text-lg font-semibold text-slate-900">
+              <h3 className="text-sm font-bold text-slate-900 sm:text-lg">
                 {calendarDate.toLocaleDateString(
                   undefined,
                   {
-                    month:
-                      "long",
-                    year:
-                      "numeric",
+                    month: "long",
+                    year: "numeric",
                   },
                 )}
               </h3>
 
               <button
                 type="button"
-                onClick={
-                  goToNextMonth
-                }
-                className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100"
+                onClick={goToNextMonth}
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"
                 aria-label="Next month"
               >
-                <ChevronRight
-                  size={20}
-                />
+                <ChevronRight size={20} />
               </button>
             </div>
 
@@ -1425,217 +1252,209 @@ export default function ProjectsPage() {
                 "Thu",
                 "Fri",
                 "Sat",
-              ].map(
-                (day) => (
-                  <div
-                    key={day}
-                    className="text-center text-xs font-semibold uppercase text-slate-400"
-                  >
+              ].map((day) => (
+                <div
+                  key={day}
+                  className="text-center text-[9px] font-bold uppercase tracking-wide text-slate-400 sm:text-xs"
+                >
+                  <span className="sm:hidden">
+                    {day.slice(0, 1)}
+                  </span>
+
+                  <span className="hidden sm:inline">
                     {day}
-                  </div>
-                ),
-              )}
+                  </span>
+                </div>
+              ))}
             </div>
 
             {/* CALENDAR */}
 
-            <div className="mt-2 grid grid-cols-7 gap-1">
-              {calendarDays.map(
-                (day) => {
-                  const dayKeyValue =
-                    dateKey(day);
+            <div className="mt-1 grid grid-cols-7 gap-0.5 sm:mt-2 sm:gap-1">
+              {calendarDays.map((day) => {
+                const dayKeyValue =
+                  dateKey(day);
 
-                  const isCurrentMonth =
-                    day.getMonth() ===
-                    calendarDate.getMonth();
+                const isCurrentMonth =
+                  day.getMonth() ===
+                  calendarDate.getMonth();
 
-                  const isSelected =
-                    selectedDate ===
-                    dayKeyValue;
+                const isSelected =
+                  selectedDate ===
+                  dayKeyValue;
 
-                  const isToday =
-                    isSameDate(
-                      day,
-                      new Date(),
-                    );
+                const isToday =
+                  isSameDate(
+                    day,
+                    new Date(),
+                  );
 
-                  const projectsForDay =
-                    projects.filter(
-                      (project) => {
-                        const projectDate =
-                          getProjectDate(
-                            project,
-                          );
-
-                        return (
-                          projectDate &&
-                          dateKey(
-                            projectDate,
-                          ) ===
-                            dayKeyValue
+                const projectsForDay =
+                  projects.filter(
+                    (project) => {
+                      const projectDate =
+                        getProjectDate(
+                          project,
                         );
-                      },
-                    );
 
-                  const hasProjects =
-                    projectsForDay.length >
-                    0;
+                      return (
+                        projectDate &&
+                        dateKey(
+                          projectDate,
+                        ) ===
+                          dayKeyValue
+                      );
+                    },
+                  );
 
-                  return (
-                    <button
-                      type="button"
-                      key={
-                        dayKeyValue
-                      }
-                      onClick={() =>
-                        selectCalendarDate(
-                          day,
-                        )
-                      }
-                      className={[
-                        "relative min-h-[105px] overflow-hidden rounded-lg p-1.5 text-left transition sm:min-h-[120px]",
-                        isCurrentMonth
-                          ? "text-slate-700"
-                          : "text-slate-300",
-                        isSelected
-                          ? "bg-slate-900 text-white"
-                          : "hover:bg-slate-100",
-                        isToday &&
-                        !isSelected
-                          ? "ring-2 ring-inset ring-slate-400"
-                          : "",
-                      ].join(
-                        " ",
-                      )}
-                    >
+                const hasProjects =
+                  projectsForDay.length > 0;
 
-                      {/* DATE */}
+                return (
+                  <button
+                    type="button"
+                    key={dayKeyValue}
+                    onClick={() =>
+                      selectCalendarDate(
+                        day,
+                      )
+                    }
+                    className={[
+                      "relative min-h-[62px] overflow-hidden rounded-md p-1 text-left transition sm:min-h-[105px] sm:rounded-lg sm:p-1.5",
+                      isCurrentMonth
+                        ? "text-slate-700"
+                        : "text-slate-300",
+                      isSelected
+                        ? "bg-slate-900 text-white"
+                        : "hover:bg-slate-100",
+                      isToday &&
+                      !isSelected
+                        ? "ring-1 ring-inset ring-slate-400 sm:ring-2"
+                        : "",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={[
+                          "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold sm:h-7 sm:w-7 sm:text-xs",
+                          isToday &&
+                          !isSelected
+                            ? "bg-slate-200 text-slate-900"
+                            : "",
+                          isSelected
+                            ? "text-white"
+                            : "",
+                        ].join(" ")}
+                      >
+                        {day.getDate()}
+                      </span>
 
-                      <div className="flex items-center justify-between">
+                      {hasProjects && (
                         <span
                           className={[
-                            "flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold",
-                            isToday &&
-                            !isSelected
-                              ? "bg-slate-200 text-slate-900"
-                              : "",
+                            "mr-0.5 h-1.5 w-1.5 rounded-full sm:mr-1",
                             isSelected
-                              ? "text-white"
-                              : "",
-                          ].join(
-                            " ",
-                          )}
-                        >
-                          {
-                            day.getDate()
-                          }
-                        </span>
+                              ? "bg-white"
+                              : "bg-slate-700",
+                          ].join(" ")}
+                        />
+                      )}
+                    </div>
 
-                        {hasProjects && (
-                          <span
-                            className={[
-                              "mr-1 h-1.5 w-1.5 rounded-full",
-                              isSelected
-                                ? "bg-white"
-                                : "bg-slate-700",
-                            ].join(
-                              " ",
-                            )}
-                          />
-                        )}
-                      </div>
+                    {/* PROJECT NAMES */}
 
-                      {/* PROJECT NAMES */}
-
-                      <div className="mt-1 space-y-1">
-                        {projectsForDay
-                          .slice(
-                            0,
-                            3,
-                          )
-                          .map(
-                            (
+                    <div className="mt-1 space-y-0.5 sm:space-y-1">
+                      {projectsForDay
+                        .slice(0, 2)
+                        .map((project) => {
+                          const projectName =
+                            getProjectName(
                               project,
-                            ) => {
-                              const projectName =
-                                getProjectName(
-                                  project,
-                                );
+                            );
 
-                              return (
-                                <div
-                                  key={
-                                    project.id
-                                  }
-                                  title={
-                                    projectName
-                                  }
-                                  className={[
-                                    "flex min-w-0 items-center gap-1 rounded px-1.5 py-1 text-[9px] font-medium leading-tight",
-                                    isSelected
-                                      ? "bg-white/15 text-white"
-                                      : "bg-slate-100 text-slate-700",
-                                  ].join(
-                                    " ",
-                                  )}
-                                >
-                                  <span
-                                    className={[
-                                      "h-1.5 w-1.5 shrink-0 rounded-full",
-                                      isSelected
-                                        ? "bg-white"
-                                        : "bg-slate-700",
-                                    ].join(
-                                      " ",
-                                    )}
-                                  />
+                          return (
+                            <div
+                              key={
+                                project.id
+                              }
+                              title={
+                                projectName
+                              }
+                              className={[
+                                "hidden min-w-0 items-center gap-1 rounded px-1 py-1 text-[8px] font-medium leading-tight sm:flex sm:px-1.5 sm:text-[9px]",
+                                isSelected
+                                  ? "bg-white/15 text-white"
+                                  : "bg-slate-100 text-slate-700",
+                              ].join(" ")}
+                            >
+                              <span
+                                className={[
+                                  "h-1.5 w-1.5 shrink-0 rounded-full",
+                                  isSelected
+                                    ? "bg-white"
+                                    : "bg-slate-700",
+                                ].join(" ")}
+                              />
 
-                                  <span className="min-w-0 truncate">
-                                    {
-                                      projectName
-                                    }
-                                  </span>
-                                </div>
-                              );
-                            },
-                          )}
+                              <span className="min-w-0 truncate">
+                                {
+                                  projectName
+                                }
+                              </span>
+                            </div>
+                          );
+                        })}
 
-                        {projectsForDay.length >
-                          3 && (
-                          <div
-                            className={[
-                              "px-1.5 text-[9px] font-semibold",
-                              isSelected
-                                ? "text-white/70"
-                                : "text-slate-400",
-                            ].join(
-                              " ",
-                            )}
-                          >
-                            +
-                            {projectsForDay.length -
-                              3}{" "}
-                            more
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  );
-                },
-              )}
+                      {projectsForDay.length >
+                        2 && (
+                        <div
+                          className={[
+                            "hidden px-1.5 text-[8px] font-semibold sm:block sm:text-[9px]",
+                            isSelected
+                              ? "text-white/70"
+                              : "text-slate-400",
+                          ].join(" ")}
+                        >
+                          +
+                          {projectsForDay.length -
+                            2}{" "}
+                          more
+                        </div>
+                      )}
+
+                      {/* MOBILE PROJECT COUNT */}
+
+                      {hasProjects && (
+                        <div
+                          className={[
+                            "mt-1 text-[8px] font-semibold sm:hidden",
+                            isSelected
+                              ? "text-white/70"
+                              : "text-slate-400",
+                          ].join(" ")}
+                        >
+                          {projectsForDay.length}{" "}
+                          {projectsForDay.length ===
+                          1
+                            ? "project"
+                            : "projects"}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             {/* FILTER SUMMARY */}
 
-            <div className="mt-4 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-              <span className="text-slate-600">
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-[11px] sm:mt-4 sm:text-sm">
+              <span className="min-w-0 truncate text-slate-600">
                 {selectedDate ? (
                   <>
                     Showing{" "}
                     <strong className="text-slate-900">
-                      {
-                        selectedDateLabel
-                      }
+                      {selectedDateLabel}
                     </strong>
                   </>
                 ) : (
@@ -1648,34 +1467,27 @@ export default function ProjectsPage() {
                 )}
               </span>
 
-              <span className="font-semibold text-slate-900">
-                {
-                  filteredProjects.length
-                }
+              <span className="shrink-0 rounded-full bg-white px-2.5 py-1 font-bold text-slate-900 shadow-sm">
+                {filteredProjects.length}
               </span>
             </div>
           </div>
         </div>
 
         {/* ======================================================
-            LOADING
+            LOADING / EMPTY / PROJECTS
         ====================================================== */}
 
         {loading ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm sm:p-12">
             <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
 
             <p className="text-sm text-slate-500">
               Loading projects...
             </p>
           </div>
-        ) : filteredProjects.length ===
-          0 ? (
-
-          /* EMPTY */
-
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-
+        ) : filteredProjects.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center sm:p-12">
             <Layers
               size={42}
               className="mx-auto mb-4 text-slate-300"
@@ -1687,7 +1499,7 @@ export default function ProjectsPage() {
                 : "No projects yet"}
             </h2>
 
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
               {selectedDate
                 ? "Try selecting another date or clear the date filter."
                 : "Create your first project to get started."}
@@ -1699,7 +1511,7 @@ export default function ProjectsPage() {
                 onClick={
                   clearDateFilter
                 }
-                className="mt-5 inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 <X size={16} />
                 Clear Date Filter
@@ -1707,7 +1519,7 @@ export default function ProjectsPage() {
             ) : (
               <Link
                 href="/projects/new"
-                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+                className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
               >
                 <Plus size={16} />
                 Create Project
@@ -1715,29 +1527,25 @@ export default function ProjectsPage() {
             )}
           </div>
         ) : (
-
-          /* ====================================================
-             PROJECT GRID
-          ==================================================== */
-
           <>
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm text-slate-500">
+            {/* PROJECT COUNT */}
+
+            <div className="mb-3 flex items-center justify-between sm:mb-4">
+              <p className="text-xs text-slate-500 sm:text-sm">
                 Showing{" "}
-                <span className="font-semibold text-slate-900">
-                  {
-                    filteredProjects.length
-                  }
+                <span className="font-bold text-slate-900">
+                  {filteredProjects.length}
                 </span>{" "}
                 project
-                {filteredProjects.length !==
-                1
+                {filteredProjects.length !== 1
                   ? "s"
                   : ""}
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* PROJECT GRID */}
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
               {filteredProjects.map(
                 (project) => {
                   const projectId =
@@ -1770,16 +1578,9 @@ export default function ProjectsPage() {
                       projectId
                     ] === true;
 
-                  /*
-                   * Show COMPLETED,
-                   * PROCESSING and
-                   * CANCELLING.
-                   */
                   const visibleUploadHistory =
                     uploadHistory.filter(
-                      (
-                        upload,
-                      ) => {
+                      (upload) => {
                         const status =
                           String(
                             upload.status ||
@@ -1799,67 +1600,79 @@ export default function ProjectsPage() {
 
                   return (
                     <div
-                      key={
-                        projectId
-                      }
-                      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                      key={projectId}
+                      className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                     >
-
                       {/* PROJECT HEADER */}
 
-                      <div className="border-b border-slate-200 p-5">
-                        <div className="flex items-start justify-between gap-3">
+                      <div className="border-b border-slate-200 p-4 sm:p-5">
+                        <div className="flex min-w-0 items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
-                            <h2 className="break-words text-lg font-bold text-slate-900">
-                              {
-                                projectName
-                              }
+                            <h2 className="break-words text-base font-bold leading-6 text-slate-900 sm:text-lg">
+                              {projectName}
                             </h2>
 
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className="mt-1 text-[10px] text-slate-400 sm:text-xs">
                               Project ID:{" "}
-                              {
-                                project.id
-                              }
+                              {project.id}
                             </p>
                           </div>
+
+                          {projectDate && (
+                            <div className="hidden shrink-0 rounded-lg bg-slate-50 px-2.5 py-1.5 text-right sm:block">
+                              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                Created
+                              </p>
+
+                              <p className="mt-0.5 text-xs font-semibold text-slate-700">
+                                {projectDate.toLocaleDateString(
+                                  undefined,
+                                  {
+                                    month:
+                                      "short",
+                                    day:
+                                      "numeric",
+                                  },
+                                )}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
 
                       {/* COUNTS */}
 
-                      <div className="grid grid-cols-2 gap-3 p-5">
-
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <div className="mb-1 flex items-center gap-2 text-slate-500">
+                      <div className="grid grid-cols-2 gap-2.5 p-4 sm:gap-3 sm:p-5">
+                        <div className="rounded-xl bg-slate-50 p-3 sm:p-3.5">
+                          <div className="mb-1.5 flex items-center gap-2 text-slate-500">
                             <Layers
                               size={15}
                             />
 
-                            <span className="text-xs">
+                            <span className="text-[10px] font-medium sm:text-xs">
                               Segments
                             </span>
                           </div>
 
-                          <p className="text-xl font-bold text-slate-900">
+                          <p className="text-lg font-bold tabular-nums text-slate-900 sm:text-xl">
                             {project.total_segments ??
                               project.segment_count ??
                               0}
                           </p>
                         </div>
 
-                        <div className="rounded-xl bg-slate-50 p-3">
-                          <div className="mb-1 flex items-center gap-2 text-slate-500">
+                        <div className="rounded-xl bg-slate-50 p-3 sm:p-3.5">
+                          <div className="mb-1.5 flex items-center gap-2 text-slate-500">
                             <BookmarkCheck
                               size={15}
                             />
 
-                            <span className="text-xs">
+                            <span className="text-[10px] font-medium sm:text-xs">
                               Saved Ads
                             </span>
                           </div>
 
-                          <p className="text-xl font-bold text-slate-900">
+                          <p className="text-lg font-bold tabular-nums text-slate-900 sm:text-xl">
                             {loadingAds[
                               projectId
                             ]
@@ -1869,11 +1682,36 @@ export default function ProjectsPage() {
                         </div>
                       </div>
 
-                      {/* ==================================================
-                          UPLOAD HISTORY
-                      ================================================== */}
+                      {/* MOBILE DATE */}
 
-                      <div className="px-5 pb-5">
+                      {projectDate && (
+                        <div className="px-4 pb-3 sm:hidden">
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                            <CalendarDays
+                              size={13}
+                            />
+
+                            <span>
+                              Created{" "}
+                              {projectDate.toLocaleDateString(
+                                undefined,
+                                {
+                                  year:
+                                    "numeric",
+                                  month:
+                                    "short",
+                                  day:
+                                    "numeric",
+                                },
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* UPLOAD HISTORY */}
+
+                      <div className="px-4 pb-4 sm:px-5 sm:pb-5">
                         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
 
                           <button
@@ -1883,35 +1721,31 @@ export default function ProjectsPage() {
                                 project,
                               )
                             }
-                            className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-slate-50"
+                            className="flex min-h-12 w-full items-center justify-between gap-3 px-3.5 py-3 text-left transition-colors hover:bg-slate-50 sm:px-4"
                             aria-expanded={
                               isUploadHistoryExpanded
                             }
                           >
-                            <div className="flex items-center gap-2.5">
-
-                              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
                                 <Upload
-                                  size={
-                                    14
-                                  }
+                                  size={14}
                                   className="text-slate-600"
                                 />
                               </div>
 
-                              <div>
-                                <p className="text-xs font-semibold text-slate-800">
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-semibold text-slate-800 sm:text-xs">
                                   Upload History
                                 </p>
 
-                                <p className="text-[10px] text-slate-400">
+                                <p className="truncate text-[9px] text-slate-400 sm:text-[10px]">
                                   Uploads, segments and saved ads by hour
                                 </p>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
-
+                            <div className="flex shrink-0 items-center gap-2">
                               {loadingUploadStatuses[
                                 projectId
                               ] && (
@@ -1919,33 +1753,25 @@ export default function ProjectsPage() {
                               )}
 
                               <ChevronRight
-                                size={
-                                  16
-                                }
+                                size={16}
                                 className={[
                                   "text-slate-400 transition-transform duration-200",
                                   isUploadHistoryExpanded
                                     ? "rotate-90"
                                     : "",
-                                ].join(
-                                  " ",
-                                )}
+                                ].join(" ")}
                               />
                             </div>
                           </button>
 
                           {isUploadHistoryExpanded && (
                             <div className="border-t border-slate-100">
-
                               {visibleUploadHistory.length ===
                               0 ? (
-
                                 <div className="px-4 py-5 text-center">
                                   <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-50">
                                     <Upload
-                                      size={
-                                        14
-                                      }
+                                      size={14}
                                       className="text-slate-300"
                                     />
                                   </div>
@@ -1954,21 +1780,24 @@ export default function ProjectsPage() {
                                     No history
                                   </p>
 
-                                  <p className="mt-0.5 text-[10px] text-slate-400">
-                                    Completed, processing, or cancelling uploads will appear here.
+                                  <p className="mx-auto mt-1 max-w-xs text-[10px] leading-4 text-slate-400">
+                                    Completed,
+                                    processing,
+                                    or
+                                    cancelling
+                                    uploads
+                                    will
+                                    appear
+                                    here.
                                   </p>
                                 </div>
-
                               ) : (
-
                                 <div className="divide-y divide-slate-100">
-
                                   {visibleUploadHistory.map(
                                     (
                                       upload,
                                       index,
                                     ) => {
-
                                       const status =
                                         String(
                                           upload.status ||
@@ -2018,14 +1847,6 @@ export default function ProjectsPage() {
                                         deletingHour ===
                                         deleteKey;
 
-                                      /*
-                                       * Only PROCESSING
-                                       * and STARTING are
-                                       * protected.
-                                       *
-                                       * CANCELLING can
-                                       * be deleted.
-                                       */
                                       const cannotDelete =
                                         isDeleting ||
                                         isProcessing ||
@@ -2036,21 +1857,20 @@ export default function ProjectsPage() {
                                           key={
                                             uploadKey
                                           }
-                                          className="px-4 py-4"
+                                          className="px-3.5 py-4 sm:px-4"
                                         >
+                                          <div className="space-y-3">
 
-                                          <div className="flex flex-col gap-3">
+                                            {/* UPLOAD INFO */}
 
-                                            {/* TOP */}
+                                            <div className="flex min-w-0 items-start gap-2.5">
 
-                                            <div className="flex items-start gap-3">
-
-                                              <div className="w-[68px] shrink-0">
-                                                <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                                              <div className="w-14 shrink-0 sm:w-[68px]">
+                                                <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
                                                   Hour
                                                 </p>
 
-                                                <p className="mt-1 text-sm font-bold tabular-nums text-slate-700">
+                                                <p className="mt-1 text-xs font-bold tabular-nums text-slate-700 sm:text-sm">
                                                   {formatBroadcastHour(
                                                     upload.broadcast_hour,
                                                   )}
@@ -2060,12 +1880,12 @@ export default function ProjectsPage() {
                                               <div className="mt-1 h-10 w-px shrink-0 bg-slate-200" />
 
                                               <div className="min-w-0 flex-1">
-                                                <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                                                <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
                                                   Audio File
                                                 </p>
 
                                                 <p
-                                                  className="mt-1 break-words text-sm font-semibold leading-5 text-slate-800"
+                                                  className="mt-1 break-words text-xs font-semibold leading-5 text-slate-800 sm:text-sm"
                                                   title={
                                                     upload.filename ||
                                                     "Unknown file"
@@ -2075,7 +1895,7 @@ export default function ProjectsPage() {
                                                     "Unknown file"}
                                                 </p>
 
-                                                <p className="mt-1 text-[10px] text-slate-400">
+                                                <p className="mt-1 text-[9px] text-slate-400">
                                                   Broadcast Hour{" "}
                                                   {formatBroadcastHour(
                                                     upload.broadcast_hour,
@@ -2083,10 +1903,11 @@ export default function ProjectsPage() {
                                                 </p>
                                               </div>
 
-                                              <div className="shrink-0 pt-4">
+                                              {/* STATUS */}
 
+                                              <div className="shrink-0">
                                                 {isProcessing ? (
-                                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[10px] font-semibold text-amber-700">
+                                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-1.5 text-[9px] font-bold text-amber-700 sm:px-2.5 sm:text-[10px]">
                                                     <span className="relative flex h-1.5 w-1.5">
                                                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
 
@@ -2096,7 +1917,7 @@ export default function ProjectsPage() {
                                                     Processing
                                                   </span>
                                                 ) : isCancelling ? (
-                                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1.5 text-[10px] font-semibold text-orange-700">
+                                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-2 py-1.5 text-[9px] font-bold text-orange-700 sm:px-2.5 sm:text-[10px]">
                                                     <span className="relative flex h-1.5 w-1.5">
                                                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
 
@@ -2106,13 +1927,12 @@ export default function ProjectsPage() {
                                                     Cancelling
                                                   </span>
                                                 ) : (
-                                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-700">
+                                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[9px] font-bold text-emerald-700 sm:px-2.5 sm:text-[10px]">
                                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
 
                                                     Completed
                                                   </span>
                                                 )}
-
                                               </div>
                                             </div>
 
@@ -2131,11 +1951,11 @@ export default function ProjectsPage() {
 
                                             {/* ACTIONS */}
 
-                                            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                                            <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
 
                                               <div
                                                 className={[
-                                                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-semibold",
+                                                  "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-semibold",
                                                   savedAdCount >
                                                   0
                                                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -2145,9 +1965,7 @@ export default function ProjectsPage() {
                                                 )}
                                               >
                                                 <BookmarkCheck
-                                                  size={
-                                                    12
-                                                  }
+                                                  size={12}
                                                 />
 
                                                 {savedAdCount >
@@ -2161,45 +1979,46 @@ export default function ProjectsPage() {
                                                   : "No Saved Ads"}
                                               </div>
 
-                                              <Link
-                                                href={
-                                                  viewUrl
-                                                }
-                                                className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 transition hover:bg-slate-100"
-                                              >
-                                                <Eye
-                                                  size={
-                                                    13
+                                              <div className="grid grid-cols-2 gap-2 sm:ml-auto sm:flex">
+                                                <Link
+                                                  href={
+                                                    viewUrl
                                                   }
-                                                />
+                                                  className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-700 transition hover:bg-slate-100 sm:min-h-8 sm:px-2.5"
+                                                >
+                                                  <Eye
+                                                    size={
+                                                      13
+                                                    }
+                                                  />
 
-                                                View
-                                              </Link>
+                                                  View
+                                                </Link>
 
-                                              <button
-                                                type="button"
-                                                disabled={
-                                                  cannotDelete
-                                                }
-                                                onClick={() =>
-                                                  handleDeleteHour(
-                                                    project,
-                                                    upload,
-                                                  )
-                                                }
-                                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                              >
-                                                <Trash2
-                                                  size={
-                                                    13
+                                                <button
+                                                  type="button"
+                                                  disabled={
+                                                    cannotDelete
                                                   }
-                                                />
+                                                  onClick={() =>
+                                                    handleDeleteHour(
+                                                      project,
+                                                      upload,
+                                                    )
+                                                  }
+                                                  className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 text-[10px] font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-8 sm:px-2.5"
+                                                >
+                                                  <Trash2
+                                                    size={
+                                                      13
+                                                    }
+                                                  />
 
-                                                {isDeleting
-                                                  ? "Deleting..."
-                                                  : "Delete Hour"}
-                                              </button>
-
+                                                  {isDeleting
+                                                    ? "Deleting..."
+                                                    : "Delete Hour"}
+                                                </button>
+                                              </div>
                                             </div>
                                           </div>
                                         </div>
@@ -2215,15 +2034,12 @@ export default function ProjectsPage() {
 
                       {/* PROJECT DETAILS */}
 
-                      <div className="flex-1 px-5 pb-5">
+                      <div className="hidden flex-1 px-5 pb-5 sm:block">
                         <div className="space-y-2 text-xs text-slate-500">
-
                           {projectDate && (
                             <div className="flex items-center gap-2">
                               <CalendarDays
-                                size={
-                                  14
-                                }
+                                size={14}
                               />
 
                               <span>
@@ -2246,12 +2062,10 @@ export default function ProjectsPage() {
                           {project.upload_time && (
                             <div className="flex items-center gap-2">
                               <Clock
-                                size={
-                                  14
-                                }
+                                size={14}
                               />
 
-                              <span>
+                              <span className="truncate">
                                 Uploaded{" "}
                                 {
                                   project.upload_time
@@ -2259,17 +2073,15 @@ export default function ProjectsPage() {
                               </span>
                             </div>
                           )}
-
                         </div>
                       </div>
 
                       {/* ACTIONS */}
 
-                      <div className="grid grid-cols-2 gap-2 border-t border-slate-200 p-4">
-
+                      <div className="grid grid-cols-2 gap-2 border-t border-slate-200 p-3.5 sm:p-4">
                         <Link
                           href={`/projects/${project.id}`}
-                          className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 sm:text-sm"
                         >
                           Open Project
                         </Link>
@@ -2278,7 +2090,7 @@ export default function ProjectsPage() {
                           href={`/ad-editor/${project.id}?name=${encodeURIComponent(
                             projectName,
                           )}`}
-                          className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 sm:text-sm"
                         >
                           Edit Ads
                         </Link>
@@ -2294,7 +2106,7 @@ export default function ProjectsPage() {
                             downloading ===
                             project.id
                           }
-                          className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="col-span-2 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 text-xs font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
                         >
                           <Download
                             size={16}
@@ -2305,7 +2117,6 @@ export default function ProjectsPage() {
                             ? "Downloading..."
                             : "Download Saved Ads"}
                         </button>
-
                       </div>
                     </div>
                   );
