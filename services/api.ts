@@ -1,4 +1,3 @@
-
 import {
   getAccessToken,
   getTokenType,
@@ -76,11 +75,34 @@ export interface UploadStatus {
 }
 
 // ============================================================
+// DELETE PROJECT HOUR RESPONSE
+// ============================================================
+
+export interface DeleteProjectHourResponse {
+  success: boolean;
+
+  message: string;
+
+  project_id: number;
+
+  hour: number;
+
+  deleted: {
+    advertisements: number;
+
+    segments: number;
+
+    upload_history: number;
+  };
+}
+
+// ============================================================
 // AUTH HEADERS
 // ============================================================
 
 function getAuthHeaders(): HeadersInit {
   const token = getAccessToken();
+
   const tokenType = getTokenType();
 
   if (!token) {
@@ -136,13 +158,14 @@ async function authFetch(
     "================================"
   );
 
-  const response = await fetch(
-    url,
-    {
-      ...options,
-      headers,
-    }
-  );
+  const response =
+    await fetch(
+      url,
+      {
+        ...options,
+        headers,
+      }
+    );
 
   console.log(
     "================================"
@@ -313,6 +336,7 @@ export async function getProject(
 export async function createProject(
   data: {
     name: string;
+
     broadcast_date: string;
   }
 ) {
@@ -850,6 +874,16 @@ export async function deleteAdvertisementsByProject(
 // ============================================================
 // DELETE ADS BY PROJECT + HOUR
 // ============================================================
+//
+// NOTE:
+// This remains available for places that specifically need
+// advertisement-only deletion.
+//
+// DO NOT use this for the Projects page "Delete Hour" button.
+//
+// Use deleteProjectHour() below for the complete deletion.
+//
+// ============================================================
 
 export async function deleteAdvertisementsByProjectHour(
   projectId: number,
@@ -906,6 +940,139 @@ export async function deleteAdvertisementsByProjectHour(
   }
 
   return res.json();
+}
+
+// ============================================================
+// DELETE ENTIRE PROJECT HOUR
+// ============================================================
+//
+// IMPORTANT:
+//
+// This is the function to use for the Projects page
+// "Delete Hour" button.
+//
+// Backend handles:
+//
+//   - Saved advertisements
+//   - New advertisements
+//   - Transcript segments
+//   - UploadStatus history
+//   - Upload session cleanup
+//
+// All deletion is performed by ONE backend request.
+//
+// Backend endpoint:
+//
+// DELETE /upload/hour/{projectId}/{hour}
+//
+// ============================================================
+
+export async function deleteProjectHour(
+  projectId: number,
+  hour: number
+): Promise<DeleteProjectHourResponse> {
+  console.log(
+    "================================"
+  );
+
+  console.log(
+    "DELETE PROJECT HOUR API"
+  );
+
+  console.log(
+    "Project ID:",
+    projectId
+  );
+
+  console.log(
+    "Hour:",
+    hour
+  );
+
+  const url =
+    `${API_URL}/upload/hour/${projectId}/${hour}`;
+
+  console.log(
+    "DELETE PROJECT HOUR URL:",
+    url
+  );
+
+  console.log(
+    "================================"
+  );
+
+  const res =
+    await authFetch(
+      url,
+      {
+        method: "DELETE",
+      }
+    );
+
+  console.log(
+    "DELETE PROJECT HOUR RESPONSE:",
+    res.status
+  );
+
+  if (!res.ok) {
+    let message =
+      "Failed to delete project hour";
+
+    try {
+      const contentType =
+        res.headers.get(
+          "content-type"
+        ) || "";
+
+      if (
+        contentType.includes(
+          "application/json"
+        )
+      ) {
+        const data =
+          await res.json();
+
+        message =
+          data?.detail ||
+          data?.message ||
+          message;
+      } else {
+        const text =
+          await res.text();
+
+        if (text) {
+          message = text;
+        }
+      }
+    } catch {
+      // Keep default message.
+    }
+
+    console.error(
+      "DELETE PROJECT HOUR FAILED:",
+      {
+        projectId,
+        hour,
+        status:
+          res.status,
+        message,
+      }
+    );
+
+    throw new Error(
+      message
+    );
+  }
+
+  const data =
+    await res.json();
+
+  console.log(
+    "DELETE PROJECT HOUR SUCCESS:",
+    data
+  );
+
+  return data;
 }
 
 // ============================================================
@@ -1225,16 +1392,6 @@ export async function cancelUpload(
     "================================"
   );
 
-  // IMPORTANT:
-  // Backend cancellation endpoint is POST:
-  //
-  // POST /upload/status-record/{id}/cancel
-  //
-  // The previous frontend code incorrectly used:
-  //
-  // DELETE /upload/status-record/{id}
-  //
-
   const res =
     await authFetch(
       `${API_URL}/upload/status-record/${uploadStatusId}/cancel`,
@@ -1295,6 +1452,17 @@ export async function cancelUpload(
 
 // ============================================================
 // DELETE UPLOAD HISTORY
+// ============================================================
+//
+// This deletes ONLY the UploadStatus history record.
+//
+// It does NOT delete:
+// - advertisements
+// - transcript segments
+//
+// For the Projects page Delete Hour button,
+// use deleteProjectHour() instead.
+//
 // ============================================================
 
 export async function deleteUploadHistory(
@@ -1598,7 +1766,9 @@ export async function getKeywordsByBrand(
 export async function createKeyword(
   data: {
     brand_id: number;
+
     keyword: string;
+
     duration?: number | null;
   }
 ) {
@@ -1639,7 +1809,9 @@ export async function updateKeyword(
   id: number,
   data: {
     brand_id?: number;
+
     keyword?: string;
+
     duration?: number | null;
   }
 ) {
