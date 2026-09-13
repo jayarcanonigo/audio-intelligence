@@ -134,6 +134,13 @@ export default function AdEditorPage() {
     useState<number | null>(null);
 
   // ============================================================
+  // ROLE / ADMIN STATE
+  // ============================================================
+
+  const [isAdmin, setIsAdmin] =
+    useState(false);
+
+  // ============================================================
   // COPY PART STATE
   // ============================================================
 
@@ -559,6 +566,33 @@ export default function AdEditorPage() {
         checkScreen
       );
   }, []);
+
+  // ============================================================
+  // ROLE CHECK
+  // ============================================================
+
+  useEffect(() => {
+    const role =
+      typeof window !== "undefined"
+        ? localStorage.getItem("role")
+        : null;
+
+    setIsAdmin(
+      String(role || "")
+        .trim()
+        .toUpperCase() === "ADMIN"
+    );
+  }, []);
+
+  // ============================================================
+  // FORCE NON-ADMINS ONTO SEGMENTS TAB
+  // ============================================================
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setMobileTab("segments");
+    }
+  }, [isAdmin]);
 
   // ============================================================
   // LOAD
@@ -3639,7 +3673,7 @@ export default function AdEditorPage() {
       {isMobile ? (
         <div className="pb-48">
           {mobileTab ===
-          "logs" ? (
+            "logs" && isAdmin ? (
             <div className="rounded-xl bg-white p-4 shadow-sm">
               {/* LIVE LOG HEADER */}
 
@@ -3761,80 +3795,88 @@ export default function AdEditorPage() {
         <div className="grid grid-cols-12 gap-6 pb-48 pt-6">
           {/* LOGS */}
 
-          <div className="col-span-5">
-            <div className="rounded-xl bg-white p-5 shadow-sm">
-              <div className="mb-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-semibold text-gray-800">
-                    Live Logs
-                  </h2>
+          {isAdmin && (
+            <div className="col-span-5">
+              <div className="rounded-xl bg-white p-5 shadow-sm">
+                <div className="mb-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-semibold text-gray-800">
+                      Live Logs
+                    </h2>
 
-                  {copyParts.length >
-                    0 && (
-                    <span className="text-xs text-gray-400">
-                      {
-                        copyParts.length
-                      }{" "}
-                      part
-                      {copyParts.length !==
-                      1
-                        ? "s"
-                        : ""}
-                    </span>
-                  )}
+                    {copyParts.length >
+                      0 && (
+                      <span className="text-xs text-gray-400">
+                        {
+                          copyParts.length
+                        }{" "}
+                        part
+                        {copyParts.length !==
+                        1
+                          ? "s"
+                          : ""}
+                      </span>
+                    )}
+                  </div>
+
+                  <CopyPartButtons />
                 </div>
 
-                <CopyPartButtons />
+                <LiveLogs
+                  logs={logs}
+                  disabledLogs={
+                    disabledLogs
+                  }
+                  selectedP1Id={
+                    selectedP1Id
+                  }
+                  selectedP2Id={
+                    selectedP2Id
+                  }
+                  currentAudioTime={
+                    currentAudioTime
+                  }
+                  logRefs={
+                    logRefs
+                  }
+                  selectedLogId={
+                    selectedLogId
+                  }
+                  setSelectedLogId={
+                    setSelectedLogId
+                  }
+                  setPhrase1={
+                    setPhrase1
+                  }
+                  setPhrase2={
+                    setPhrase2
+                  }
+                  setSelectedP1Id={
+                    setSelectedP1Id
+                  }
+                  setSelectedP2Id={
+                    setSelectedP2Id
+                  }
+                  onPlay={
+                    handlePlaySegment
+                  }
+                  onAddSingle={
+                    handleAddSingle
+                  }
+                />
               </div>
-
-              <LiveLogs
-                logs={logs}
-                disabledLogs={
-                  disabledLogs
-                }
-                selectedP1Id={
-                  selectedP1Id
-                }
-                selectedP2Id={
-                  selectedP2Id
-                }
-                currentAudioTime={
-                  currentAudioTime
-                }
-                logRefs={
-                  logRefs
-                }
-                selectedLogId={
-                  selectedLogId
-                }
-                setSelectedLogId={
-                  setSelectedLogId
-                }
-                setPhrase1={
-                  setPhrase1
-                }
-                setPhrase2={
-                  setPhrase2
-                }
-                setSelectedP1Id={
-                  setSelectedP1Id
-                }
-                setSelectedP2Id={
-                  setSelectedP2Id
-                }
-                onPlay={
-                  handlePlaySegment
-                }
-                onAddSingle={
-                  handleAddSingle
-                }
-              />
             </div>
-          </div>
+          )}
 
           {/* SEGMENTS */}
 
-          <div className="col-span-7">
+          <div
+            className={
+              isAdmin
+                ? "col-span-7"
+                : "col-span-12"
+            }
+          >
             <div className="rounded-xl bg-white p-5 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="font-semibold text-gray-800">
@@ -4021,30 +4063,32 @@ export default function AdEditorPage() {
               <div className="flex items-center gap-2">
                 {/* LOGS / SEGMENTS */}
 
-                <button
-                  onClick={
-                    toggleMobileTab
-                  }
-                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-700 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-800 active:scale-[0.98]"
-                >
-                  <span>
-                    {mobileTab ===
-                    "logs"
-                      ? "📝"
-                      : "🎧"}
-                  </span>
+                {isAdmin && (
+                  <button
+                    onClick={
+                      toggleMobileTab
+                    }
+                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-700 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-800 active:scale-[0.98]"
+                  >
+                    <span>
+                      {mobileTab ===
+                      "logs"
+                        ? "📝"
+                        : "🎧"}
+                    </span>
 
-                  <span>
-                    {mobileTab ===
-                    "logs"
-                      ? "Logs"
-                      : "Segments"}
-                  </span>
+                    <span>
+                      {mobileTab ===
+                      "logs"
+                        ? "Logs"
+                        : "Segments"}
+                    </span>
 
-                  <span className="text-[10px] opacity-70">
-                    ⇄
-                  </span>
-                </button>
+                    <span className="text-[10px] opacity-70">
+                      ⇄
+                    </span>
+                  </button>
+                )}
 
                 {/* LAST */}
 
@@ -4065,20 +4109,22 @@ export default function AdEditorPage() {
 
                 {/* REPROCESS */}
 
-                <button
-                  onClick={
-                    handleReprocessAds
-                  }
-                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
-                >
-                  <RefreshCw
-                    size={15}
-                  />
+                {isAdmin && (
+                  <button
+                    onClick={
+                      handleReprocessAds
+                    }
+                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+                  >
+                    <RefreshCw
+                      size={15}
+                    />
 
-                  <span>
-                    Reprocess
-                  </span>
-                </button>
+                    <span>
+                      Reprocess
+                    </span>
+                  </button>
+                )}
 
                 {/* MORE */}
 
@@ -4103,49 +4149,53 @@ export default function AdEditorPage() {
                     <div className="absolute bottom-11 right-0 w-60 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
                       {/* UPLOAD JSON */}
 
-                      <button
-                        onClick={() => {
-                          setShowJsonImport(
-                            true
-                          );
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setShowJsonImport(
+                              true
+                            );
 
-                          setShowMenu(
-                            false
-                          );
-                        }}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-                      >
-                        <FileJson
-                          size={16}
-                        />
+                            setShowMenu(
+                              false
+                            );
+                          }}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                        >
+                          <FileJson
+                            size={16}
+                          />
 
-                        Upload JSON
-                      </button>
+                          Upload JSON
+                        </button>
+                      )}
 
                       {/* ADD */}
 
-                      <button
-                        onClick={() => {
-                          handleAddRange();
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            handleAddRange();
 
-                          setShowMenu(
-                            false
-                          );
-                        }}
-                        disabled={
-                          selectedP1Id ===
-                            null ||
-                          selectedP2Id ===
-                            null
-                        }
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Plus
-                          size={16}
-                        />
+                            setShowMenu(
+                              false
+                            );
+                          }}
+                          disabled={
+                            selectedP1Id ===
+                              null ||
+                            selectedP2Id ===
+                              null
+                          }
+                          className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Plus
+                            size={16}
+                          />
 
-                        Add Segment
-                      </button>
+                          Add Segment
+                        </button>
+                      )}
 
                       {/* SAVE */}
 
@@ -4197,26 +4247,28 @@ export default function AdEditorPage() {
 
                       {/* DELETE */}
 
-                      <button
-                        onClick={() => {
-                          handleDeleteAllAdvertisements();
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            handleDeleteAllAdvertisements();
 
-                          setShowMenu(
-                            false
-                          );
-                        }}
-                        disabled={
-                          results.length ===
-                          0
-                        }
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Trash2
-                          size={16}
-                        />
+                            setShowMenu(
+                              false
+                            );
+                          }}
+                          disabled={
+                            results.length ===
+                            0
+                          }
+                          className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Trash2
+                            size={16}
+                          />
 
-                        Delete All
-                      </button>
+                          Delete All
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -4251,48 +4303,52 @@ export default function AdEditorPage() {
 
                   {/* ADD */}
 
-                  <button
-                    onClick={
-                      handleAddRange
-                    }
-                    disabled={
-                      selectedP1Id ===
-                        null ||
-                      selectedP2Id ===
-                        null
-                    }
-                    className={`flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-sm transition active:scale-[0.98] ${
-                      selectedP1Id !==
-                        null &&
-                      selectedP2Id !==
-                        null
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "cursor-not-allowed bg-gray-200 text-gray-400"
-                    }`}
-                  >
-                    <Plus
-                      size={14}
-                    />
+                  {isAdmin && (
+                    <button
+                      onClick={
+                        handleAddRange
+                      }
+                      disabled={
+                        selectedP1Id ===
+                          null ||
+                        selectedP2Id ===
+                          null
+                      }
+                      className={`flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-sm transition active:scale-[0.98] ${
+                        selectedP1Id !==
+                          null &&
+                        selectedP2Id !==
+                          null
+                          ? "bg-blue-600 text-white hover:bg-blue-700"
+                          : "cursor-not-allowed bg-gray-200 text-gray-400"
+                      }`}
+                    >
+                      <Plus
+                        size={14}
+                      />
 
-                    Add
-                  </button>
+                      Add
+                    </button>
+                  )}
 
                   {/* UPLOAD JSON */}
 
-                  <button
-                    onClick={() =>
-                      setShowJsonImport(
-                        true
-                      )
-                    }
-                    className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
-                  >
-                    <FileJson
-                      size={14}
-                    />
+                  {isAdmin && (
+                    <button
+                      onClick={() =>
+                        setShowJsonImport(
+                          true
+                        )
+                      }
+                      className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
+                    >
+                      <FileJson
+                        size={14}
+                      />
 
-                    Upload JSON
-                  </button>
+                      Upload JSON
+                    </button>
+                  )}
                 </div>
 
                 {/* RIGHT */}
@@ -4300,18 +4356,20 @@ export default function AdEditorPage() {
                 <div className="flex items-center gap-2">
                   {/* REPROCESS */}
 
-                  <button
-                    onClick={
-                      handleReprocessAds
-                    }
-                    className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
-                  >
-                    <RefreshCw
-                      size={14}
-                    />
+                  {isAdmin && (
+                    <button
+                      onClick={
+                        handleReprocessAds
+                      }
+                      className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+                    >
+                      <RefreshCw
+                        size={14}
+                      />
 
-                    Reprocess
-                  </button>
+                      Reprocess
+                    </button>
+                  )}
 
                   {/* SAVE */}
 
@@ -4353,22 +4411,24 @@ export default function AdEditorPage() {
 
                   {/* DELETE */}
 
-                  <button
-                    onClick={
-                      handleDeleteAllAdvertisements
-                    }
-                    disabled={
-                      results.length ===
-                      0
-                    }
-                    className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-                  >
-                    <Trash2
-                      size={14}
-                    />
+                  {isAdmin && (
+                    <button
+                      onClick={
+                        handleDeleteAllAdvertisements
+                      }
+                      disabled={
+                        results.length ===
+                        0
+                      }
+                      className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                    >
+                      <Trash2
+                        size={14}
+                      />
 
-                    Delete
-                  </button>
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
