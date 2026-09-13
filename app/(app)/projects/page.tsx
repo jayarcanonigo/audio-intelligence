@@ -1,12 +1,15 @@
-
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+
 import Link from "next/link";
+
 import {
   BookmarkCheck,
   CalendarDays,
@@ -27,8 +30,13 @@ import {
   getAdvertisements,
   getProjects,
   getUploadStatuses,
+  type Advertisement,
   type UploadStatus,
 } from "@/services/api";
+
+/* ============================================================
+   TYPES
+============================================================ */
 
 type Project = {
   id: number;
@@ -41,20 +49,12 @@ type Project = {
   segment_count?: number;
 };
 
-type SavedAdView = {
-  id?: number | string;
-  start_time?: string | null;
-  end_time?: string | null;
-  start?: string | null;
-  end?: string | null;
+type SavedAdView = Advertisement & {
   duration?: number | string | null;
   actual_length?: string | null;
   brand?: string | null;
-  brand_name?: string | null;
-  text?: string | null;
   complete_text?: string | null;
   copyline?: string | null;
-  status?: string | null;
   is_saved?: boolean;
   saved?: boolean;
 };
@@ -63,35 +63,60 @@ type SavedAdView = {
    TIME HELPERS
 ============================================================ */
 
-function timeToSeconds(value?: string | null): number {
-  if (!value) return 0;
+function timeToSeconds(
+  value?: string | null,
+): number {
+  if (!value) {
+    return 0;
+  }
 
-  const parts = value.split(":").map(Number);
+  const parts = value
+    .split(":")
+    .map(Number);
 
   if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return (
+      parts[0] * 3600 +
+      parts[1] * 60 +
+      parts[2]
+    );
   }
 
   if (parts.length === 2) {
-    return parts[0] * 60 + parts[1];
+    return (
+      parts[0] * 60 +
+      parts[1]
+    );
   }
 
   return Number(value) || 0;
 }
 
-function secondsToTime(totalSeconds: number): string {
-  const seconds = Math.max(0, Math.round(totalSeconds));
+function secondsToTime(
+  totalSeconds: number,
+): string {
+  const seconds = Math.max(
+    0,
+    Math.round(totalSeconds),
+  );
 
-  const hours = Math.floor(seconds / 3600);
+  const hours = Math.floor(
+    seconds / 3600,
+  );
 
-  const minutes = Math.floor((seconds % 3600) / 60);
+  const minutes = Math.floor(
+    (seconds % 3600) / 60,
+  );
 
-  const remainingSeconds = seconds % 60;
+  const remainingSeconds =
+    seconds % 60;
 
   return [
     String(hours).padStart(2, "0"),
     String(minutes).padStart(2, "0"),
-    String(remainingSeconds).padStart(2, "0"),
+    String(
+      remainingSeconds,
+    ).padStart(2, "0"),
   ].join(":");
 }
 
@@ -105,13 +130,16 @@ function calculateDuration(
     duration !== null &&
     duration !== ""
   ) {
-    const parsedDuration = Number(duration);
+    const parsedDuration =
+      Number(duration);
 
     if (
       !Number.isNaN(parsedDuration) &&
       parsedDuration > 0
     ) {
-      return Math.round(parsedDuration);
+      return Math.round(
+        parsedDuration,
+      );
     }
   }
 
@@ -122,7 +150,8 @@ function calculateDuration(
   return Math.max(
     0,
     Math.round(
-      timeToSeconds(end) - timeToSeconds(start),
+      timeToSeconds(end) -
+        timeToSeconds(start),
     ),
   );
 }
@@ -131,7 +160,9 @@ function calculateEndTime(
   start?: string | null,
   duration?: number | string | null,
 ): string {
-  if (!start) return "";
+  if (!start) {
+    return "";
+  }
 
   return secondsToTime(
     timeToSeconds(start) +
@@ -139,7 +170,9 @@ function calculateEndTime(
   );
 }
 
-function cleanText(value?: string | null): string {
+function cleanText(
+  value?: string | null,
+): string {
   return String(value ?? "")
     .replace(/\s+/g, " ")
     .trim();
@@ -149,8 +182,11 @@ function cleanText(value?: string | null): string {
    DATE HELPERS
 ============================================================ */
 
-function dateKey(date: Date): string {
-  const year = date.getFullYear();
+function dateKey(
+  date: Date,
+): string {
+  const year =
+    date.getFullYear();
 
   const month = String(
     date.getMonth() + 1,
@@ -163,12 +199,16 @@ function dateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function parseDateKey(value: string): Date {
+function parseDateKey(
+  value: string,
+): Date {
   const [
     year,
     month,
     day,
-  ] = value.split("-").map(Number);
+  ] = value
+    .split("-")
+    .map(Number);
 
   return new Date(
     year,
@@ -181,34 +221,41 @@ function isSameDate(
   first: Date,
   second: Date,
 ): boolean {
-  return dateKey(first) === dateKey(second);
+  return (
+    dateKey(first) ===
+    dateKey(second)
+  );
 }
 
 function getCalendarDays(
   monthDate: Date,
 ): Date[] {
-  const firstDayOfMonth = new Date(
-    monthDate.getFullYear(),
-    monthDate.getMonth(),
-    1,
-  );
+  const firstDayOfMonth =
+    new Date(
+      monthDate.getFullYear(),
+      monthDate.getMonth(),
+      1,
+    );
 
   const firstDayIndex =
     firstDayOfMonth.getDay();
 
-  const calendarStart = new Date(
-    monthDate.getFullYear(),
-    monthDate.getMonth(),
-    1 - firstDayIndex,
-  );
+  const calendarStart =
+    new Date(
+      monthDate.getFullYear(),
+      monthDate.getMonth(),
+      1 - firstDayIndex,
+    );
 
   return Array.from(
     { length: 42 },
     (_, index) => {
-      const day = new Date(calendarStart);
+      const day =
+        new Date(calendarStart);
 
       day.setDate(
-        calendarStart.getDate() + index,
+        calendarStart.getDate() +
+          index,
       );
 
       return day;
@@ -243,7 +290,11 @@ function getProjectDate(
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
     return null;
   }
 
@@ -257,10 +308,92 @@ function getProjectDate(
 function isSavedAdvertisement(
   ad: SavedAdView,
 ): boolean {
+  const status = String(
+    ad.status ?? "",
+  ).toUpperCase();
+
   return (
-    ad.status === "SAVED" ||
+    status === "SAVED" ||
     ad.is_saved === true ||
     ad.saved === true
+  );
+}
+
+function normalizeAdvertisements(
+  response: unknown,
+): SavedAdView[] {
+  if (Array.isArray(response)) {
+    return response as SavedAdView[];
+  }
+
+  if (
+    response &&
+    typeof response === "object"
+  ) {
+    const data =
+      response as Record<
+        string,
+        unknown
+      >;
+
+    const candidates = [
+      data.advertisements,
+      data.ads,
+      data.data,
+      data.items,
+    ];
+
+    const arrayResult =
+      candidates.find(
+        Array.isArray,
+      );
+
+    if (Array.isArray(arrayResult)) {
+      return arrayResult as SavedAdView[];
+    }
+  }
+
+  return [];
+}
+
+function getAdStart(
+  ad: SavedAdView,
+): string {
+  return (
+    ad.start_time ||
+    ad.start ||
+    ""
+  );
+}
+
+function getAdEnd(
+  ad: SavedAdView,
+): string {
+  return (
+    ad.end_time ||
+    ad.end ||
+    ""
+  );
+}
+
+function getAdBrand(
+  ad: SavedAdView,
+): string {
+  return (
+    ad.brand ||
+    ad.brand_name ||
+    "Unknown Advertisement"
+  );
+}
+
+function getAdText(
+  ad: SavedAdView,
+): string {
+  return cleanText(
+    ad.text ||
+      ad.complete_text ||
+      ad.copyline ||
+      "",
   );
 }
 
@@ -269,31 +402,91 @@ function getSavedAdsForHour(
   broadcastHour?: number | null,
 ): SavedAdView[] {
   if (
-    broadcastHour === undefined ||
-    broadcastHour === null
+    broadcastHour ===
+      undefined ||
+    broadcastHour === null ||
+    !Number.isFinite(
+      Number(broadcastHour),
+    )
   ) {
     return [];
   }
 
-  const expectedHour = String(
-    Number(broadcastHour),
-  ).padStart(2, "0");
+  const expectedHour =
+    String(
+      Number(broadcastHour),
+    ).padStart(2, "0");
 
-  return advertisements.filter((ad) => {
-    const start =
-      ad.start_time || ad.start;
+  return advertisements.filter(
+    (ad) => {
+      const start =
+        getAdStart(ad);
 
-    if (!start) {
-      return false;
-    }
+      if (!start) {
+        return false;
+      }
 
-    const hour = start.split(":")[0];
+      const match =
+        String(start).match(
+          /(?:^|T|\s)(\d{1,2}):\d{2}(?::\d{2})?/,
+        );
 
-    return (
-      String(Number(hour)).padStart(2, "0") ===
-      expectedHour
-    );
-  });
+      if (!match) {
+        return false;
+      }
+
+      const hour =
+        String(
+          Number(match[1]),
+        ).padStart(2, "0");
+
+      return (
+        hour === expectedHour
+      );
+    },
+  );
+}
+
+function getSavedAdHours(
+  advertisements: SavedAdView[],
+): number[] {
+  const hours =
+    new Set<number>();
+
+  advertisements.forEach(
+    (ad) => {
+      const start =
+        getAdStart(ad);
+
+      if (!start) {
+        return;
+      }
+
+      const match =
+        String(start).match(
+          /(?:^|T|\s)(\d{1,2}):\d{2}(?::\d{2})?/,
+        );
+
+      if (!match) {
+        return;
+      }
+
+      const hour =
+        Number(match[1]);
+
+      if (
+        Number.isFinite(hour) &&
+        hour >= 0 &&
+        hour <= 23
+      ) {
+        hours.add(hour);
+      }
+    },
+  );
+
+  return Array.from(hours).sort(
+    (a, b) => a - b,
+  );
 }
 
 /* ============================================================
@@ -305,134 +498,127 @@ function formatBroadcastHour(
 ): string {
   if (
     hour === null ||
-    hour === undefined
+    hour === undefined ||
+    !Number.isFinite(
+      Number(hour),
+    )
   ) {
     return "--:--";
   }
 
-  return `${String(hour).padStart(2, "0")}:00`;
+  return `${String(
+    Number(hour),
+  ).padStart(2, "0")}:00`;
 }
 
 /* ============================================================
-   CSV DOWNLOAD
+   CSV
 ============================================================ */
 
-async function createCsvDownload(
+function downloadCsv(
   projectName: string,
   advertisements: SavedAdView[],
-  projectId: number,
-  setDownloading: React.Dispatch<
-    React.SetStateAction<string | number | null>
-  >,
-) {
-  try {
-    setDownloading(projectId);
+): void {
+  const headers = [
+    "START",
+    "END",
+    "Duration",
+    "AD NAME",
+    "COMPLETE TEXT",
+  ];
 
-    const headers = [
-      "START",
-      "END",
-      "Duration",
-      "AD NAME",
-      "COMPLETE TEXT",
-    ];
+  const rows =
+    advertisements.map(
+      (ad) => {
+        const start =
+          getAdStart(ad);
 
-    const rows = advertisements.map((ad) => {
-      const start =
-        ad.start_time ||
-        ad.start ||
-        "";
+        const duration =
+          calculateDuration(
+            start,
+            getAdEnd(ad),
+            ad.duration ||
+              ad.actual_length,
+          );
 
-      const duration =
-        calculateDuration(
+        const end =
+          getAdEnd(ad) ||
+          calculateEndTime(
+            start,
+            duration,
+          );
+
+        const brand =
+          getAdBrand(ad);
+
+        const completeText =
+          getAdText(ad);
+
+        return [
           start,
-          ad.end_time ||
-            ad.end,
-          ad.duration ||
-            ad.actual_length,
-        );
-
-      const end =
-        ad.end_time ||
-        ad.end ||
-        calculateEndTime(
-          start,
-          duration,
-        );
-
-      const brand =
-        ad.brand ||
-        ad.brand_name ||
-        "Unknown Advertisement";
-
-      const completeText =
-        cleanText(
-          ad.text ||
-            ad.complete_text ||
-            ad.copyline ||
-            "",
-        );
-
-      return [
-        start,
-        end,
-        `${duration}s`,
-        brand,
-        completeText,
-      ];
-    });
-
-    const csvRows = [
-      headers,
-      ...rows,
-    ].map((row) =>
-      row
-        .map((value) => {
-          const text = String(value ?? "");
-
-          return `"${text.replace(
-            /"/g,
-            '""',
-          )}"`;
-        })
-        .join(","),
-    );
-
-    const blob = new Blob(
-      [csvRows.join("\n")],
-      {
-        type: "text/csv;charset=utf-8;",
+          end,
+          `${duration}s`,
+          brand,
+          completeText,
+        ];
       },
     );
 
-    const url =
-      URL.createObjectURL(blob);
+  const csvRows = [
+    headers,
+    ...rows,
+  ].map((row) =>
+    row
+      .map((value) => {
+        const text =
+          String(value ?? "");
 
-    const link =
-      document.createElement("a");
+        return `"${text.replace(
+          /"/g,
+          '""',
+        )}"`;
+      })
+      .join(","),
+  );
 
-    link.href = url;
+  const blob = new Blob(
+    [csvRows.join("\n")],
+    {
+      type:
+        "text/csv;charset=utf-8;",
+    },
+  );
 
-    link.download =
-      `${projectName
-        .replace(
-          /[^a-z0-9]+/gi,
-          "_",
-        )
-        .replace(
-          /^_+|_+$/g,
-          "",
-        )}_saved_ads.csv`;
+  const url =
+    URL.createObjectURL(blob);
 
-    document.body.appendChild(link);
+  const link =
+    document.createElement("a");
 
-    link.click();
+  link.href = url;
 
-    document.body.removeChild(link);
+  link.download =
+    `${projectName
+      .replace(
+        /[^a-z0-9]+/gi,
+        "_",
+      )
+      .replace(
+        /^_+|_+$/g,
+        "",
+      )}_saved_ads.csv`;
 
-    URL.revokeObjectURL(url);
-  } finally {
-    setDownloading(null);
-  }
+  document.body.appendChild(
+    link,
+  );
+
+  link.click();
+
+  document.body.removeChild(
+    link,
+  );
+
+  URL.revokeObjectURL(url);
 }
 
 /* ============================================================
@@ -488,9 +674,9 @@ export default function ProjectsPage() {
   const [
     downloading,
     setDownloading,
-  ] = useState<string | number | null>(
-    null,
-  );
+  ] = useState<
+    string | number | null
+  >(null);
 
   const [
     deletingHour,
@@ -507,272 +693,454 @@ export default function ProjectsPage() {
   const [
     selectedDate,
     setSelectedDate,
-  ] = useState<string | null>(null);
+  ] = useState<string | null>(
+    null,
+  );
+
+  const loadingAdsRef =
+    useRef<
+      Record<string, boolean>
+    >({});
 
   /* ============================================================
      LOAD PROJECTS
   ============================================================ */
 
-  async function loadProjects() {
-    try {
-      setLoading(true);
+  const loadProjects =
+    useCallback(async () => {
+      try {
+        setLoading(true);
 
-      const response =
-        await getProjects();
+        const response =
+          await getProjects();
 
-      const projectList =
-        Array.isArray(response)
-          ? response
-          : response?.projects || [];
+        const projectList =
+          Array.isArray(response)
+            ? response
+            : response?.projects ||
+              [];
 
-      setProjects(projectList);
+        setProjects(
+          projectList,
+        );
 
-      if (projectList.length > 0) {
-        const sortedProjects =
-          [...projectList].sort(
-            (first, second) => {
-              const firstDate =
-                getProjectDate(first)
-                  ?.getTime() || 0;
+        if (
+          projectList.length > 0
+        ) {
+          const sortedProjects =
+            [...projectList].sort(
+              (
+                first,
+                second,
+              ) => {
+                const firstDate =
+                  getProjectDate(
+                    first,
+                  )?.getTime() || 0;
 
-              const secondDate =
-                getProjectDate(second)
-                  ?.getTime() || 0;
+                const secondDate =
+                  getProjectDate(
+                    second,
+                  )?.getTime() || 0;
 
-              return (
-                secondDate -
-                firstDate
-              );
-            },
-          );
+                return (
+                  secondDate -
+                  firstDate
+                );
+              },
+            );
 
-        const latestProject =
-          sortedProjects[0];
+          const latestProject =
+            sortedProjects[0];
 
-        const latestDate =
-          getProjectDate(
-            latestProject,
-          );
+          const latestDate =
+            getProjectDate(
+              latestProject,
+            );
 
-        if (latestDate) {
-          setCalendarDate(
-            latestDate,
-          );
+          if (latestDate) {
+            setCalendarDate(
+              latestDate,
+            );
 
-          setSelectedDate(
-            dateKey(latestDate),
-          );
+            setSelectedDate(
+              dateKey(
+                latestDate,
+              ),
+            );
+          }
         }
-      }
-    } catch (error) {
-      console.error(
-        "Failed to load projects:",
-        error,
-      );
+      } catch (error) {
+        console.error(
+          "Failed to load projects:",
+          error,
+        );
 
-      setProjects([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+        setProjects([]);
+      } finally {
+        setLoading(false);
+      }
+    }, []);
 
   /* ============================================================
      INITIAL LOAD
   ============================================================ */
 
   useEffect(() => {
-    loadProjects();
-  }, []);
+    void loadProjects();
+  }, [loadProjects]);
 
   /* ============================================================
-     LOAD SAVED ADS ON DEMAND
+     FILTERED PROJECTS
+     
+     IMPORTANT:
+     This must be declared BEFORE filteredProjectIds.
   ============================================================ */
 
-  async function loadSavedAds(
-    projectId: number,
-  ) {
-    const projectKey =
-      String(projectId);
+  const filteredProjects =
+    useMemo(() => {
+      if (!selectedDate) {
+        return projects;
+      }
 
-    if (
-      savedAdsByProject[
-        projectKey
-      ] !== undefined
-    ) {
-      return savedAdsByProject[
-        projectKey
-      ];
-    }
+      return projects.filter(
+        (project) => {
+          const projectDate =
+            getProjectDate(
+              project,
+            );
 
-    try {
-      setLoadingAds(
-        (previous) => ({
-          ...previous,
-          [projectKey]: true,
-        }),
+          return (
+            projectDate !== null &&
+            dateKey(
+              projectDate,
+            ) === selectedDate
+          );
+        },
       );
+    }, [
+      projects,
+      selectedDate,
+    ]);
 
-      const advertisements =
-        await getAdvertisements(
-          projectId,
-        );
+  /* ============================================================
+     LOAD SAVED ADS
+  ============================================================ */
 
-      const savedAdvertisements =
-        Array.isArray(
-          advertisements,
-        )
-          ? advertisements.filter(
+  const loadSavedAds =
+    useCallback(
+      async (
+        projectId: number,
+        force = false,
+      ): Promise<
+        SavedAdView[]
+      > => {
+        const projectKey =
+          String(projectId);
+
+        /*
+         * Prevent duplicate simultaneous requests.
+         */
+        if (
+          loadingAdsRef.current[
+            projectKey
+          ]
+        ) {
+          return (
+            savedAdsByProject[
+              projectKey
+            ] || []
+          );
+        }
+
+        /*
+         * Use cache unless force refresh was requested.
+         */
+        if (
+          !force &&
+          savedAdsByProject[
+            projectKey
+          ] !== undefined
+        ) {
+          return (
+            savedAdsByProject[
+              projectKey
+            ] || []
+          );
+        }
+
+        loadingAdsRef.current[
+          projectKey
+        ] = true;
+
+        try {
+          setLoadingAds(
+            (previous) => ({
+              ...previous,
+              [projectKey]:
+                true,
+            }),
+          );
+
+          console.log(
+            "Loading advertisements:",
+            projectId,
+          );
+
+          const response =
+            await getAdvertisements(
+              projectId,
+            );
+
+          /*
+           * Supports:
+           *
+           * []
+           * { advertisements: [] }
+           * { ads: [] }
+           * { data: [] }
+           * { items: [] }
+           */
+          const advertisements =
+            normalizeAdvertisements(
+              response,
+            );
+
+          const savedAdvertisements =
+            advertisements.filter(
               isSavedAdvertisement,
-            )
-          : [];
+            );
 
-      setSavedAdsByProject(
-        (previous) => ({
-          ...previous,
-          [projectKey]:
-            savedAdvertisements,
-        }),
-      );
+          console.log(
+            "Saved ads loaded:",
+            {
+              projectId,
+              total:
+                advertisements.length,
+              saved:
+                savedAdvertisements.length,
+            },
+          );
 
-      return savedAdvertisements;
-    } catch (error) {
-      console.error(
-        `Failed to load advertisements for project ${projectId}:`,
-        error,
-      );
+          setSavedAdsByProject(
+            (previous) => ({
+              ...previous,
+              [projectKey]:
+                savedAdvertisements,
+            }),
+          );
 
-      setSavedAdsByProject(
-        (previous) => ({
-          ...previous,
-          [projectKey]: [],
-        }),
-      );
+          return savedAdvertisements;
+        } catch (error) {
+          console.error(
+            `Failed to load advertisements for project ${projectId}:`,
+            error,
+          );
 
-      return [];
-    } finally {
-      setLoadingAds(
-        (previous) => ({
-          ...previous,
-          [projectKey]: false,
-        }),
-      );
-    }
-  }
+          setSavedAdsByProject(
+            (previous) => ({
+              ...previous,
+              [projectKey]: [],
+            }),
+          );
+
+          return [];
+        } finally {
+          loadingAdsRef.current[
+            projectKey
+          ] = false;
+
+          setLoadingAds(
+            (previous) => ({
+              ...previous,
+              [projectKey]:
+                false,
+            }),
+          );
+        }
+      },
+      [savedAdsByProject],
+    );
 
   /* ============================================================
-     LOAD UPLOAD HISTORY ON DEMAND
+     AUTOMATICALLY LOAD SAVED ADS FOR VISIBLE PROJECTS
   ============================================================ */
 
-  async function loadUploadStatuses(
-    projectId: number,
-  ) {
-    const projectKey =
-      String(projectId);
+  const filteredProjectIds =
+    useMemo(
+      () =>
+        filteredProjects.map(
+          (project) =>
+            project.id,
+        ),
+      [filteredProjects],
+    );
 
+  useEffect(() => {
     if (
-      uploadStatusesByProject[
-        projectKey
-      ] !== undefined
+      loading ||
+      filteredProjectIds.length ===
+        0
     ) {
       return;
     }
 
-    try {
-      setLoadingUploadStatuses(
-        (previous) => ({
-          ...previous,
-          [projectKey]: true,
-        }),
-      );
+    filteredProjectIds.forEach(
+      (projectId) => {
+        const key =
+          String(projectId);
 
-      const statuses =
-        await getUploadStatuses(
-          projectId,
-        );
+        if (
+          savedAdsByProject[
+            key
+          ] === undefined &&
+          !loadingAdsRef.current[
+            key
+          ]
+        ) {
+          void loadSavedAds(
+            projectId,
+          );
+        }
+      },
+    );
+  }, [
+    loading,
+    filteredProjectIds,
+    savedAdsByProject,
+    loadSavedAds,
+  ]);
 
-      const sortedStatuses =
-        [
-          ...(Array.isArray(
-            statuses,
-          )
-            ? statuses
-            : []),
-        ].sort(
-          (
-            first,
-            second,
-          ) => {
-            const firstHour =
-              Number(
-                first.broadcast_hour ??
-                  999,
-              );
+  /* ============================================================
+     LOAD UPLOAD HISTORY
+  ============================================================ */
 
-            const secondHour =
-              Number(
-                second.broadcast_hour ??
-                  999,
-              );
+  const loadUploadStatuses =
+    useCallback(
+      async (
+        projectId: number,
+        force = false,
+      ) => {
+        const projectKey =
+          String(projectId);
 
-            if (
-              firstHour !==
-              secondHour
-            ) {
-              return (
-                firstHour -
-                secondHour
-              );
-            }
+        if (
+          !force &&
+          uploadStatusesByProject[
+            projectKey
+          ] !== undefined
+        ) {
+          return (
+            uploadStatusesByProject[
+              projectKey
+            ] || []
+          );
+        }
 
-            const firstTime =
-              new Date(
-                first.created_at ||
-                  first.updated_at ||
-                  0,
-              ).getTime();
+        try {
+          setLoadingUploadStatuses(
+            (previous) => ({
+              ...previous,
+              [projectKey]:
+                true,
+            }),
+          );
 
-            const secondTime =
-              new Date(
-                second.created_at ||
-                  second.updated_at ||
-                  0,
-              ).getTime();
-
-            return (
-              secondTime -
-              firstTime
+          const statuses =
+            await getUploadStatuses(
+              projectId,
             );
-          },
-        );
 
-      setUploadStatusesByProject(
-        (previous) => ({
-          ...previous,
-          [projectKey]:
-            sortedStatuses,
-        }),
-      );
-    } catch (error) {
-      console.error(
-        `Failed to load upload history for project ${projectId}:`,
-        error,
-      );
+          const sortedStatuses =
+            [
+              ...(Array.isArray(
+                statuses,
+              )
+                ? statuses
+                : []),
+            ].sort(
+              (
+                first,
+                second,
+              ) => {
+                const firstHour =
+                  Number(
+                    first.broadcast_hour ??
+                      999,
+                  );
 
-      setUploadStatusesByProject(
-        (previous) => ({
-          ...previous,
-          [projectKey]: [],
-        }),
-      );
-    } finally {
-      setLoadingUploadStatuses(
-        (previous) => ({
-          ...previous,
-          [projectKey]: false,
-        }),
-      );
-    }
-  }
+                const secondHour =
+                  Number(
+                    second.broadcast_hour ??
+                      999,
+                  );
+
+                if (
+                  firstHour !==
+                  secondHour
+                ) {
+                  return (
+                    firstHour -
+                    secondHour
+                  );
+                }
+
+                const firstTime =
+                  new Date(
+                    first.created_at ||
+                      first.updated_at ||
+                      0,
+                  ).getTime();
+
+                const secondTime =
+                  new Date(
+                    second.created_at ||
+                      second.updated_at ||
+                      0,
+                  ).getTime();
+
+                return (
+                  secondTime -
+                  firstTime
+                );
+              },
+            );
+
+          setUploadStatusesByProject(
+            (previous) => ({
+              ...previous,
+              [projectKey]:
+                sortedStatuses,
+            }),
+          );
+
+          return sortedStatuses;
+        } catch (error) {
+          console.error(
+            `Failed to load upload history for project ${projectId}:`,
+            error,
+          );
+
+          setUploadStatusesByProject(
+            (previous) => ({
+              ...previous,
+              [projectKey]: [],
+            }),
+          );
+
+          return [];
+        } finally {
+          setLoadingUploadStatuses(
+            (previous) => ({
+              ...previous,
+              [projectKey]:
+                false,
+            }),
+          );
+        }
+      },
+      [uploadStatusesByProject],
+    );
 
   /* ============================================================
      TOGGLE UPLOAD HISTORY
@@ -800,44 +1168,25 @@ export default function ProjectsPage() {
       }),
     );
 
-    if (
-      shouldOpen &&
-      uploadStatusesByProject[
-        projectKey
-      ] === undefined
-    ) {
-      await loadUploadStatuses(
-        project.id,
-      );
+    if (shouldOpen) {
+      /*
+       * Refresh both upload history and saved ads.
+       *
+       * This makes sure that newly saved ads
+       * from Ad Editor appear immediately.
+       */
+      await Promise.all([
+        loadUploadStatuses(
+          project.id,
+          true,
+        ),
+        loadSavedAds(
+          project.id,
+          true,
+        ),
+      ]);
     }
   }
-
-  /* ============================================================
-     FILTERED PROJECTS
-  ============================================================ */
-
-  const filteredProjects =
-    useMemo(() => {
-      if (!selectedDate) {
-        return projects;
-      }
-
-      return projects.filter(
-        (project) => {
-          const projectDate =
-            getProjectDate(project);
-
-          return (
-            projectDate !== null &&
-            dateKey(projectDate) ===
-              selectedDate
-          );
-        },
-      );
-    }, [
-      projects,
-      selectedDate,
-    ]);
 
   /* ============================================================
      CALENDAR
@@ -875,7 +1224,8 @@ export default function ProjectsPage() {
   }
 
   function goToToday() {
-    const today = new Date();
+    const today =
+      new Date();
 
     setCalendarDate(today);
 
@@ -931,12 +1281,16 @@ export default function ProjectsPage() {
         upload.status || "",
       ).toUpperCase();
 
+    /*
+     * All active states must be protected.
+     */
     if (
       status === "PROCESSING" ||
-      status === "STARTING"
+      status === "STARTING" ||
+      status === "CANCELLING"
     ) {
       window.alert(
-        "This hour cannot be deleted while the upload is still processing.",
+        "This hour cannot be deleted while the upload is still active. Cancel the upload first.",
       );
 
       return;
@@ -1019,16 +1373,6 @@ export default function ProjectsPage() {
 
       await loadProjects();
 
-      if (
-        expandedUploadHistory[
-          projectKey
-        ]
-      ) {
-        await loadUploadStatuses(
-          projectId,
-        );
-      }
-
       window.alert(
         `Hour ${formatBroadcastHour(
           hour,
@@ -1064,13 +1408,19 @@ export default function ProjectsPage() {
       getProjectName(project);
 
     try {
+      setDownloading(
+        projectId,
+      );
+
       const advertisements =
         await loadSavedAds(
           projectId,
+          true,
         );
 
       if (
-        !advertisements.length
+        advertisements.length ===
+        0
       ) {
         window.alert(
           "There are no saved advertisements for this project.",
@@ -1079,11 +1429,9 @@ export default function ProjectsPage() {
         return;
       }
 
-      await createCsvDownload(
+      downloadCsv(
         projectName,
         advertisements,
-        projectId,
-        setDownloading,
       );
     } catch (error) {
       console.error(
@@ -1094,6 +1442,8 @@ export default function ProjectsPage() {
       window.alert(
         "Failed to download saved advertisements.",
       );
+    } finally {
+      setDownloading(null);
     }
   }
 
@@ -1134,8 +1484,9 @@ export default function ProjectsPage() {
             </h1>
 
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500 sm:text-sm">
-              Manage your uploaded audio projects
-              and saved advertisements.
+              Manage your uploaded audio
+              projects and saved
+              advertisements.
             </p>
           </div>
 
@@ -1154,8 +1505,6 @@ export default function ProjectsPage() {
 
         <div className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:mb-6">
 
-          {/* CALENDAR HEADER */}
-
           <div className="border-b border-slate-200 p-3 sm:p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
@@ -1173,7 +1522,8 @@ export default function ProjectsPage() {
                   </h2>
 
                   <p className="mt-0.5 text-[11px] text-slate-500 sm:text-xs">
-                    Select a date to filter projects.
+                    Select a date to
+                    filter projects.
                   </p>
                 </div>
               </div>
@@ -1181,11 +1531,15 @@ export default function ProjectsPage() {
               <div className="flex w-full gap-2 sm:w-auto">
                 <button
                   type="button"
-                  onClick={goToToday}
+                  onClick={
+                    goToToday
+                  }
                   className={[
                     "min-h-10 flex-1 rounded-lg border px-3 text-xs font-semibold transition sm:flex-none sm:text-sm",
                     selectedDate ===
-                    dateKey(new Date())
+                    dateKey(
+                      new Date(),
+                    )
                       ? "border-slate-900 bg-slate-900 text-white"
                       : "border-slate-200 text-slate-700 hover:bg-slate-50",
                   ].join(" ")}
@@ -1196,7 +1550,9 @@ export default function ProjectsPage() {
                 {selectedDate && (
                   <button
                     type="button"
-                    onClick={clearDateFilter}
+                    onClick={
+                      clearDateFilter
+                    }
                     className="inline-flex min-h-10 flex-1 items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 sm:flex-none sm:text-sm"
                   >
                     <X size={15} />
@@ -1209,39 +1565,45 @@ export default function ProjectsPage() {
 
           <div className="p-2.5 sm:p-4">
 
-            {/* MONTH NAVIGATION */}
-
             <div className="mb-3 flex items-center justify-between sm:mb-5">
               <button
                 type="button"
-                onClick={goToPreviousMonth}
+                onClick={
+                  goToPreviousMonth
+                }
                 className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"
                 aria-label="Previous month"
               >
-                <ChevronLeft size={20} />
+                <ChevronLeft
+                  size={20}
+                />
               </button>
 
               <h3 className="text-sm font-bold text-slate-900 sm:text-lg">
                 {calendarDate.toLocaleDateString(
                   undefined,
                   {
-                    month: "long",
-                    year: "numeric",
+                    month:
+                      "long",
+                    year:
+                      "numeric",
                   },
                 )}
               </h3>
 
               <button
                 type="button"
-                onClick={goToNextMonth}
+                onClick={
+                  goToNextMonth
+                }
                 className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100"
                 aria-label="Next month"
               >
-                <ChevronRight size={20} />
+                <ChevronRight
+                  size={20}
+                />
               </button>
             </div>
-
-            {/* WEEK DAYS */}
 
             <div className="grid grid-cols-7 border-b border-slate-200 pb-2">
               {[
@@ -1268,185 +1630,200 @@ export default function ProjectsPage() {
               ))}
             </div>
 
-            {/* CALENDAR */}
-
             <div className="mt-1 grid grid-cols-7 gap-0.5 sm:mt-2 sm:gap-1">
-              {calendarDays.map((day) => {
-                const dayKeyValue =
-                  dateKey(day);
+              {calendarDays.map(
+                (day) => {
+                  const dayKeyValue =
+                    dateKey(day);
 
-                const isCurrentMonth =
-                  day.getMonth() ===
-                  calendarDate.getMonth();
+                  const isCurrentMonth =
+                    day.getMonth() ===
+                    calendarDate.getMonth();
 
-                const isSelected =
-                  selectedDate ===
-                  dayKeyValue;
+                  const isSelected =
+                    selectedDate ===
+                    dayKeyValue;
 
-                const isToday =
-                  isSameDate(
-                    day,
-                    new Date(),
-                  );
+                  const isToday =
+                    isSameDate(
+                      day,
+                      new Date(),
+                    );
 
-                const projectsForDay =
-                  projects.filter(
-                    (project) => {
-                      const projectDate =
-                        getProjectDate(
-                          project,
+                  const projectsForDay =
+                    projects.filter(
+                      (project) => {
+                        const projectDate =
+                          getProjectDate(
+                            project,
+                          );
+
+                        return (
+                          projectDate &&
+                          dateKey(
+                            projectDate,
+                          ) ===
+                            dayKeyValue
                         );
+                      },
+                    );
 
-                      return (
-                        projectDate &&
-                        dateKey(
-                          projectDate,
-                        ) ===
-                          dayKeyValue
-                      );
-                    },
-                  );
+                  const hasProjects =
+                    projectsForDay.length >
+                    0;
 
-                const hasProjects =
-                  projectsForDay.length > 0;
-
-                return (
-                  <button
-                    type="button"
-                    key={dayKeyValue}
-                    onClick={() =>
-                      selectCalendarDate(
-                        day,
-                      )
-                    }
-                    className={[
-                      "relative min-h-[62px] overflow-hidden rounded-md p-1 text-left transition sm:min-h-[105px] sm:rounded-lg sm:p-1.5",
-                      isCurrentMonth
-                        ? "text-slate-700"
-                        : "text-slate-300",
-                      isSelected
-                        ? "bg-slate-900 text-white"
-                        : "hover:bg-slate-100",
-                      isToday &&
-                      !isSelected
-                        ? "ring-1 ring-inset ring-slate-400 sm:ring-2"
-                        : "",
-                    ].join(" ")}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={[
-                          "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold sm:h-7 sm:w-7 sm:text-xs",
-                          isToday &&
-                          !isSelected
-                            ? "bg-slate-200 text-slate-900"
-                            : "",
-                          isSelected
-                            ? "text-white"
-                            : "",
-                        ].join(" ")}
-                      >
-                        {day.getDate()}
-                      </span>
-
-                      {hasProjects && (
+                  return (
+                    <button
+                      type="button"
+                      key={
+                        dayKeyValue
+                      }
+                      onClick={() =>
+                        selectCalendarDate(
+                          day,
+                        )
+                      }
+                      className={[
+                        "relative min-h-[62px] overflow-hidden rounded-md p-1 text-left transition sm:min-h-[105px] sm:rounded-lg sm:p-1.5",
+                        isCurrentMonth
+                          ? "text-slate-700"
+                          : "text-slate-300",
+                        isSelected
+                          ? "bg-slate-900 text-white"
+                          : "hover:bg-slate-100",
+                        isToday &&
+                        !isSelected
+                          ? "ring-1 ring-inset ring-slate-400 sm:ring-2"
+                          : "",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between">
                         <span
                           className={[
-                            "mr-0.5 h-1.5 w-1.5 rounded-full sm:mr-1",
+                            "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold sm:h-7 sm:w-7 sm:text-xs",
+                            isToday &&
+                            !isSelected
+                              ? "bg-slate-200 text-slate-900"
+                              : "",
                             isSelected
-                              ? "bg-white"
-                              : "bg-slate-700",
-                          ].join(" ")}
-                        />
-                      )}
-                    </div>
+                              ? "text-white"
+                              : "",
+                          ].join(
+                            " ",
+                          )}
+                        >
+                          {day.getDate()}
+                        </span>
 
-                    {/* PROJECT NAMES */}
+                        {hasProjects && (
+                          <span
+                            className={[
+                              "mr-0.5 h-1.5 w-1.5 rounded-full sm:mr-1",
+                              isSelected
+                                ? "bg-white"
+                                : "bg-slate-700",
+                            ].join(
+                              " ",
+                            )}
+                          />
+                        )}
+                      </div>
 
-                    <div className="mt-1 space-y-0.5 sm:space-y-1">
-                      {projectsForDay
-                        .slice(0, 2)
-                        .map((project) => {
-                          const projectName =
-                            getProjectName(
+                      <div className="mt-1 space-y-0.5 sm:space-y-1">
+                        {projectsForDay
+                          .slice(0, 2)
+                          .map(
+                            (
                               project,
-                            );
+                            ) => {
+                              const name =
+                                getProjectName(
+                                  project,
+                                );
 
-                          return (
-                            <div
-                              key={
-                                project.id
-                              }
-                              title={
-                                projectName
-                              }
-                              className={[
-                                "hidden min-w-0 items-center gap-1 rounded px-1 py-1 text-[8px] font-medium leading-tight sm:flex sm:px-1.5 sm:text-[9px]",
-                                isSelected
-                                  ? "bg-white/15 text-white"
-                                  : "bg-slate-100 text-slate-700",
-                              ].join(" ")}
-                            >
-                              <span
-                                className={[
-                                  "h-1.5 w-1.5 shrink-0 rounded-full",
-                                  isSelected
-                                    ? "bg-white"
-                                    : "bg-slate-700",
-                                ].join(" ")}
-                              />
+                              return (
+                                <div
+                                  key={
+                                    project.id
+                                  }
+                                  title={
+                                    name
+                                  }
+                                  className={[
+                                    "hidden min-w-0 items-center gap-1 rounded px-1 py-1 text-[8px] font-medium leading-tight sm:flex sm:px-1.5 sm:text-[9px]",
+                                    isSelected
+                                      ? "bg-white/15 text-white"
+                                      : "bg-slate-100 text-slate-700",
+                                  ].join(
+                                    " ",
+                                  )}
+                                >
+                                  <span
+                                    className={[
+                                      "h-1.5 w-1.5 shrink-0 rounded-full",
+                                      isSelected
+                                        ? "bg-white"
+                                        : "bg-slate-700",
+                                    ].join(
+                                      " ",
+                                    )}
+                                  />
 
-                              <span className="min-w-0 truncate">
-                                {
-                                  projectName
-                                }
-                              </span>
-                            </div>
-                          );
-                        })}
+                                  <span className="min-w-0 truncate">
+                                    {
+                                      name
+                                    }
+                                  </span>
+                                </div>
+                              );
+                            },
+                          )}
 
-                      {projectsForDay.length >
-                        2 && (
-                        <div
-                          className={[
-                            "hidden px-1.5 text-[8px] font-semibold sm:block sm:text-[9px]",
-                            isSelected
-                              ? "text-white/70"
-                              : "text-slate-400",
-                          ].join(" ")}
-                        >
-                          +
-                          {projectsForDay.length -
-                            2}{" "}
-                          more
-                        </div>
-                      )}
+                        {projectsForDay.length >
+                          2 && (
+                          <div
+                            className={[
+                              "hidden px-1.5 text-[8px] font-semibold sm:block sm:text-[9px]",
+                              isSelected
+                                ? "text-white/70"
+                                : "text-slate-400",
+                            ].join(
+                              " ",
+                            )}
+                          >
+                            +
+                            {projectsForDay.length -
+                              2}{" "}
+                            more
+                          </div>
+                        )}
 
-                      {/* MOBILE PROJECT COUNT */}
-
-                      {hasProjects && (
-                        <div
-                          className={[
-                            "mt-1 text-[8px] font-semibold sm:hidden",
-                            isSelected
-                              ? "text-white/70"
-                              : "text-slate-400",
-                          ].join(" ")}
-                        >
-                          {projectsForDay.length}{" "}
-                          {projectsForDay.length ===
-                          1
-                            ? "project"
-                            : "projects"}
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+                        {hasProjects && (
+                          <div
+                            className={[
+                              "mt-1 text-[8px] font-semibold sm:hidden",
+                              isSelected
+                                ? "text-white/70"
+                                : "text-slate-400",
+                            ].join(
+                              " ",
+                            )}
+                          >
+                            {
+                              projectsForDay.length
+                            }{" "}
+                            {projectsForDay.length ===
+                            1
+                              ? "project"
+                              : "projects"}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                },
+              )}
             </div>
-
-            {/* FILTER SUMMARY */}
 
             <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-[11px] sm:mt-4 sm:text-sm">
               <span className="min-w-0 truncate text-slate-600">
@@ -1454,7 +1831,9 @@ export default function ProjectsPage() {
                   <>
                     Showing{" "}
                     <strong className="text-slate-900">
-                      {selectedDateLabel}
+                      {
+                        selectedDateLabel
+                      }
                     </strong>
                   </>
                 ) : (
@@ -1468,7 +1847,9 @@ export default function ProjectsPage() {
               </span>
 
               <span className="shrink-0 rounded-full bg-white px-2.5 py-1 font-bold text-slate-900 shadow-sm">
-                {filteredProjects.length}
+                {
+                  filteredProjects.length
+                }
               </span>
             </div>
           </div>
@@ -1486,7 +1867,8 @@ export default function ProjectsPage() {
               Loading projects...
             </p>
           </div>
-        ) : filteredProjects.length === 0 ? (
+        ) : filteredProjects.length ===
+          0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center sm:p-12">
             <Layers
               size={42}
@@ -1528,22 +1910,21 @@ export default function ProjectsPage() {
           </div>
         ) : (
           <>
-            {/* PROJECT COUNT */}
-
             <div className="mb-3 flex items-center justify-between sm:mb-4">
               <p className="text-xs text-slate-500 sm:text-sm">
                 Showing{" "}
                 <span className="font-bold text-slate-900">
-                  {filteredProjects.length}
+                  {
+                    filteredProjects.length
+                  }
                 </span>{" "}
                 project
-                {filteredProjects.length !== 1
+                {filteredProjects.length !==
+                1
                   ? "s"
                   : ""}
               </p>
             </div>
-
-            {/* PROJECT GRID */}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
               {filteredProjects.map(
@@ -1593,28 +1974,42 @@ export default function ProjectsPage() {
                           status ===
                             "PROCESSING" ||
                           status ===
+                            "STARTING" ||
+                          status ===
                             "CANCELLING"
                         );
                       },
                     );
 
+                  const savedAdHours =
+                    getSavedAdHours(
+                      savedAds,
+                    );
+
                   return (
                     <div
-                      key={projectId}
+                      key={
+                        projectId
+                      }
                       className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                     >
+
                       {/* PROJECT HEADER */}
 
                       <div className="border-b border-slate-200 p-4 sm:p-5">
                         <div className="flex min-w-0 items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <h2 className="break-words text-base font-bold leading-6 text-slate-900 sm:text-lg">
-                              {projectName}
+                              {
+                                projectName
+                              }
                             </h2>
 
                             <p className="mt-1 text-[10px] text-slate-400 sm:text-xs">
                               Project ID:{" "}
-                              {project.id}
+                              {
+                                project.id
+                              }
                             </p>
                           </div>
 
@@ -1682,6 +2077,11 @@ export default function ProjectsPage() {
                         </div>
                       </div>
 
+                      {/* =================================================
+                          SAVED ADS BY HOUR
+                      ================================================= */}
+
+                 
                       {/* MOBILE DATE */}
 
                       {projectDate && (
@@ -1709,7 +2109,9 @@ export default function ProjectsPage() {
                         </div>
                       )}
 
-                      {/* UPLOAD HISTORY */}
+                      {/* =================================================
+                          UPLOAD HISTORY
+                      ================================================= */}
 
                       <div className="px-4 pb-4 sm:px-5 sm:pb-5">
                         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -1759,7 +2161,9 @@ export default function ProjectsPage() {
                                   isUploadHistoryExpanded
                                     ? "rotate-90"
                                     : "",
-                                ].join(" ")}
+                                ].join(
+                                  " ",
+                                )}
                               />
                             </div>
                           </button>
@@ -1783,12 +2187,10 @@ export default function ProjectsPage() {
                                   <p className="mx-auto mt-1 max-w-xs text-[10px] leading-4 text-slate-400">
                                     Completed,
                                     processing,
-                                    or
-                                    cancelling
-                                    uploads
-                                    will
-                                    appear
-                                    here.
+                                    starting,
+                                    or cancelling
+                                    uploads will
+                                    appear here.
                                   </p>
                                 </div>
                               ) : (
@@ -1850,7 +2252,8 @@ export default function ProjectsPage() {
                                       const cannotDelete =
                                         isDeleting ||
                                         isProcessing ||
-                                        isStarting;
+                                        isStarting ||
+                                        isCancelling;
 
                                       return (
                                         <div
@@ -1864,7 +2267,6 @@ export default function ProjectsPage() {
                                             {/* UPLOAD INFO */}
 
                                             <div className="flex min-w-0 items-start gap-2.5">
-
                                               <div className="w-14 shrink-0 sm:w-[68px]">
                                                 <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
                                                   Hour
@@ -1894,19 +2296,13 @@ export default function ProjectsPage() {
                                                   {upload.filename ||
                                                     "Unknown file"}
                                                 </p>
-
-                                                <p className="mt-1 text-[9px] text-slate-400">
-                                                  Broadcast Hour{" "}
-                                                  {formatBroadcastHour(
-                                                    upload.broadcast_hour,
-                                                  )}
-                                                </p>
                                               </div>
 
                                               {/* STATUS */}
 
                                               <div className="shrink-0">
-                                                {isProcessing ? (
+                                                {isProcessing ||
+                                                isStarting ? (
                                                   <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-1.5 text-[9px] font-bold text-amber-700 sm:px-2.5 sm:text-[10px]">
                                                     <span className="relative flex h-1.5 w-1.5">
                                                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
@@ -1914,7 +2310,9 @@ export default function ProjectsPage() {
                                                       <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" />
                                                     </span>
 
-                                                    Processing
+                                                    {isStarting
+                                                      ? "Starting"
+                                                      : "Processing"}
                                                   </span>
                                                 ) : isCancelling ? (
                                                   <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-2 py-1.5 text-[9px] font-bold text-orange-700 sm:px-2.5 sm:text-[10px]">
@@ -1952,7 +2350,6 @@ export default function ProjectsPage() {
                                             {/* ACTIONS */}
 
                                             <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
-
                                               <div
                                                 className={[
                                                   "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-semibold",
@@ -2076,7 +2473,9 @@ export default function ProjectsPage() {
                         </div>
                       </div>
 
-                      {/* ACTIONS */}
+                      {/* =================================================
+                          ACTIONS
+                      ================================================= */}
 
                       <div className="grid grid-cols-2 gap-2 border-t border-slate-200 p-3.5 sm:p-4">
                         <Link
