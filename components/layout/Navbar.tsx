@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -18,6 +17,8 @@ import {
 } from "@/services/auth";
 
 import { getWallet } from "@/services/wallet";
+
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 // ============================================================
 // API
@@ -261,13 +262,6 @@ export default function Navbar() {
 
     useEffect(() => {
 
-        /*
-         * This runs ONLY on the client after hydration.
-         *
-         * localStorage is never accessed during
-         * the initial server render.
-         */
-
         setMounted(true);
 
         const storedUsername =
@@ -486,28 +480,6 @@ export default function Navbar() {
     ]);
 
     // ========================================================
-    // AUTO REFRESH
-    // ========================================================
-    //
-    // IMPORTANT:
-    // Removed the 10-second polling.
-    //
-    // This prevents:
-    //
-    // GET /system/settings/beta
-    //
-    // from being called every 10 seconds.
-    //
-    // The setting is refreshed on:
-    //
-    // 1. Initial page load
-    // 2. Browser tab becoming visible
-    // 3. Window focus
-    // 4. betaUpdated event
-    //
-    // ========================================================
-
-    // ========================================================
     // LOGOUT
     // ========================================================
 
@@ -664,6 +636,21 @@ export default function Navbar() {
                 </nav>
 
                 {/* ==================================================
+                    SHARED NOTIFICATION
+                    One instance for desktop + mobile.
+                ================================================== */}
+
+                <div
+                    className={
+                        styles.notificationArea
+                    }
+                >
+
+                    <NotificationBell />
+
+                </div>
+
+                {/* ==================================================
                     DESKTOP USER AREA
                 ================================================== */}
 
@@ -678,13 +665,6 @@ export default function Navbar() {
                     ================================================== */}
 
                     {!mounted || betaLoading ? (
-
-                        /*
-                         * IMPORTANT:
-                         *
-                         * Server and first client render
-                         * show exactly the same neutral state.
-                         */
 
                         <div
                             className={
@@ -1046,7 +1026,7 @@ export default function Navbar() {
                             <div
                                 className={
                                     styles.mobileBalanceCardIcon
-                                }
+                            }
                             >
                                 💰
                             </div>
@@ -1189,4 +1169,3 @@ export default function Navbar() {
         </header>
     );
 }
-

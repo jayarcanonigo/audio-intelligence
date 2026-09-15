@@ -32,24 +32,20 @@ import UploadPanel from "@/components/upload/UploadPanel";
 
 import {
   getUploadStatuses,
+  getActiveUploadCount,
   cancelUpload,
   deleteUploadHistory,
   type UploadStatus,
+  type ActiveUploadCount,
 } from "@/services/api";
-
-import {
-  getUploadLimit,
-} from "@/services/settings";
-
-/*
- * Fallback value used only if the
- * upload-limit setting cannot be loaded.
- */
-const DEFAULT_UPLOAD_LIMIT = 3;
 
 /*
  * These statuses count toward the
  * maximum number of active uploads.
+ *
+ * IMPORTANT:
+ * The count returned by /upload/active-count
+ * is PER USER across ALL PROJECTS.
  */
 const ACTIVE_UPLOAD_STATUSES = [
   "STARTING",
@@ -82,16 +78,20 @@ export default function ProjectPage() {
     `Project #${projectId}`;
 
   // ============================================================
-  // UPLOAD LIMIT
+  // USER ACTIVE UPLOAD LIMIT
   // ============================================================
 
-  const [uploadLimit, setUploadLimit] =
-    useState<number>(
-      DEFAULT_UPLOAD_LIMIT,
-    );
+  const [
+    activeUploadInfo,
+    setActiveUploadInfo,
+  ] = useState<ActiveUploadCount | null>(
+    null,
+  );
 
-  const [loadingUploadLimit, setLoadingUploadLimit] =
-    useState(true);
+  const [
+    loadingActiveUploadCount,
+    setLoadingActiveUploadCount,
+  ] = useState(true);
 
   // ============================================================
   // UPLOAD PANELS
@@ -116,84 +116,74 @@ export default function ProjectPage() {
   const [uploadStatuses, setUploadStatuses] =
     useState<UploadStatus[]>([]);
 
-  const [loadingUploadStatuses, setLoadingUploadStatuses] =
-    useState(true);
+  const [
+    loadingUploadStatuses,
+    setLoadingUploadStatuses,
+  ] = useState(true);
 
   // ============================================================
   // CANCEL / DELETE STATES
   // ============================================================
 
-  const [cancellingUploadId, setCancellingUploadId] =
-    useState<number | null>(null);
+  const [
+    cancellingUploadId,
+    setCancellingUploadId,
+  ] = useState<number | null>(null);
 
-  const [deletingUploadId, setDeletingUploadId] =
-    useState<number | null>(null);
+  const [
+    deletingUploadId,
+    setDeletingUploadId,
+  ] = useState<number | null>(null);
 
   // ============================================================
-  // LOAD UPLOAD LIMIT
-  //
-  // Gets the configured upload limit from:
-  //
-  // GET /system/settings/upload-limit
-  //
-  // Example:
-  // {
-  //   "key": "upload_limit",
-  //   "value": "10",
-  //   "limit": 10
-  // }
+  // LOAD USER ACTIVE UPLOAD COUNT
   // ============================================================
 
-  const loadUploadLimit =
-    useCallback(async () => {
-      try {
-        setLoadingUploadLimit(true);
+  const loadActiveUploadCount =
+    useCallback(
+      async (
+        showLoading = false,
+      ) => {
+        try {
+          if (showLoading) {
+            setLoadingActiveUploadCount(
+              true,
+            );
+          }
 
-        const limit =
-          await getUploadLimit();
+          const data =
+            await getActiveUploadCount();
 
-        if (
-          Number.isInteger(limit) &&
-          limit >= 1
-        ) {
-          setUploadLimit(limit);
-
-          /*
-           * If the administrator reduced
-           * the upload limit, make sure the
-           * number of visible panels does not
-           * exceed the new limit.
-           */
-          setUploadPanels(
-            (prev) =>
-              prev.slice(0, limit),
+          setActiveUploadInfo(
+            data,
           );
+        } catch (error) {
+          console.error(
+            "Failed to load active upload count:",
+            error,
+          );
+        } finally {
+          if (showLoading) {
+            setLoadingActiveUploadCount(
+              false,
+            );
+          }
         }
-      } catch (error) {
-        console.error(
-          "Failed to load upload limit:",
-          error,
-        );
-
-        /*
-         * Keep DEFAULT_UPLOAD_LIMIT as
-         * fallback if the setting fails.
-         */
-      } finally {
-        setLoadingUploadLimit(false);
-      }
-    }, []);
+      },
+      [],
+    );
 
   // ============================================================
   // LOAD UPLOAD HISTORY
   //
   // SORT:
   //
-  // 01:00
-  // 02:00
-  // 03:00
-  // ...
   // 24:00
+  // 23:00
+  // 22:00
+  // ...
+  // 07:00
+  // 06:00
   //
   // IMPORTANT:
   // We sort by broadcast_hour, NOT created_at.
@@ -229,34 +219,35 @@ export default function ProjectPage() {
                 const firstHour =
                   Number(
                     first.broadcast_hour ??
-                      999,
+                      0,
                   );
 
                 const secondHour =
                   Number(
                     second.broadcast_hour ??
-                      999,
+                      0,
                   );
 
                 /*
                  * PRIMARY SORT:
-                 * Broadcast hour ascending.
                  *
-                 * 1 -> 2 -> 3 -> ... -> 24
+                 * Broadcast hour DESCENDING.
+                 *
+                 * 24 -> 23 -> 22 -> ... -> 2 -> 1
                  */
                 if (
                   firstHour !==
                   secondHour
                 ) {
                   return (
-                    firstHour -
-                    secondHour
+                    secondHour -
+                    firstHour
                   );
                 }
 
                 /*
-                 * If two uploads have the
-                 * same broadcast hour,
+                 * If two uploads have
+                 * the same broadcast hour,
                  * newest upload is shown first.
                  */
                 const firstTime =
@@ -305,25 +296,56 @@ export default function ProjectPage() {
 
   useEffect(() => {
     loadUploadStatuses(true);
-    loadUploadLimit();
+
+    loadActiveUploadCount(
+      true,
+    );
   }, [
     loadUploadStatuses,
-    loadUploadLimit,
+    loadActiveUploadCount,
   ]);
 
   // ============================================================
-  // ACTIVE UPLOAD COUNT
-  //
-  // ONLY THESE COUNT:
-  //
-  // STARTING
-  // PROCESSING
-  // CANCELLING
-  //
-  // COMPLETED/CANCELLED/FAILED DO NOT COUNT.
+  // CURRENT USER ACTIVE UPLOAD COUNT
   // ============================================================
 
   const activeUploadCount =
+    activeUploadInfo?.active_uploads ??
+    0;
+
+  const uploadLimit =
+    activeUploadInfo?.limit ??
+    0;
+
+  const remainingUploads =
+    activeUploadInfo?.remaining ??
+    Math.max(
+      uploadLimit -
+        activeUploadCount,
+      0,
+    );
+
+  const canAddUpload =
+    activeUploadInfo !== null &&
+    activeUploadInfo.available &&
+    activeUploadCount <
+      uploadLimit;
+
+  /*
+   * Hide the upload interface when
+   * the user has reached the global
+   * active upload limit.
+   */
+  const uploadLimitReached =
+    activeUploadInfo !== null &&
+    activeUploadCount >=
+      uploadLimit;
+
+  // ============================================================
+  // ACTIVE STATUS COUNT FOR CURRENT PROJECT
+  // ============================================================
+
+  const currentProjectActiveUploadCount =
     useMemo(() => {
       return uploadStatuses.filter(
         (upload) => {
@@ -343,16 +365,6 @@ export default function ProjectPage() {
 
   // ============================================================
   // AVAILABLE / BLOCKED HOURS
-  //
-  // BLOCKED:
-  // STARTING
-  // PROCESSING
-  // CANCELLING
-  // COMPLETED
-  //
-  // AVAILABLE AGAIN:
-  // CANCELLED
-  // FAILED
   // ============================================================
 
   const unavailableHours =
@@ -404,26 +416,7 @@ export default function ProjectPage() {
     ]);
 
   // ============================================================
-  // CAN ADD UPLOAD
-  //
-  // Uses the upload limit from Settings.
-  //
-  // Example:
-  // uploadLimit = 10
-  //
-  // Active Uploads:
-  // 0 / 10
-  // 1 / 10
-  // ...
-  // 10 / 10
-  // ============================================================
-
-  const canAddUpload =
-    activeUploadCount <
-    uploadLimit;
-
-  // ============================================================
-  // AUTO REFRESH ACTIVE UPLOADS
+  // AUTO REFRESH
   // ============================================================
 
   useEffect(() => {
@@ -436,6 +429,10 @@ export default function ProjectPage() {
     const interval =
       window.setInterval(
         () => {
+          loadActiveUploadCount(
+            false,
+          );
+
           loadUploadStatuses(
             false,
           );
@@ -450,6 +447,7 @@ export default function ProjectPage() {
     };
   }, [
     activeUploadCount,
+    loadActiveUploadCount,
     loadUploadStatuses,
   ]);
 
@@ -459,22 +457,18 @@ export default function ProjectPage() {
 
   const addUploadPanel = () => {
     if (
-      loadingUploadLimit ||
-      activeUploadCount >=
-        uploadLimit
+      loadingActiveUploadCount ||
+      !canAddUpload
     ) {
       return;
     }
 
     setUploadPanels(
       (prev) => {
-        /*
-         * Do not create more panels
-         * than the configured limit.
-         */
         if (
+          uploadLimit > 0 &&
           prev.length >=
-          uploadLimit
+            uploadLimit
         ) {
           return prev;
         }
@@ -575,28 +569,27 @@ export default function ProjectPage() {
   // ============================================================
 
   const handleUploadStart =
-    () => {
-      loadUploadStatuses(
+    async () => {
+      await loadActiveUploadCount(
+        false,
+      );
+
+      await loadUploadStatuses(
         false,
       );
     };
 
   // ============================================================
   // UPLOAD COMPLETE
-  //
-  // COMPLETED:
-  //   hour remains unavailable
-  //
-  // CANCELLED:
-  //   hour becomes available
-  //
-  // FAILED:
-  //   hour becomes available
   // ============================================================
 
   const handleUploadComplete =
-    () => {
-      loadUploadStatuses(
+    async () => {
+      await loadActiveUploadCount(
+        false,
+      );
+
+      await loadUploadStatuses(
         false,
       );
     };
@@ -645,10 +638,6 @@ export default function ProjectPage() {
           upload.id,
         );
 
-        /*
-         * Keep it CANCELLING until
-         * backend confirms CANCELLED.
-         */
         setUploadStatuses(
           (prev) =>
             prev.map(
@@ -666,6 +655,10 @@ export default function ProjectPage() {
             ),
         );
 
+        await loadActiveUploadCount(
+          false,
+        );
+
         await loadUploadStatuses(
           false,
         );
@@ -679,6 +672,10 @@ export default function ProjectPage() {
           error instanceof Error
             ? error.message
             : "Failed to cancel upload.",
+        );
+
+        await loadActiveUploadCount(
+          false,
         );
 
         await loadUploadStatuses(
@@ -746,6 +743,10 @@ export default function ProjectPage() {
                 upload.id,
             ),
         );
+
+        await loadActiveUploadCount(
+          false,
+        );
       } catch (error) {
         console.error(
           "Failed to delete upload history:",
@@ -759,6 +760,10 @@ export default function ProjectPage() {
         );
 
         await loadUploadStatuses(
+          false,
+        );
+
+        await loadActiveUploadCount(
           false,
         );
       } finally {
@@ -983,7 +988,6 @@ export default function ProjectPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-
       <div className="mx-auto max-w-5xl p-6">
 
         {/* ======================================================
@@ -1082,24 +1086,31 @@ export default function ProjectPage() {
               className="text-slate-500"
             />
 
-            <span className="text-sm font-medium text-slate-700">
-              Active Uploads
-            </span>
+            <div>
+
+              <span className="text-sm font-medium text-slate-700">
+                Active Uploads
+              </span>
+
+              <p className="text-[11px] text-slate-400">
+                Across all your
+                projects
+              </p>
+
+            </div>
 
           </div>
 
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold ${
-              activeUploadCount >=
-              uploadLimit
+              uploadLimitReached
                 ? "bg-red-50 text-red-700"
                 : "bg-emerald-50 text-emerald-700"
             }`}
           >
-            {activeUploadCount} /{" "}
-            {loadingUploadLimit
+            {loadingActiveUploadCount
               ? "..."
-              : uploadLimit}
+              : `${activeUploadCount} / ${uploadLimit}`}
           </span>
 
         </div>
@@ -1108,146 +1119,205 @@ export default function ProjectPage() {
             UPLOAD PANELS
         ====================================================== */}
 
-        <div className="space-y-5">
+        {!uploadLimitReached &&
+          !loadingActiveUploadCount && (
+            <div className="space-y-5">
 
-          {uploadPanels.map(
-            (
-              panelId,
-              index,
-            ) => (
-              <div
-                key={panelId}
-                className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
-              >
+              {uploadPanels.map(
+                (
+                  panelId,
+                  index,
+                ) => (
+                  <div
+                    key={panelId}
+                    className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                  >
 
-                <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/60 px-6 py-4">
+                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/60 px-6 py-4">
 
-                  <div>
+                      <div>
 
-                    <h2 className="text-sm font-semibold text-slate-800">
-                      Upload{" "}
-                      {index + 1}
-                    </h2>
+                        <h2 className="text-sm font-semibold text-slate-800">
+                          Upload{" "}
+                          {index + 1}
+                        </h2>
 
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      Select an audio
-                      file to start
-                      processing.
-                    </p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          Select an audio
+                          file to start
+                          processing.
+                        </p>
+
+                      </div>
+
+                      {uploadPanels.length >
+                        1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeUploadPanel(
+                              panelId,
+                            )
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2
+                            size={14}
+                          />
+                          Remove
+                        </button>
+                      )}
+
+                    </div>
+
+                    <div className="p-6">
+
+                      <UploadPanel
+                        projectId={
+                          projectId
+                        }
+                        onComplete={
+                          handleUploadComplete
+                        }
+                        onUploadStart={
+                          handleUploadStart
+                        }
+                        unavailableHours={
+                          unavailableHours
+                        }
+                      />
+
+                    </div>
 
                   </div>
+                ),
+              )}
 
-                  {uploadPanels.length >
-                    1 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeUploadPanel(
-                          panelId,
-                        )
+              {/* ==================================================
+                  ADD ANOTHER UPLOAD
+              ================================================== */}
+
+              {canAddUpload && (
+                <div className="flex flex-col items-center justify-center pb-8 pt-1">
+
+                  <button
+                    type="button"
+                    onClick={
+                      addUploadPanel
+                    }
+                    disabled={
+                      loadingActiveUploadCount ||
+                      !canAddUpload
+                    }
+                    className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
+                  >
+
+                    <Plus
+                      size={16}
+                    />
+
+                    Add Another Upload
+
+                  </button>
+
+                  <p className="mt-2 text-xs text-slate-400">
+
+                    Available upload
+                    slots:{" "}
+
+                    <span className="font-semibold text-slate-600">
+                      {
+                        remainingUploads
                       }
-                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2
-                        size={14}
-                      />
-                      Remove
-                    </button>
-                  )}
+                    </span>
 
-                </div>
-
-                <div className="p-6">
-
-                  <UploadPanel
-                    projectId={
-                      projectId
-                    }
-                    onComplete={
-                      handleUploadComplete
-                    }
-                    onUploadStart={
-                      handleUploadStart
-                    }
-                    unavailableHours={
-                      unavailableHours
-                    }
-                  />
-
-                </div>
-
-              </div>
-            ),
-          )}
-
-          {/* ====================================================
-              ADD ANOTHER UPLOAD
-          ==================================================== */}
-
-          {uploadPanels.length <
-            uploadLimit && (
-            <div className="flex flex-col items-center justify-center pb-8 pt-1">
-
-              <button
-                type="button"
-                onClick={
-                  addUploadPanel
-                }
-                disabled={
-                  !canAddUpload ||
-                  loadingUploadLimit
-                }
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
-              >
-
-                <Plus
-                  size={16}
-                />
-
-                Add Another Upload
-
-              </button>
-
-              <p className="mt-2 text-xs text-slate-400">
-
-                Active uploads:{" "}
-
-                <span className="font-semibold text-slate-600">
-                  {
-                    activeUploadCount
-                  }
-                </span>
-
-                {" / "}
-
-                {
-                  loadingUploadLimit
-                    ? "..."
-                    : uploadLimit
-                }
-
-              </p>
-
-              {!canAddUpload &&
-                !loadingUploadLimit && (
-                  <p className="mt-1 text-xs text-red-500">
-                    Maximum of{" "}
-                    {
-                      uploadLimit
-                    }{" "}
-                    uploads are currently
-                    processing.
                   </p>
-                )}
+
+                </div>
+              )}
 
             </div>
           )}
 
-        </div>
+        {/* ======================================================
+            LIMIT REACHED MESSAGE
+        ====================================================== */}
+
+        {uploadLimitReached && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-5">
+
+            <div className="flex items-start gap-3">
+
+              <div className="rounded-lg bg-red-100 p-2">
+
+                <Upload
+                  size={18}
+                  className="text-red-600"
+                />
+
+              </div>
+
+              <div className="min-w-0">
+
+                <h2 className="text-sm font-semibold text-red-800">
+                  Upload limit reached
+                </h2>
+
+                <p className="mt-1 text-xs leading-relaxed text-red-700">
+                  You currently have{" "}
+                  <strong>
+                    {
+                      activeUploadCount
+                    }
+                  </strong>{" "}
+                  active uploads out of{" "}
+                  <strong>
+                    {
+                      uploadLimit
+                    }
+                  </strong>{" "}
+                  allowed.
+                </p>
+
+                <p className="mt-1 text-xs leading-relaxed text-red-600">
+                  Please wait for an
+                  upload to finish or
+                  cancel an active upload
+                  before starting another
+                  one.
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+        {/* ======================================================
+            UPLOAD COUNT LOADING
+        ====================================================== */}
+
+        {loadingActiveUploadCount && (
+          <div className="mb-6 flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-8">
+
+            <Loader2
+              size={22}
+              className="mr-2 animate-spin text-slate-400"
+            />
+
+            <span className="text-sm text-slate-500">
+              Checking upload
+              availability...
+            </span>
+
+          </div>
+        )}
 
         {/* ======================================================
             UPLOAD HISTORY
-            SORTED BY BROADCAST HOUR ASCENDING
+            SORTED BY BROADCAST HOUR DESCENDING
+            24:00 -> 01:00
         ====================================================== */}
 
         <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -1273,7 +1343,7 @@ export default function ProjectPage() {
 
                 <p className="mt-0.5 text-xs text-slate-500">
                   Sorted by Broadcast
-                  Hour: 01:00 → 24:00
+                  Hour: 24:00 → 01:00
                 </p>
 
               </div>
@@ -1282,11 +1352,15 @@ export default function ProjectPage() {
 
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
                 loadUploadStatuses(
                   true,
-                )
-              }
+                );
+
+                loadActiveUploadCount(
+                  false,
+                );
+              }}
               disabled={
                 loadingUploadStatuses
               }

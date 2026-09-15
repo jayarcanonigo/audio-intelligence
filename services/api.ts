@@ -1,9 +1,10 @@
+
 import {
   getAccessToken,
   getTokenType,
 } from "./auth";
 
-const API_URL =
+export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:8000";
 
@@ -75,6 +76,42 @@ export interface UploadStatus {
 }
 
 // ============================================================
+// USER ACTIVE UPLOAD COUNT
+// ============================================================
+//
+// The backend calculates this PER USER across ALL PROJECTS.
+//
+// Example:
+//
+// upload_limit = 4
+//
+// User A:
+//   Project 1 -> 2 active
+//   Project 2 -> 1 active
+//   Project 3 -> 1 active
+//
+// Total = 4 / 4
+//
+// User B has a separate limit of 4.
+//
+// The limit comes from:
+// system_settings.upload_limit
+//
+// ============================================================
+
+export interface ActiveUploadCount {
+  success: boolean;
+
+  active_uploads: number;
+
+  limit: number;
+
+  remaining: number;
+
+  available: boolean;
+}
+
+// ============================================================
 // DELETE PROJECT HOUR RESPONSE
 // ============================================================
 
@@ -100,7 +137,7 @@ export interface DeleteProjectHourResponse {
 // AUTH HEADERS
 // ============================================================
 
-function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(): HeadersInit {
   const token = getAccessToken();
 
   const tokenType = getTokenType();
@@ -874,16 +911,6 @@ export async function deleteAdvertisementsByProject(
 // ============================================================
 // DELETE ADS BY PROJECT + HOUR
 // ============================================================
-//
-// NOTE:
-// This remains available for places that specifically need
-// advertisement-only deletion.
-//
-// DO NOT use this for the Projects page "Delete Hour" button.
-//
-// Use deleteProjectHour() below for the complete deletion.
-//
-// ============================================================
 
 export async function deleteAdvertisementsByProjectHour(
   projectId: number,
@@ -944,27 +971,6 @@ export async function deleteAdvertisementsByProjectHour(
 
 // ============================================================
 // DELETE ENTIRE PROJECT HOUR
-// ============================================================
-//
-// IMPORTANT:
-//
-// This is the function to use for the Projects page
-// "Delete Hour" button.
-//
-// Backend handles:
-//
-//   - Saved advertisements
-//   - New advertisements
-//   - Transcript segments
-//   - UploadStatus history
-//   - Upload session cleanup
-//
-// All deletion is performed by ONE backend request.
-//
-// Backend endpoint:
-//
-// DELETE /upload/hour/{projectId}/{hour}
-//
 // ============================================================
 
 export async function deleteProjectHour(
@@ -1151,6 +1157,112 @@ export async function getLogs(
 }
 
 // ============================================================
+// GET CURRENT USER ACTIVE UPLOAD COUNT
+// ============================================================
+//
+// IMPORTANT:
+//
+// This uses the backend system setting:
+//
+// system_settings
+// ----------------------------
+// key:   upload_limit
+// value:  4
+//
+// The backend returns the configured value.
+//
+// The frontend does NOT hard-code the limit.
+//
+// Scope:
+// - Per user
+// - Across all projects
+//
+// ============================================================
+
+export async function getActiveUploadCount(): Promise<ActiveUploadCount> {
+  const res =
+    await authFetch(
+      `${API_URL}/upload/active-count`
+    );
+
+  if (!res.ok) {
+    let message =
+      "Failed to load active upload count";
+
+    try {
+      const contentType =
+        res.headers.get(
+          "content-type"
+        ) || "";
+
+      if (
+        contentType.includes(
+          "application/json"
+        )
+      ) {
+        const data =
+          await res.json();
+
+        message =
+          data?.detail ||
+          data?.message ||
+          message;
+      } else {
+        const text =
+          await res.text();
+
+        if (text) {
+          message = text;
+        }
+      }
+    } catch {
+      // Keep default message.
+    }
+
+    throw new Error(
+      message
+    );
+  }
+
+  const data =
+    await res.json();
+
+  console.log(
+    "================================"
+  );
+
+  console.log(
+    "USER ACTIVE UPLOAD COUNT"
+  );
+
+  console.log(
+    "Active uploads:",
+    data.active_uploads
+  );
+
+  console.log(
+    "Upload limit:",
+    data.limit
+  );
+
+  console.log(
+    "Remaining:",
+    data.remaining
+  );
+
+  console.log(
+    "Available:",
+    data.available
+  );
+
+  console.log(
+    "================================"
+  );
+
+  return data;
+}
+
+// ============================================================
 // AUDIO UPLOAD
 // ============================================================
 
@@ -1263,6 +1375,17 @@ export async function uploadAudio(
       }
     } catch {
       // Keep default.
+    }
+
+    // --------------------------------------------------------
+    // 429 = user upload limit reached.
+    // --------------------------------------------------------
+
+    if (res.status === 429) {
+      console.warn(
+        "UPLOAD LIMIT REACHED:",
+        message
+      );
     }
 
     throw new Error(
@@ -1452,17 +1575,6 @@ export async function cancelUpload(
 
 // ============================================================
 // DELETE UPLOAD HISTORY
-// ============================================================
-//
-// This deletes ONLY the UploadStatus history record.
-//
-// It does NOT delete:
-// - advertisements
-// - transcript segments
-//
-// For the Projects page Delete Hour button,
-// use deleteProjectHour() instead.
-//
 // ============================================================
 
 export async function deleteUploadHistory(
@@ -1944,3 +2056,4 @@ export async function getSegmentHours(
 
   return res.json();
 }
+

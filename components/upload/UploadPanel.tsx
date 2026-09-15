@@ -175,6 +175,10 @@ export default function UploadPanel({
 
   // ============================================================
   // MONITOR UPLOAD STATUS
+  //
+  // Status is still monitored in the background.
+  // The visual status/progress display has been removed because
+  // Upload History already displays this information.
   // ============================================================
 
   useEffect(() => {
@@ -379,92 +383,6 @@ export default function UploadPanel({
           ? "⏳ Uploading..."
           : "🚀 Upload Audio"}
       </button>
-
-      {/* ================= PROGRESS ================= */}
-
-      {status && (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 shadow-sm">
-
-          <div className="mb-4 flex items-center justify-between">
-
-            <span className="font-semibold text-gray-700">
-              Status
-            </span>
-
-            <span
-              className={`rounded-full px-3 py-1 text-sm font-medium ${
-                String(
-                  status.status ||
-                    "",
-                ).toUpperCase() ===
-                "COMPLETED"
-                  ? "bg-green-100 text-green-700"
-                  : String(
-                        status.status ||
-                          "",
-                      ).toUpperCase() ===
-                      "PROCESSING"
-                  ? "bg-blue-100 text-blue-700"
-                  : String(
-                        status.status ||
-                          "",
-                      ).toUpperCase() ===
-                      "CANCELLED"
-                  ? "bg-gray-100 text-gray-700"
-                  : String(
-                        status.status ||
-                          "",
-                      ).toUpperCase() ===
-                        "FAILED" ||
-                    String(
-                      status.status ||
-                        "",
-                    ).toUpperCase() ===
-                      "ERROR"
-                  ? "bg-red-100 text-red-700"
-                  : "bg-yellow-100 text-yellow-700"
-              }`}
-            >
-              {status.status}
-            </span>
-
-          </div>
-
-          <div className="mb-2 flex justify-between text-sm text-gray-600">
-
-            <span>
-              Chunk{" "}
-              {status.current_chunk ??
-                0}{" "}
-              /{" "}
-              {status.total_chunks ??
-                0}
-            </span>
-
-            <span>
-              {status.progress_percent ||
-                0}
-              %
-            </span>
-
-          </div>
-
-          <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
-
-            <div
-              className="h-3 rounded-full bg-blue-600 transition-all duration-500"
-              style={{
-                width: `${
-                  status.progress_percent ||
-                  0
-                }%`,
-              }}
-            />
-
-          </div>
-
-        </div>
-      )}
 
     </div>
   );

@@ -792,9 +792,6 @@ export default function ProjectsPage() {
 
   /* ============================================================
      FILTERED PROJECTS
-     
-     IMPORTANT:
-     This must be declared BEFORE filteredProjectIds.
   ============================================================ */
 
   const filteredProjects =
@@ -838,9 +835,6 @@ export default function ProjectsPage() {
         const projectKey =
           String(projectId);
 
-        /*
-         * Prevent duplicate simultaneous requests.
-         */
         if (
           loadingAdsRef.current[
             projectKey
@@ -853,9 +847,6 @@ export default function ProjectsPage() {
           );
         }
 
-        /*
-         * Use cache unless force refresh was requested.
-         */
         if (
           !force &&
           savedAdsByProject[
@@ -892,15 +883,6 @@ export default function ProjectsPage() {
               projectId,
             );
 
-          /*
-           * Supports:
-           *
-           * []
-           * { advertisements: [] }
-           * { ads: [] }
-           * { data: [] }
-           * { items: [] }
-           */
           const advertisements =
             normalizeAdvertisements(
               response,
@@ -963,7 +945,7 @@ export default function ProjectsPage() {
     );
 
   /* ============================================================
-     AUTOMATICALLY LOAD SAVED ADS FOR VISIBLE PROJECTS
+     AUTOMATICALLY LOAD SAVED ADS
   ============================================================ */
 
   const filteredProjectIds =
@@ -1013,6 +995,9 @@ export default function ProjectsPage() {
 
   /* ============================================================
      LOAD UPLOAD HISTORY
+     
+     SORT:
+     24 -> 23 -> 22 -> ... -> 01
   ============================================================ */
 
   const loadUploadStatuses =
@@ -1066,25 +1051,35 @@ export default function ProjectsPage() {
                 const firstHour =
                   Number(
                     first.broadcast_hour ??
-                      999,
+                      0,
                   );
 
                 const secondHour =
                   Number(
                     second.broadcast_hour ??
-                      999,
+                      0,
                   );
 
+                /*
+                 * Broadcast hour DESCENDING:
+                 *
+                 * 24 -> 23 -> 22 -> ...
+                 * -> 03 -> 02 -> 01
+                 */
                 if (
                   firstHour !==
                   secondHour
                 ) {
                   return (
-                    firstHour -
-                    secondHour
+                    secondHour -
+                    firstHour
                   );
                 }
 
+                /*
+                 * Same hour:
+                 * newest upload first.
+                 */
                 const firstTime =
                   new Date(
                     first.created_at ||
@@ -1169,12 +1164,6 @@ export default function ProjectsPage() {
     );
 
     if (shouldOpen) {
-      /*
-       * Refresh both upload history and saved ads.
-       *
-       * This makes sure that newly saved ads
-       * from Ad Editor appear immediately.
-       */
       await Promise.all([
         loadUploadStatuses(
           project.id,
@@ -1281,9 +1270,6 @@ export default function ProjectsPage() {
         upload.status || "",
       ).toUpperCase();
 
-    /*
-     * All active states must be protected.
-     */
     if (
       status === "PROCESSING" ||
       status === "STARTING" ||
@@ -1986,6 +1972,20 @@ export default function ProjectsPage() {
                       savedAds,
                     );
 
+                  /*
+                   * IMPORTANT:
+                   *
+                   * This is the URL used by
+                   * Open Project.
+                   *
+                   * Example:
+                   * /projects/20?name=test
+                   */
+                  const projectUrl =
+                    `/projects/${project.id}?name=${encodeURIComponent(
+                      projectName,
+                    )}`;
+
                   return (
                     <div
                       key={
@@ -2077,11 +2077,6 @@ export default function ProjectsPage() {
                         </div>
                       </div>
 
-                      {/* =================================================
-                          SAVED ADS BY HOUR
-                      ================================================= */}
-
-                 
                       {/* MOBILE DATE */}
 
                       {projectDate && (
@@ -2478,12 +2473,20 @@ export default function ProjectsPage() {
                       ================================================= */}
 
                       <div className="grid grid-cols-2 gap-2 border-t border-slate-200 p-3.5 sm:p-4">
+
+                        {/* OPEN PROJECT
+                            NOW INCLUDES PROJECT NAME */}
+
                         <Link
-                          href={`/projects/${project.id}`}
+                          href={
+                            projectUrl
+                          }
                           className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 sm:text-sm"
                         >
                           Open Project
                         </Link>
+
+                        {/* EDIT ADS */}
 
                         <Link
                           href={`/ad-editor/${project.id}?name=${encodeURIComponent(
@@ -2493,6 +2496,8 @@ export default function ProjectsPage() {
                         >
                           Edit Ads
                         </Link>
+
+                        {/* DOWNLOAD SAVED ADS */}
 
                         <button
                           type="button"
@@ -2516,7 +2521,9 @@ export default function ProjectsPage() {
                             ? "Downloading..."
                             : "Download Saved Ads"}
                         </button>
+
                       </div>
+
                     </div>
                   );
                 },
