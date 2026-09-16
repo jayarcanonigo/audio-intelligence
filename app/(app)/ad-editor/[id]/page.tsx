@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -26,6 +27,7 @@ import {
   createAdvertisement,
   reprocessAdvertisements,
   getSegmentHours,
+  getUploadStatuses,
   updateAdvertisement,
 } from "@/services/api";
 
@@ -116,10 +118,12 @@ export default function AdEditorPage() {
   const urlHour =
     searchParams.get("hour");
 
+  // ============================================================
+  // BROADCAST HOUR
+  // ============================================================
+
   const [broadcastHour, setBroadcastHour] =
-    useState<string>(
-      urlHour || "1"
-    );
+    useState<string>("");
 
   const [hours, setHours] =
     useState<number[]>([]);
@@ -368,6 +372,15 @@ export default function AdEditorPage() {
         return;
       }
 
+      // Do not request hour 0 when no completed
+      // broadcast hour has been selected yet.
+      if (
+        !broadcastHour &&
+        broadcastHour !== "all"
+      ) {
+        return;
+      }
+
       try {
         if (!opts.silent) {
           setRefreshing(true);
@@ -379,6 +392,13 @@ export default function AdEditorPage() {
             : Number(
                 broadcastHour
               );
+
+        if (
+          broadcastHour !== "all" &&
+          !Number.isFinite(hour)
+        ) {
+          return;
+        }
 
         const data =
           await getLogs(
@@ -610,64 +630,187 @@ export default function AdEditorPage() {
   ]);
 
   // ============================================================
-  // LOAD HOURS
+  // LOAD ONLY COMPLETED BROADCAST HOURS
   // ============================================================
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadHours() {
+      if (!projectId) {
+        return;
+      }
+
       try {
-        const data =
-          await getSegmentHours(
-            projectId
+        const [
+          segmentHours,
+          uploadStatuses,
+        ] = await Promise.all([
+          getSegmentHours(projectId),
+          getUploadStatuses(projectId),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        // ------------------------------------------------------
+        // Find upload hours with COMPLETED status
+        // ------------------------------------------------------
+
+        const completedHours =
+          new Set<number>();
+
+        if (
+          Array.isArray(
+            uploadStatuses
+          )
+        ) {
+          uploadStatuses.forEach(
+            (upload: any) => {
+              const status =
+                String(
+                  upload?.status ||
+                    ""
+                )
+                  .trim()
+                  .toUpperCase();
+
+              if (
+                status !==
+                "COMPLETED"
+              ) {
+                return;
+              }
+
+              const hour =
+                Number(
+                  upload?.broadcast_hour
+                );
+
+              if (
+                Number.isFinite(
+                  hour
+                ) &&
+                hour >= 0 &&
+                hour <= 23
+              ) {
+                completedHours.add(
+                  hour
+                );
+              }
+            }
           );
+        }
 
-        setHours(data);
+        // ------------------------------------------------------
+        // Only use hours that have both:
+        //
+        // 1. Transcript segments
+        // 2. COMPLETED upload status
+        // ------------------------------------------------------
 
-        const urlHour =
+        const completedSegmentHours =
+          (
+            Array.isArray(
+              segmentHours
+            )
+              ? segmentHours
+              : []
+          )
+            .map(Number)
+            .filter(
+              (hour) =>
+                Number.isFinite(
+                  hour
+                ) &&
+                completedHours.has(
+                  hour
+                )
+            )
+            .sort(
+              (a, b) =>
+                a - b
+            );
+
+        setHours(
+          completedSegmentHours
+        );
+
+        // ------------------------------------------------------
+        // Respect ?hour= only when that hour is COMPLETED
+        // ------------------------------------------------------
+
+        const requestedHour =
           searchParams.get(
             "hour"
           );
 
-        if (urlHour) {
-          const parsedHour =
-            Number(urlHour);
-
-          if (
-            Number.isFinite(
-              parsedHour
-            ) &&
-            data.includes(
-              parsedHour
-            )
-          ) {
-            setBroadcastHour(
-              String(
-                parsedHour
+        const parsedUrlHour =
+          requestedHour !== null
+            ? Number(
+                requestedHour
               )
-            );
+            : NaN;
 
-            return;
-          }
+        if (
+          Number.isFinite(
+            parsedUrlHour
+          ) &&
+          completedSegmentHours.includes(
+            parsedUrlHour
+          )
+        ) {
+          setBroadcastHour(
+            String(
+              parsedUrlHour
+            )
+          );
+
+          return;
         }
 
-        if (data.length > 0) {
+        // ------------------------------------------------------
+        // Otherwise select first COMPLETED hour
+        // ------------------------------------------------------
+
+        if (
+          completedSegmentHours.length >
+          0
+        ) {
           setBroadcastHour(
-            String(data[0])
+            String(
+              completedSegmentHours[0]
+            )
           );
         } else {
-          setBroadcastHour("1");
+          // No completed uploads
+          setBroadcastHour("");
+          setLogs([]);
+          setResults([]);
+          setDisabledLogs([]);
         }
       } catch (error) {
         console.error(
-          "Failed loading segment hours",
+          "Failed loading completed broadcast hours:",
           error
         );
+
+        if (!cancelled) {
+          setHours([]);
+          setBroadcastHour("");
+          setLogs([]);
+          setResults([]);
+          setDisabledLogs([]);
+        }
       }
     }
 
-    if (projectId) {
-      loadHours();
-    }
+    loadHours();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     projectId,
     searchParams,
@@ -710,9 +853,6 @@ export default function AdEditorPage() {
 
   // ============================================================
   // COPY PARTS
-  //
-  // The transcript is split into maximum 10,000-character
-  // sections first.
   // ============================================================
 
   const copyParts =
@@ -778,7 +918,8 @@ export default function AdEditorPage() {
         return [];
       }
 
-      const parts: string[] = [];
+      const parts: string[] =
+        [];
 
       let currentPart =
         "";
@@ -843,18 +984,6 @@ export default function AdEditorPage() {
 
   // ============================================================
   // COPY PART GROUPS
-  //
-  // Example:
-  //
-  // PART 1 + PART 2
-  // PART 3 + PART 4
-  // PART 5
-  //
-  // If there are 6 parts:
-  //
-  // PART 1 + PART 2
-  // PART 3 + PART 4
-  // PART 5 + PART 6
   // ============================================================
 
   const copyPartGroups =
@@ -1342,9 +1471,9 @@ export default function AdEditorPage() {
             .filter(
               Boolean
             ) as {
-              start: number;
-              end: number;
-            }[];
+            start: number;
+            end: number;
+          }[];
 
         for (
           let index = 0;
@@ -3597,26 +3726,37 @@ export default function AdEditorPage() {
                     e.target.value
                   )
                 }
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                disabled={
+                  hours.length ===
+                  0
+                }
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
               >
-                {hours.map(
-                  (
-                    hour
-                  ) => (
-                    <option
-                      key={hour}
-                      value={String(
-                        hour
-                      )}
-                    >
-                      {String(
-                        hour
-                      ).padStart(
-                        2,
-                        "0"
-                      )}
-                      :00
-                    </option>
+                {hours.length ===
+                0 ? (
+                  <option value="">
+                    No completed uploads
+                  </option>
+                ) : (
+                  hours.map(
+                    (
+                      hour
+                    ) => (
+                      <option
+                        key={hour}
+                        value={String(
+                          hour
+                        )}
+                      >
+                        {String(
+                          hour
+                        ).padStart(
+                          2,
+                          "0"
+                        )}
+                        :00
+                      </option>
+                    )
                   )
                 )}
               </select>
@@ -3628,36 +3768,43 @@ export default function AdEditorPage() {
               </div>
 
               <div className="flex max-w-[700px] gap-2 overflow-x-auto rounded-xl border border-gray-200 bg-gray-50 p-2">
-                {hours.map(
-                  (
-                    hour
-                  ) => (
-                    <button
-                      key={hour}
-                      onClick={() =>
-                        setBroadcastHour(
+                {hours.length ===
+                0 ? (
+                  <div className="px-3 py-2 text-sm text-gray-400">
+                    No completed uploads
+                  </div>
+                ) : (
+                  hours.map(
+                    (
+                      hour
+                    ) => (
+                      <button
+                        key={hour}
+                        onClick={() =>
+                          setBroadcastHour(
+                            String(
+                              hour
+                            )
+                          )
+                        }
+                        className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-all ${
+                          broadcastHour ===
                           String(
                             hour
                           )
-                        )
-                      }
-                      className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-                        broadcastHour ===
-                        String(
+                            ? "bg-blue-600 text-white shadow"
+                            : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+                        }`}
+                      >
+                        {String(
                           hour
-                        )
-                          ? "bg-blue-600 text-white shadow"
-                          : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
-                      }`}
-                    >
-                      {String(
-                        hour
-                      ).padStart(
-                        2,
-                        "0"
-                      )}
-                      :00
-                    </button>
+                        ).padStart(
+                          2,
+                          "0"
+                        )}
+                        :00
+                      </button>
+                    )
                   )
                 )}
               </div>
@@ -3675,8 +3822,6 @@ export default function AdEditorPage() {
           {mobileTab ===
             "logs" && isAdmin ? (
             <div className="rounded-xl bg-white p-4 shadow-sm">
-              {/* LIVE LOG HEADER */}
-
               <div className="mb-4">
                 <div className="flex items-center justify-between">
                   <h2 className="font-semibold text-gray-800">
@@ -3793,8 +3938,6 @@ export default function AdEditorPage() {
         </div>
       ) : (
         <div className="grid grid-cols-12 gap-6 pb-48 pt-6">
-          {/* LOGS */}
-
           {isAdmin && (
             <div className="col-span-5">
               <div className="rounded-xl bg-white p-5 shadow-sm">
@@ -3868,8 +4011,6 @@ export default function AdEditorPage() {
             </div>
           )}
 
-          {/* SEGMENTS */}
-
           <div
             className={
               isAdmin
@@ -3933,8 +4074,6 @@ export default function AdEditorPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="space-y-4 p-5">
-              {/* FILE PICKER */}
-
               <div>
                 <input
                   ref={
@@ -3972,8 +4111,6 @@ export default function AdEditorPage() {
                 </button>
               </div>
 
-              {/* OR */}
-
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-gray-200" />
 
@@ -3983,8 +4120,6 @@ export default function AdEditorPage() {
 
                 <div className="h-px flex-1 bg-gray-200" />
               </div>
-
-              {/* TEXTAREA */}
 
               <textarea
                 value={
@@ -4009,8 +4144,6 @@ export default function AdEditorPage() {
                 className="h-64 w-full resize-none rounded-xl border border-gray-300 bg-gray-50 p-4 font-mono text-xs leading-5 text-gray-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
               />
             </div>
-
-            {/* FOOTER */}
 
             <div className="flex items-center justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4">
               <button
@@ -4054,15 +4187,9 @@ export default function AdEditorPage() {
 
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur">
         <div className="mx-auto w-full max-w-[1800px] px-3 py-2 md:px-5 md:py-3">
-          {/* ====================================================
-              MOBILE
-          ==================================================== */}
-
           {isMobile ? (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                {/* LOGS / SEGMENTS */}
-
                 {isAdmin && (
                   <button
                     onClick={
@@ -4090,8 +4217,6 @@ export default function AdEditorPage() {
                   </button>
                 )}
 
-                {/* LAST */}
-
                 <button
                   onClick={
                     handleCenterLastCompleted
@@ -4107,14 +4232,15 @@ export default function AdEditorPage() {
                   </span>
                 </button>
 
-                {/* REPROCESS */}
-
                 {isAdmin && (
                   <button
                     onClick={
                       handleReprocessAds
                     }
-                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+                    disabled={
+                      !broadcastHour
+                    }
+                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <RefreshCw
                       size={15}
@@ -4125,8 +4251,6 @@ export default function AdEditorPage() {
                     </span>
                   </button>
                 )}
-
-                {/* MORE */}
 
                 <div className="relative">
                   <button
@@ -4147,8 +4271,6 @@ export default function AdEditorPage() {
 
                   {showMenu && (
                     <div className="absolute bottom-11 right-0 w-60 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
-                      {/* UPLOAD JSON */}
-
                       {isAdmin && (
                         <button
                           onClick={() => {
@@ -4169,8 +4291,6 @@ export default function AdEditorPage() {
                           Upload JSON
                         </button>
                       )}
-
-                      {/* ADD */}
 
                       {isAdmin && (
                         <button
@@ -4197,8 +4317,6 @@ export default function AdEditorPage() {
                         </button>
                       )}
 
-                      {/* SAVE */}
-
                       <button
                         onClick={() => {
                           handleSaveAllSegments();
@@ -4219,8 +4337,6 @@ export default function AdEditorPage() {
 
                         Save
                       </button>
-
-                      {/* DOWNLOAD */}
 
                       <button
                         onClick={() => {
@@ -4244,8 +4360,6 @@ export default function AdEditorPage() {
                       </button>
 
                       <div className="border-t border-gray-100" />
-
-                      {/* DELETE */}
 
                       {isAdmin && (
                         <button
@@ -4275,17 +4389,9 @@ export default function AdEditorPage() {
               </div>
             </div>
           ) : (
-            /* ==================================================
-               DESKTOP
-            ================================================== */
-
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-4">
-                {/* LEFT */}
-
                 <div className="flex items-center gap-2">
-                  {/* LAST */}
-
                   <button
                     onClick={
                       handleCenterLastCompleted
@@ -4300,8 +4406,6 @@ export default function AdEditorPage() {
                       Last
                     </span>
                   </button>
-
-                  {/* ADD */}
 
                   {isAdmin && (
                     <button
@@ -4331,8 +4435,6 @@ export default function AdEditorPage() {
                     </button>
                   )}
 
-                  {/* UPLOAD JSON */}
-
                   {isAdmin && (
                     <button
                       onClick={() =>
@@ -4351,17 +4453,16 @@ export default function AdEditorPage() {
                   )}
                 </div>
 
-                {/* RIGHT */}
-
                 <div className="flex items-center gap-2">
-                  {/* REPROCESS */}
-
                   {isAdmin && (
                     <button
                       onClick={
                         handleReprocessAds
                       }
-                      className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+                      disabled={
+                        !broadcastHour
+                      }
+                      className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <RefreshCw
                         size={14}
@@ -4370,8 +4471,6 @@ export default function AdEditorPage() {
                       Reprocess
                     </button>
                   )}
-
-                  {/* SAVE */}
 
                   <button
                     onClick={
@@ -4390,8 +4489,6 @@ export default function AdEditorPage() {
                     Save
                   </button>
 
-                  {/* DOWNLOAD */}
-
                   <button
                     onClick={
                       handleDownloadExcel
@@ -4408,8 +4505,6 @@ export default function AdEditorPage() {
 
                     Download
                   </button>
-
-                  {/* DELETE */}
 
                   {isAdmin && (
                     <button
@@ -4434,10 +4529,6 @@ export default function AdEditorPage() {
             </div>
           )}
 
-          {/* ====================================================
-              AUDIO PLAYER
-          ==================================================== */}
-
           <div className="mt-2 border-t border-gray-100 pt-2">
             <AudioPlayer
               file={file}
@@ -4461,3 +4552,4 @@ export default function AdEditorPage() {
     </div>
   );
 }
+
