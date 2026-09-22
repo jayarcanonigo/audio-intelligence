@@ -3713,102 +3713,62 @@ export default function AdEditorPage() {
 
           <div className="w-full md:w-auto">
             <div className="block md:hidden">
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Broadcast Hour
-              </label>
+  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+    Broadcast Hour
+  </label>
 
-              <select
-                value={
-                  broadcastHour
-                }
-                onChange={(e) =>
-                  setBroadcastHour(
-                    e.target.value
-                  )
-                }
-                disabled={
-                  hours.length ===
-                  0
-                }
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
-              >
-                {hours.length ===
-                0 ? (
-                  <option value="">
-                    No completed uploads
-                  </option>
-                ) : (
-                  hours.map(
-                    (
-                      hour
-                    ) => (
-                      <option
-                        key={hour}
-                        value={String(
-                          hour
-                        )}
-                      >
-                        {String(
-                          hour
-                        ).padStart(
-                          2,
-                          "0"
-                        )}
-                        :00
-                      </option>
-                    )
-                  )
-                )}
-              </select>
-            </div>
+  <select
+    value={broadcastHour}
+    onChange={(e) => setBroadcastHour(e.target.value)}
+    disabled={hours.length === 0}
+    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+  >
+    ...
+  </select>
+</div>
 
-            <div className="hidden md:block">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Broadcast Hour
-              </div>
+          <div className="hidden md:block">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Broadcast Hour
+        </div>
 
-              <div className="flex max-w-[700px] gap-2 overflow-x-auto rounded-xl border border-gray-200 bg-gray-50 p-2">
-                {hours.length ===
-                0 ? (
-                  <div className="px-3 py-2 text-sm text-gray-400">
-                    No completed uploads
-                  </div>
-                ) : (
-                  hours.map(
-                    (
-                      hour
-                    ) => (
-                      <button
-                        key={hour}
-                        onClick={() =>
-                          setBroadcastHour(
-                            String(
-                              hour
-                            )
-                          )
-                        }
-                        className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-                          broadcastHour ===
-                          String(
-                            hour
-                          )
-                            ? "bg-blue-600 text-white shadow"
-                            : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
-                        }`}
-                      >
-                        {String(
-                          hour
-                        ).padStart(
-                          2,
-                          "0"
-                        )}
-                        :00
-                      </button>
-                    )
-                  )
-                )}
-              </div>
-            </div>
+  <div className="flex items-center gap-2">
+    <div className="flex max-w-[700px] gap-2 overflow-x-auto rounded-xl border border-gray-200 bg-gray-50 p-2">
+      {hours.length === 0 ? (
+        <div className="px-3 py-2 text-sm text-gray-400">
+          No completed uploads
+        </div>
+      ) : (
+        hours.map((hour) => (
+          <button
+            key={hour}
+            onClick={() => setBroadcastHour(String(hour))}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-all ${
+              broadcastHour === String(hour)
+                ? "bg-blue-600 text-white shadow"
+                : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            {String(hour).padStart(2, "0")}:00
+          </button>
+        ))
+      )}
+    </div>
+
+    <button
+      type="button"
+      onClick={handleRefresh}
+      disabled={refreshing}
+      title="Refresh"
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <RefreshCw
+        size={16}
+        className={refreshing ? "animate-spin" : ""}
+      />
+    </button>
+  </div>
+</div>
           </div>
         </div>
       </div>
