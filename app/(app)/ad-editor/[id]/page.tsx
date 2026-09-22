@@ -1010,6 +1010,218 @@ export default function AdEditorPage() {
       return groups;
     }, [copyParts]);
 
+
+  // ============================================================
+// COPY ALL ADVERTISEMENTS AS JSON
+// SAVED + NEW + OVERLAPPING
+// ============================================================
+
+const handleCopySavedAdsJson = async () => {
+  if (!results || results.length === 0) {
+    toast.warning("No advertisements to copy");
+    return;
+  }
+
+  const getSeconds = (
+    time?: string | number
+  ): number => {
+    if (
+      time === undefined ||
+      time === null ||
+      time === ""
+    ) {
+      return 0;
+    }
+
+    // Already seconds
+    if (typeof time === "number") {
+      return Number.isFinite(time)
+        ? time
+        : 0;
+    }
+
+    const value = String(time).trim();
+
+    if (!value) {
+      return 0;
+    }
+
+    // Numeric string
+    if (/^\d+(\.\d+)?$/.test(value)) {
+      const numeric = Number(value);
+
+      return Number.isFinite(numeric)
+        ? numeric
+        : 0;
+    }
+
+    const parts = value
+      .split(":")
+      .map(Number);
+
+    if (
+      parts.some(
+        (part) => !Number.isFinite(part)
+      )
+    ) {
+      return 0;
+    }
+
+    // HH:MM:SS
+    if (parts.length === 3) {
+      const [
+        hours,
+        minutes,
+        seconds,
+      ] = parts;
+
+      return (
+        hours * 3600 +
+        minutes * 60 +
+        seconds
+      );
+    }
+
+    // MM:SS
+    if (parts.length === 2) {
+      const [
+        minutes,
+        seconds,
+      ] = parts;
+
+      return (
+        minutes * 60 +
+        seconds
+      );
+    }
+
+    return parts[0] || 0;
+  };
+
+  const formatTime = (
+    time?: string | number
+  ): string => {
+    // Preserve existing timestamp format
+    // when available.
+    if (
+      typeof time === "string" &&
+      /^\d{2}:\d{2}:\d{2}$/.test(
+        time.trim()
+      )
+    ) {
+      return time.trim();
+    }
+
+    const totalSeconds = Math.max(
+      0,
+      Math.round(getSeconds(time))
+    );
+
+    const hours = Math.floor(
+      totalSeconds / 3600
+    );
+
+    const minutes = Math.floor(
+      (totalSeconds % 3600) / 60
+    );
+
+    const seconds =
+      totalSeconds % 60;
+
+    return [
+      String(hours).padStart(2, "0"),
+      String(minutes).padStart(2, "0"),
+      String(seconds).padStart(2, "0"),
+    ].join(":");
+  };
+
+  const advertisements = [...results]
+    .sort((a: any, b: any) => {
+      const aStart = getSeconds(
+        a.start ?? a.start_time
+      );
+
+      const bStart = getSeconds(
+        b.start ?? b.start_time
+      );
+
+      return aStart - bStart;
+    })
+    .map((ad: any) => {
+      const start =
+        ad.start ??
+        ad.start_time ??
+        "00:00:00";
+
+      const end =
+        ad.end ??
+        ad.end_time ??
+        "00:00:00";
+
+      const startSeconds =
+        getSeconds(start);
+
+      const endSeconds =
+        getSeconds(end);
+
+      return {
+        start: formatTime(start),
+        end: formatTime(end),
+
+        // IMPORTANT:
+        // actual_length is NUMBER of seconds
+        actual_length: Math.max(
+          0,
+          Math.round(
+            endSeconds -
+              startSeconds
+          )
+        ),
+
+        brand:
+          ad.brand_name ??
+          ad.brand ??
+          "",
+
+        copyline:
+          ad.text ??
+          ad.copyline ??
+          "",
+      };
+    });
+
+  const json = JSON.stringify(
+    {
+      advertisements,
+    },
+    null,
+    2
+  );
+
+  try {
+    await navigator.clipboard.writeText(
+      json
+    );
+
+    toast.success(
+      `📋 ${advertisements.length} advertisement${
+        advertisements.length === 1
+          ? ""
+          : "s"
+      } copied as JSON`
+    );
+  } catch (error) {
+    console.error(
+      "Failed to copy advertisements JSON:",
+      error
+    );
+
+    toast.error(
+      "Failed to copy advertisements JSON"
+    );
+  }
+};
+
   // ============================================================
   // COPY PART GROUP
   // ============================================================
@@ -4209,52 +4421,306 @@ export default function AdEditorPage() {
       ======================================================== */}
 
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur">
-        <div className="mx-auto w-full max-w-[1800px] px-3 py-2 md:px-5 md:py-3">
-          {isMobile ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
+  <div className="mx-auto w-full max-w-[1800px] px-3 py-2 md:px-5 md:py-3">
+
+    {/* ============================================================
+        MOBILE FOOTER
+    ============================================================ */}
+
+    {isMobile ? (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+
+          {/* Logs / Segments */}
+          {isAdmin && (
+            <button
+              onClick={toggleMobileTab}
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-700 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-800 active:scale-[0.98]"
+            >
+              <span>
+                {mobileTab === "logs"
+                  ? "📝"
+                  : "🎧"}
+              </span>
+
+              <span>
+                {mobileTab === "logs"
+                  ? "Logs"
+                  : "Segments"}
+              </span>
+
+              <span className="text-[10px] opacity-70">
+                ⇄
+              </span>
+            </button>
+          )}
+
+          {/* Last */}
+          <button
+            onClick={handleCenterLastCompleted}
+            className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700 active:scale-[0.98]"
+          >
+            <span>🎯</span>
+
+            <span>Last</span>
+          </button>
+
+          {/* Upload JSON */}
+          {isAdmin && (
+            <button
+              onClick={() =>
+                setShowJsonImport(true)
+              }
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
+            >
+              <FileJson size={14} />
+
+              <span>
+                Upload JSON
+              </span>
+            </button>
+          )}
+
+          {/* Copy JSON */}
+          <button
+            onClick={handleCopySavedAdsJson}
+            disabled={results.length === 0}
+            className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Copy size={14} />
+
+            <span>
+              Copy JSON
+            </span>
+          </button>
+
+          {/* More */}
+          <div className="relative">
+            <button
+              onClick={() =>
+                setShowMenu(
+                  (prev) => !prev
+                )
+              }
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
+            >
+              <MoreVertical size={18} />
+            </button>
+
+            {showMenu && (
+              <div className="absolute bottom-11 right-0 z-50 w-60 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+
+                {/* Add Segment */}
                 {isAdmin && (
                   <button
-                    onClick={
-                      toggleMobileTab
+                    onClick={() => {
+                      handleAddRange();
+
+                      setShowMenu(
+                        false
+                      );
+                    }}
+                    disabled={
+                      selectedP1Id ===
+                        null ||
+                      selectedP2Id ===
+                        null
                     }
-                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-700 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-800 active:scale-[0.98]"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    <span>
-                      {mobileTab ===
-                      "logs"
-                        ? "📝"
-                        : "🎧"}
-                    </span>
+                    <Plus size={16} />
 
-                    <span>
-                      {mobileTab ===
-                      "logs"
-                        ? "Logs"
-                        : "Segments"}
-                    </span>
-
-                    <span className="text-[10px] opacity-70">
-                      ⇄
-                    </span>
+                    Add Segment
                   </button>
                 )}
 
+                {/* Reprocess */}
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      handleReprocessAds();
+
+                      setShowMenu(
+                        false
+                      );
+                    }}
+                    disabled={
+                      !broadcastHour
+                    }
+                    className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <RefreshCw
+                      size={16}
+                    />
+
+                    Reprocess
+                  </button>
+                )}
+
+                {/* Save */}
+                <button
+                  onClick={() => {
+                    handleSaveAllSegments();
+
+                    setShowMenu(
+                      false
+                    );
+                  }}
+                  disabled={
+                    results.length === 0
+                  }
+                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-green-700 transition hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Save size={16} />
+
+                  Save
+                </button>
+
+                {/* Download */}
+                <button
+                  onClick={() => {
+                    handleDownloadExcel();
+
+                    setShowMenu(
+                      false
+                    );
+                  }}
+                  disabled={
+                    results.length === 0
+                  }
+                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Download
+                    size={16}
+                  />
+
+                  Download Excel
+                </button>
+
+                {/* Delete */}
+                {isAdmin && (
+                  <>
+                    <div className="border-t border-gray-100" />
+
+                    <button
+                      onClick={() => {
+                        handleDeleteAllAdvertisements();
+
+                        setShowMenu(
+                          false
+                        );
+                      }}
+                      disabled={
+                        results.length ===
+                        0
+                      }
+                      className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Trash2
+                        size={16}
+                      />
+
+                      Delete All
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    ) : (
+
+      /* ============================================================
+          DESKTOP FOOTER
+      ============================================================ */
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-4">
+
+              {/* LEFT ACTIONS */}
+              <div className="flex items-center gap-2">
+
+                {/* Last */}
                 <button
                   onClick={
                     handleCenterLastCompleted
                   }
-                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700 active:scale-[0.98]"
+                  className="flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700 active:scale-[0.98]"
                 >
-                  <span>
-                    🎯
-                  </span>
+                  <span>🎯</span>
 
                   <span>
                     Last
                   </span>
                 </button>
 
+                {/* Add */}
+                {isAdmin && (
+                  <button
+                    onClick={
+                      handleAddRange
+                    }
+                    disabled={
+                      selectedP1Id ===
+                        null ||
+                      selectedP2Id ===
+                        null
+                    }
+                    className={`flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-sm transition active:scale-[0.98] ${
+                      selectedP1Id !==
+                        null &&
+                      selectedP2Id !==
+                        null
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "cursor-not-allowed bg-gray-200 text-gray-400"
+                    }`}
+                  >
+                    <Plus size={14} />
+
+                    Add
+                  </button>
+                )}
+
+                {/* Upload JSON */}
+                {isAdmin && (
+                  <button
+                    onClick={() =>
+                      setShowJsonImport(
+                        true
+                      )
+                    }
+                    className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
+                  >
+                    <FileJson
+                      size={14}
+                    />
+
+                    Upload JSON
+                  </button>
+                )}
+
+                {/* Copy JSON */}
+                <button
+                  onClick={
+                    handleCopySavedAdsJson
+                  }
+                  disabled={
+                    results.length ===
+                    0
+                  }
+                  className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Copy size={14} />
+
+                  Copy JSON
+                </button>
+              </div>
+
+              {/* RIGHT ACTIONS */}
+              <div className="flex items-center gap-2">
+
+                {/* Reprocess */}
                 {isAdmin && (
                   <button
                     onClick={
@@ -4263,315 +4729,87 @@ export default function AdEditorPage() {
                     disabled={
                       !broadcastHour
                     }
-                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <RefreshCw
-                      size={15}
+                      size={14}
                     />
 
-                    <span>
-                      Reprocess
-                    </span>
+                    Reprocess
                   </button>
                 )}
 
-                <div className="relative">
-                  <button
-                    onClick={() =>
-                      setShowMenu(
-                        (
-                          prev
-                        ) =>
-                          !prev
-                      )
-                    }
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-700 transition hover:bg-gray-100"
-                  >
-                    <MoreVertical
-                      size={18}
-                    />
-                  </button>
+                {/* Save */}
+                <button
+                  onClick={
+                    handleSaveAllSegments
+                  }
+                  disabled={
+                    results.length === 0
+                  }
+                  className="flex h-9 items-center gap-1.5 rounded-lg bg-green-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                >
+                  <Save size={14} />
 
-                  {showMenu && (
-                    <div className="absolute bottom-11 right-0 w-60 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
-                      {isAdmin && (
-                        <button
-                          onClick={() => {
-                            setShowJsonImport(
-                              true
-                            );
+                  Save
+                </button>
 
-                            setShowMenu(
-                              false
-                            );
-                          }}
-                          className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-                        >
-                          <FileJson
-                            size={16}
-                          />
+                {/* Download */}
+                <button
+                  onClick={
+                    handleDownloadExcel
+                  }
+                  disabled={
+                    results.length === 0
+                  }
+                  className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                >
+                  <Download
+                    size={14}
+                  />
 
-                          Upload JSON
-                        </button>
-                      )}
+                  Download
+                </button>
 
-                      {isAdmin && (
-                        <button
-                          onClick={() => {
-                            handleAddRange();
-
-                            setShowMenu(
-                              false
-                            );
-                          }}
-                          disabled={
-                            selectedP1Id ===
-                              null ||
-                            selectedP2Id ===
-                              null
-                          }
-                          className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <Plus
-                            size={16}
-                          />
-
-                          Add Segment
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => {
-                          handleSaveAllSegments();
-
-                          setShowMenu(
-                            false
-                          );
-                        }}
-                        disabled={
-                          results.length ===
-                          0
-                        }
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Save
-                          size={16}
-                        />
-
-                        Save
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          handleDownloadExcel();
-
-                          setShowMenu(
-                            false
-                          );
-                        }}
-                        disabled={
-                          results.length ===
-                          0
-                        }
-                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Download
-                          size={16}
-                        />
-
-                        Download Excel
-                      </button>
-
-                      <div className="border-t border-gray-100" />
-
-                      {isAdmin && (
-                        <button
-                          onClick={() => {
-                            handleDeleteAllAdvertisements();
-
-                            setShowMenu(
-                              false
-                            );
-                          }}
-                          disabled={
-                            results.length ===
-                            0
-                          }
-                          className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <Trash2
-                            size={16}
-                          />
-
-                          Delete All
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
+                {/* Delete */}
+                {isAdmin && (
                   <button
                     onClick={
-                      handleCenterLastCompleted
-                    }
-                    className="flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700 active:scale-[0.98]"
-                  >
-                    <span>
-                      🎯
-                    </span>
-
-                    <span>
-                      Last
-                    </span>
-                  </button>
-
-                  {isAdmin && (
-                    <button
-                      onClick={
-                        handleAddRange
-                      }
-                      disabled={
-                        selectedP1Id ===
-                          null ||
-                        selectedP2Id ===
-                          null
-                      }
-                      className={`flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-sm transition active:scale-[0.98] ${
-                        selectedP1Id !==
-                          null &&
-                        selectedP2Id !==
-                          null
-                          ? "bg-blue-600 text-white hover:bg-blue-700"
-                          : "cursor-not-allowed bg-gray-200 text-gray-400"
-                      }`}
-                    >
-                      <Plus
-                        size={14}
-                      />
-
-                      Add
-                    </button>
-                  )}
-
-                  {isAdmin && (
-                    <button
-                      onClick={() =>
-                        setShowJsonImport(
-                          true
-                        )
-                      }
-                      className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
-                    >
-                      <FileJson
-                        size={14}
-                      />
-
-                      Upload JSON
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {isAdmin && (
-                    <button
-                      onClick={
-                        handleReprocessAds
-                      }
-                      disabled={
-                        !broadcastHour
-                      }
-                      className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <RefreshCw
-                        size={14}
-                      />
-
-                      Reprocess
-                    </button>
-                  )}
-
-                  <button
-                    onClick={
-                      handleSaveAllSegments
+                      handleDeleteAllAdvertisements
                     }
                     disabled={
-                      results.length ===
-                      0
+                      results.length === 0
                     }
-                    className="flex h-9 items-center gap-1.5 rounded-lg bg-green-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                   >
-                    <Save
+                    <Trash2
                       size={14}
                     />
 
-                    Save
+                    Delete
                   </button>
-
-                  <button
-                    onClick={
-                      handleDownloadExcel
-                    }
-                    disabled={
-                      results.length ===
-                      0
-                    }
-                    className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-                  >
-                    <Download
-                      size={14}
-                    />
-
-                    Download
-                  </button>
-
-                  {isAdmin && (
-                    <button
-                      onClick={
-                        handleDeleteAllAdvertisements
-                      }
-                      disabled={
-                        results.length ===
-                        0
-                      }
-                      className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-                    >
-                      <Trash2
-                        size={14}
-                      />
-
-                      Delete
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
             </div>
-          )}
-
-          <div className="mt-2 border-t border-gray-100 pt-2">
-            <AudioPlayer
-              file={file}
-              setFile={setFile}
-              audioRef={
-                audioRef
-              }
-              audioUrl={
-                audioUrl
-              }
-              onChange={
-                handleAudioChange
-              }
-              onTimeUpdate={
-                handleTimeUpdate
-              }
-            />
           </div>
+        )}
+
+        {/* ============================================================
+            AUDIO PLAYER
+        ============================================================ */}
+
+        <div className="mt-2 border-t border-gray-100 pt-2">
+          <AudioPlayer
+            file={file}
+            setFile={setFile}
+            audioRef={audioRef}
+            audioUrl={audioUrl}
+            onChange={handleAudioChange}
+            onTimeUpdate={handleTimeUpdate}
+          />
         </div>
       </div>
+    </div>
     </div>
   );
 }
