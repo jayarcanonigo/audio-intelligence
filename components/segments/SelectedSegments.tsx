@@ -2655,9 +2655,7 @@ export default function SelectedSegments({
                     <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end">
 
                       <div className="min-w-0 flex-1 sm:flex-none">
-                        <span className="mb-1 block text-xs text-gray-500">
-                          Start
-                        </span>
+                       
 
                         <TimeInput
                           value={
@@ -2674,9 +2672,7 @@ export default function SelectedSegments({
                       </div>
 
                       <div className="min-w-0 flex-1 sm:flex-none">
-                        <span className="mb-1 block text-xs text-gray-500">
-                          Duration
-                        </span>
+                       
 
                         <input
                           type="number"
@@ -2717,10 +2713,7 @@ export default function SelectedSegments({
                       </div>
 
                       <div className="min-w-0 flex-1 sm:flex-none">
-                        <span className="mb-1 block text-xs text-gray-500">
-                          End
-                        </span>
-
+                  
                         <TimeInput
                           value={
                             editEnd
@@ -2738,9 +2731,20 @@ export default function SelectedSegments({
                      * ==================================================
                      * NON-EDIT TIME
                      *
-                     * ONE ROW ON MOBILE AND DESKTOP:
+                     * MOBILE:
                      *
-                     * [−1] [START] [+1]  DURATION  [−1] [END] [+1]
+                     * START
+                     * [−]  START  [+]
+                     *
+                     * DURATION
+                     *    9 sec
+                     *
+                     * END
+                     * [−]  END  [+]
+                     *
+                     * DESKTOP:
+                     *
+                     * [−1] [START] [+1] DURATION [−1] [END] [+1]
                      *
                      * START +/-:
                      *   Moves BOTH start and end.
@@ -2755,260 +2759,552 @@ export default function SelectedSegments({
 
                     <div
                       className="
-                        flex
                         w-full
-                        items-center
-                        justify-center
-                        gap-1
-                        overflow-x-auto
-                        whitespace-nowrap
+                        sm:flex
+                        sm:items-center
+                        sm:justify-center
                         sm:gap-2
                       "
                     >
 
-                      {/* START -1 */}
+                      {/* ==================================================
+                          MOBILE TIME LAYOUT
+                          ================================================== */}
 
-                      <button
-                        type="button"
-                        disabled={
-                          toSeconds(
-                            row.start
-                          ) <= 0
-                        }
-                        onClick={(e) => {
-                          e.stopPropagation();
+                      <div className="space-y-3 sm:hidden">
 
-                          changeStartBy(
-                            row,
-                            -1
-                          );
-                        }}
+                        {/* START */}
+
+                        <div>
+                          <div className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                            Start
+                          </div>
+
+                          <div className="flex items-center justify-center gap-2">
+
+                            {/* START - */}
+
+                            <button
+                              type="button"
+                              disabled={
+                                toSeconds(
+                                  row.start
+                                ) <= 0
+                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+
+                                changeStartBy(
+                                  row,
+                                  -1
+                                );
+                              }}
+                              className="
+                                flex
+                                h-9
+                                w-9
+                                shrink-0
+                                items-center
+                                justify-center
+                                rounded-lg
+                                border
+                                border-gray-300
+                                bg-white
+                                text-xs
+                                font-bold
+                                text-gray-700
+                                shadow-sm
+                                transition
+                                active:scale-95
+                                hover:bg-gray-100
+                                disabled:cursor-not-allowed
+                                disabled:opacity-40
+                              "
+                              title="Move start backward by 1 second"
+                              aria-label="Move start backward by 1 second"
+                            >
+                              −
+                            </button>
+
+                            {/* START TIME */}
+
+                            <span
+                              className="
+                                flex
+                                h-9
+                                w-[110px]
+                                items-center
+                                justify-center
+                                rounded-lg
+                                border
+                                border-gray-300
+                                bg-white
+                                px-2
+                                font-mono
+                                text-xs
+                                font-semibold
+                                tracking-tight
+                                text-gray-700
+                                shadow-sm
+                              "
+                            >
+                              {row.start ||
+                                "00:00:00"}
+                            </span>
+
+                            {/* START + */}
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+
+                                changeStartBy(
+                                  row,
+                                  1
+                                );
+                              }}
+                              className="
+                                flex
+                                h-9
+                                w-9
+                                shrink-0
+                                items-center
+                                justify-center
+                                rounded-lg
+                                border
+                                border-gray-300
+                                bg-white
+                                text-xs
+                                font-bold
+                                text-gray-700
+                                shadow-sm
+                                transition
+                                active:scale-95
+                                hover:bg-gray-100
+                              "
+                              title="Move start forward by 1 second"
+                              aria-label="Move start forward by 1 second"
+                            >
+                              +
+                            </button>
+
+                          </div>
+                        </div>
+
+                        {/* DURATION */}
+
+                        <div>
+                          <div className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                            Duration
+                          </div>
+
+                          <div className="flex justify-center">
+                            <span
+                              className="
+                                flex
+                                h-9
+                                min-w-[110px]
+                                items-center
+                                justify-center
+                                rounded-lg
+                                border
+                                border-gray-200
+                                bg-white
+                                px-3
+                                text-xs
+                                font-bold
+                                text-gray-600
+                                shadow-sm
+                              "
+                            >
+                              {duration} sec
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* END */}
+
+                        <div>
+                          <div className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                            End
+                          </div>
+
+                          <div className="flex items-center justify-center gap-2">
+
+                            {/* END - */}
+
+                            <button
+                              type="button"
+                              disabled={
+                                duration <=
+                                1
+                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+
+                                changeEndBy(
+                                  row,
+                                  -1
+                                );
+                              }}
+                              className="
+                                flex
+                                h-9
+                                w-9
+                                shrink-0
+                                items-center
+                                justify-center
+                                rounded-lg
+                                border
+                                border-gray-300
+                                bg-white
+                                text-xs
+                                font-bold
+                                text-gray-700
+                                shadow-sm
+                                transition
+                                active:scale-95
+                                hover:bg-gray-100
+                                disabled:cursor-not-allowed
+                                disabled:opacity-40
+                              "
+                              title="Move end backward by 1 second"
+                              aria-label="Move end backward by 1 second"
+                            >
+                              −
+                            </button>
+
+                            {/* END TIME */}
+
+                            <span
+                              className="
+                                flex
+                                h-9
+                                w-[110px]
+                                items-center
+                                justify-center
+                                rounded-lg
+                                border
+                                border-gray-300
+                                bg-white
+                                px-2
+                                font-mono
+                                text-xs
+                                font-semibold
+                                tracking-tight
+                                text-gray-700
+                                shadow-sm
+                              "
+                            >
+                              {row.end ||
+                                "00:00:00"}
+                            </span>
+
+                            {/* END + */}
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+
+                                changeEndBy(
+                                  row,
+                                  1
+                                );
+                              }}
+                              className="
+                                flex
+                                h-9
+                                w-9
+                                shrink-0
+                                items-center
+                                justify-center
+                                rounded-lg
+                                border
+                                border-gray-300
+                                bg-white
+                                text-xs
+                                font-bold
+                                text-gray-700
+                                shadow-sm
+                                transition
+                                active:scale-95
+                                hover:bg-gray-100
+                              "
+                              title="Move end forward by 1 second"
+                              aria-label="Move end forward by 1 second"
+                            >
+                              +
+                            </button>
+
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* ==================================================
+                          DESKTOP TIME LAYOUT
+                          EXISTING DESIGN
+                          ================================================== */}
+
+                      <div
                         className="
-                          flex
-                          h-9
-                          w-9
-                          shrink-0
+                          hidden
+                          w-full
                           items-center
                           justify-center
-                          rounded-lg
-                          border
-                          border-gray-300
-                          bg-white
-                          text-xs
-                          font-bold
-                          text-gray-700
-                          shadow-sm
-                          hover:bg-gray-100
-                          active:bg-gray-200
-                          disabled:cursor-not-allowed
-                          disabled:opacity-40
-                          sm:h-10
-                          sm:w-10
-                        "
-                        title="Move start backward by 1 second"
-                      >
-                        −1
-                      </button>
-
-                      {/* START */}
-
-                      <span
-                        className="
-                          flex
-                          h-9
-                          min-w-[82px]
-                          shrink-0
-                          items-center
-                          justify-center
-                          rounded-lg
-                          border
-                          border-gray-300
-                          bg-white
-                          px-2
-                          text-[11px]
-                          font-semibold
-                          text-gray-700
-                          shadow-sm
-                          sm:h-10
-                          sm:min-w-[96px]
-                          sm:px-3
-                          sm:text-sm
+                          gap-1
+                          whitespace-nowrap
+                          sm:flex
+                          sm:gap-2
                         "
                       >
-                        {row.start ||
-                          "00:00:00"}
-                      </span>
 
-                      {/* START +1 */}
+                        {/* START -1 */}
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        <button
+                          type="button"
+                          disabled={
+                            toSeconds(
+                              row.start
+                            ) <= 0
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
 
-                          changeStartBy(
-                            row,
+                            changeStartBy(
+                              row,
+                              -1
+                            );
+                          }}
+                          className="
+                            flex
+                            h-9
+                            w-9
+                            shrink-0
+                            items-center
+                            justify-center
+                            rounded-lg
+                            border
+                            border-gray-300
+                            bg-white
+                            text-xs
+                            font-bold
+                            text-gray-700
+                            shadow-sm
+                            hover:bg-gray-100
+                            active:bg-gray-200
+                            disabled:cursor-not-allowed
+                            disabled:opacity-40
+                            sm:h-10
+                            sm:w-10
+                          "
+                          title="Move start backward by 1 second"
+                        >
+                          −1
+                        </button>
+
+                        {/* START */}
+
+                        <span
+                          className="
+                            flex
+                            h-9
+                            min-w-[82px]
+                            shrink-0
+                            items-center
+                            justify-center
+                            rounded-lg
+                            border
+                            border-gray-300
+                            bg-white
+                            px-2
+                            text-[11px]
+                            font-semibold
+                            text-gray-700
+                            shadow-sm
+                            sm:h-10
+                            sm:min-w-[96px]
+                            sm:px-3
+                            sm:text-sm
+                          "
+                        >
+                          {row.start ||
+                            "00:00:00"}
+                        </span>
+
+                        {/* START +1 */}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+
+                            changeStartBy(
+                              row,
+                              1
+                            );
+                          }}
+                          className="
+                            flex
+                            h-9
+                            w-9
+                            shrink-0
+                            items-center
+                            justify-center
+                            rounded-lg
+                            border
+                            border-gray-300
+                            bg-white
+                            text-xs
+                            font-bold
+                            text-gray-700
+                            shadow-sm
+                            hover:bg-gray-100
+                            active:bg-gray-200
+                            sm:h-10
+                            sm:w-10
+                          "
+                          title="Move start forward by 1 second"
+                        >
+                          +1
+                        </button>
+
+                        {/* DURATION */}
+
+                        <span
+                          className="
+                            mx-1
+                            flex
+                            h-9
+                            min-w-[54px]
+                            shrink-0
+                            items-center
+                            justify-center
+                            px-1
+                            text-[11px]
+                            font-bold
+                            text-gray-600
+                            sm:mx-2
+                            sm:h-10
+                            sm:min-w-[72px]
+                            sm:text-sm
+                          "
+                        >
+                          {duration} sec
+                        </span>
+
+                        {/* END -1 */}
+
+                        <button
+                          type="button"
+                          disabled={
+                            duration <=
                             1
-                          );
-                        }}
-                        className="
-                          flex
-                          h-9
-                          w-9
-                          shrink-0
-                          items-center
-                          justify-center
-                          rounded-lg
-                          border
-                          border-gray-300
-                          bg-white
-                          text-xs
-                          font-bold
-                          text-gray-700
-                          shadow-sm
-                          hover:bg-gray-100
-                          active:bg-gray-200
-                          sm:h-10
-                          sm:w-10
-                        "
-                        title="Move start forward by 1 second"
-                      >
-                        +1
-                      </button>
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
 
-                      {/* DURATION */}
+                            changeEndBy(
+                              row,
+                              -1
+                            );
+                          }}
+                          className="
+                            flex
+                            h-9
+                            w-9
+                            shrink-0
+                            items-center
+                            justify-center
+                            rounded-lg
+                            border
+                            border-gray-300
+                            bg-white
+                            text-xs
+                            font-bold
+                            text-gray-700
+                            shadow-sm
+                            hover:bg-gray-100
+                            active:bg-gray-200
+                            disabled:cursor-not-allowed
+                            disabled:opacity-40
+                            sm:h-10
+                            sm:w-10
+                          "
+                          title="Move end backward by 1 second"
+                        >
+                          −1
+                        </button>
 
-                      <span
-                        className="
-                          mx-1
-                          flex
-                          h-9
-                          min-w-[54px]
-                          shrink-0
-                          items-center
-                          justify-center
-                          px-1
-                          text-[11px]
-                          font-bold
-                          text-gray-600
-                          sm:mx-2
-                          sm:h-10
-                          sm:min-w-[72px]
-                          sm:text-sm
-                        "
-                      >
-                        {duration} sec
-                      </span>
+                        {/* END */}
 
-                      {/* END -1 */}
+                        <span
+                          className="
+                            flex
+                            h-9
+                            min-w-[82px]
+                            shrink-0
+                            items-center
+                            justify-center
+                            rounded-lg
+                            border
+                            border-gray-300
+                            bg-white
+                            px-2
+                            text-[11px]
+                            font-semibold
+                            text-gray-700
+                            shadow-sm
+                            sm:h-10
+                            sm:min-w-[96px]
+                            sm:px-3
+                            sm:text-sm
+                          "
+                        >
+                          {row.end ||
+                            "00:00:00"}
+                        </span>
 
-                      <button
-                        type="button"
-                        disabled={
-                          duration <=
-                          1
-                        }
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        {/* END +1 */}
 
-                          changeEndBy(
-                            row,
-                            -1
-                          );
-                        }}
-                        className="
-                          flex
-                          h-9
-                          w-9
-                          shrink-0
-                          items-center
-                          justify-center
-                          rounded-lg
-                          border
-                          border-gray-300
-                          bg-white
-                          text-xs
-                          font-bold
-                          text-gray-700
-                          shadow-sm
-                          hover:bg-gray-100
-                          active:bg-gray-200
-                          disabled:cursor-not-allowed
-                          disabled:opacity-40
-                          sm:h-10
-                          sm:w-10
-                        "
-                        title="Move end backward by 1 second"
-                      >
-                        −1
-                      </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
 
-                      {/* END */}
+                            changeEndBy(
+                              row,
+                              1
+                            );
+                          }}
+                          className="
+                            flex
+                            h-9
+                            w-9
+                            shrink-0
+                            items-center
+                            justify-center
+                            rounded-lg
+                            border
+                            border-gray-300
+                            bg-white
+                            text-xs
+                            font-bold
+                            text-gray-700
+                            shadow-sm
+                            hover:bg-gray-100
+                            active:bg-gray-200
+                            sm:h-10
+                            sm:w-10
+                          "
+                          title="Move end forward by 1 second"
+                        >
+                          +1
+                        </button>
 
-                      <span
-                        className="
-                          flex
-                          h-9
-                          min-w-[82px]
-                          shrink-0
-                          items-center
-                          justify-center
-                          rounded-lg
-                          border
-                          border-gray-300
-                          bg-white
-                          px-2
-                          text-[11px]
-                          font-semibold
-                          text-gray-700
-                          shadow-sm
-                          sm:h-10
-                          sm:min-w-[96px]
-                          sm:px-3
-                          sm:text-sm
-                        "
-                      >
-                        {row.end ||
-                          "00:00:00"}
-                      </span>
-
-                      {/* END +1 */}
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-
-                          changeEndBy(
-                            row,
-                            1
-                          );
-                        }}
-                        className="
-                          flex
-                          h-9
-                          w-9
-                          shrink-0
-                          items-center
-                          justify-center
-                          rounded-lg
-                          border
-                          border-gray-300
-                          bg-white
-                          text-xs
-                          font-bold
-                          text-gray-700
-                          shadow-sm
-                          hover:bg-gray-100
-                          active:bg-gray-200
-                          sm:h-10
-                          sm:w-10
-                        "
-                        title="Move end forward by 1 second"
-                      >
-                        +1
-                      </button>
-
+                      </div>
                     </div>
                   )}
 

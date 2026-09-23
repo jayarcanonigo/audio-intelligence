@@ -19,6 +19,7 @@ import {
   RefreshCw,
   RotateCw,
   Upload,
+  FileText,
 } from "lucide-react";
 
 import {
@@ -35,6 +36,8 @@ import {
   updateUploadFee,
   getUploadLimit,
   updateUploadLimit,
+  getAdsRule,
+  updateAdsRule,
   getSystemUsage,
   restartApi,
   getApiHealth,
@@ -101,6 +104,19 @@ export default function SettingsPage() {
     useState(false);
 
   // ==========================================================
+  // ADS RULE
+  // ==========================================================
+
+  const [adsRule, setAdsRule] =
+    useState("");
+
+  const [loadingAdsRule, setLoadingAdsRule] =
+    useState(false);
+
+  const [savingAdsRule, setSavingAdsRule] =
+    useState(false);
+
+  // ==========================================================
   // BETA SETTING
   // ==========================================================
 
@@ -164,6 +180,7 @@ export default function SettingsPage() {
 
     loadUploadFee();
     loadUploadLimit();
+    loadAdsRule();
     loadBetaSetting();
     loadSystemUsage();
   }, [
@@ -355,6 +372,85 @@ export default function SettingsPage() {
       );
     } finally {
       setSavingUploadLimit(false);
+    }
+  }
+
+  // ==========================================================
+  // LOAD ADS RULE
+  // ==========================================================
+
+  async function loadAdsRule() {
+    try {
+      setLoadingAdsRule(true);
+
+      const result =
+        await getAdsRule();
+
+      // IMPORTANT:
+      // getAdsRule() returns SystemSetting.
+      // The actual rule text is result.value.
+      setAdsRule(
+        result?.value ?? ""
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load advertisement rules:",
+        error
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load advertisement rules."
+      );
+    } finally {
+      setLoadingAdsRule(false);
+    }
+  }
+
+  // ==========================================================
+  // SAVE ADS RULE
+  // ==========================================================
+
+  async function saveAdsRule() {
+    const rule =
+      adsRule.trim();
+
+    if (!rule) {
+      toast.error(
+        "Advertisement detection rules cannot be empty."
+      );
+
+      return;
+    }
+
+    try {
+      setSavingAdsRule(true);
+
+      const result =
+        await updateAdsRule(rule);
+
+      // Keep exactly what the backend saved.
+      setAdsRule(
+        result?.value ?? rule
+      );
+
+      toast.success(
+        "Advertisement detection rules updated successfully."
+      );
+    } catch (error) {
+      console.error(
+        "Failed to save advertisement rules:",
+        error
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to save advertisement rules."
+      );
+    } finally {
+      setSavingAdsRule(false);
     }
   }
 
@@ -929,6 +1025,118 @@ export default function SettingsPage() {
             />
 
           </div>
+
+          {/* ==================================================
+              ADS DETECTION RULES
+          ================================================== */}
+
+          {isAdmin && (
+
+            <div className="bg-white rounded-xl shadow p-6">
+
+              <div className="flex items-center gap-2 mb-2">
+
+                <FileText className="w-5 h-5 text-indigo-600" />
+
+                <h2 className="font-semibold text-lg">
+                  Advertisement Detection Rules
+                </h2>
+
+              </div>
+
+              <p className="text-sm text-gray-500 mb-5">
+                Configure the rules used by the advertisement
+                detection engine. These rules are stored in
+                the database and can be updated without changing
+                application code.
+              </p>
+
+              <textarea
+                value={adsRule}
+                onChange={(e) =>
+                  setAdsRule(
+                    e.target.value
+                  )
+                }
+                disabled={
+                  loadingAdsRule ||
+                  savingAdsRule
+                }
+                rows={18}
+                spellCheck={false}
+                placeholder={
+                  "Enter advertisement detection rules..."
+                }
+                className="
+                  w-full
+                  border
+                  border-gray-300
+                  rounded-lg
+                  px-4
+                  py-3
+                  text-sm
+                  font-mono
+                  leading-6
+                  resize-y
+                  focus:outline-none
+                  focus:ring-2
+                  focus:ring-indigo-500
+                  focus:border-indigo-500
+                  disabled:bg-gray-100
+                  disabled:text-gray-500
+                "
+              />
+
+              <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+
+                <div className="text-xs text-gray-500">
+
+                  {loadingAdsRule
+                    ? "Loading advertisement rules..."
+                    : `${adsRule.length.toLocaleString()} characters`}
+
+                </div>
+
+                <button
+                  type="button"
+                  onClick={
+                    saveAdsRule
+                  }
+                  disabled={
+                    loadingAdsRule ||
+                    savingAdsRule ||
+                    !adsRule.trim()
+                  }
+                  className="
+                    bg-indigo-600
+                    hover:bg-indigo-700
+                    disabled:opacity-50
+                    disabled:cursor-not-allowed
+                    text-white
+                    px-5
+                    py-2
+                    rounded-lg
+                    flex
+                    items-center
+                    justify-center
+                    gap-2
+                    min-w-[150px]
+                  "
+                >
+
+                  <Save className="w-4 h-4" />
+
+                  {savingAdsRule
+                    ? "Saving..."
+                    : "Save Rules"}
+
+                </button>
+
+              </div>
+
+            </div>
+
+          )}
 
           {/* ==================================================
               BETA FEATURES
@@ -1779,8 +1987,6 @@ export default function SettingsPage() {
 
                     <div className="flex flex-wrap items-center gap-4 text-sm">
 
-                      {/* STATUS */}
-
                       <div>
 
                         <span className="text-gray-500">
@@ -1805,8 +2011,6 @@ export default function SettingsPage() {
 
                       </div>
 
-                      {/* PID */}
-
                       <div>
 
                         <span className="text-gray-500">
@@ -1821,8 +2025,6 @@ export default function SettingsPage() {
                         </span>
 
                       </div>
-
-                      {/* RESTARTS */}
 
                       <div>
 
@@ -1840,8 +2042,6 @@ export default function SettingsPage() {
 
                       </div>
 
-                      {/* CPU */}
-
                       <div>
 
                         <span className="text-gray-500">
@@ -1857,8 +2057,6 @@ export default function SettingsPage() {
                         </span>
 
                       </div>
-
-                      {/* RAM */}
 
                       <div>
 

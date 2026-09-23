@@ -12,7 +12,7 @@ import LiveLogs from "@/components/logs/LiveLogs";
 import { fetchFile } from "@ffmpeg/util";
 import SelectedSegments from "@/components/segments/SelectedSegments";
 import AudioPlayer from "@/components/audio/AudioPlayer";
-
+import { getAdsRule } from "@/services/settings";
 import {
   useParams,
   useSearchParams,
@@ -1387,6 +1387,18 @@ const handleCopySavedAdsJson = async () => {
       }
     };
 
+    const copyAdRuleSettings = async () => {
+    try {
+      const setting = await getAdsRule();
+
+      await navigator.clipboard.writeText(setting.value);
+
+      toast.success("Ad rule settings copied");
+    } catch (error) {
+      console.error("Failed to copy ad rule settings:", error);
+      toast.error("Failed to copy ad rule settings");
+    }
+  };
   // ============================================================
   // JSON IMPORT HELPERS
   // ============================================================
@@ -3982,18 +3994,28 @@ const handleCopySavedAdsJson = async () => {
       <div className="rounded-xl bg-white p-4 shadow-sm md:p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-800 md:text-2xl">
-              🎧 Ad Editor
-            </h1>
+          <h1 className="text-xl font-bold text-gray-800 md:text-2xl">
+            🎧 Ad Editor
+          </h1>
 
-            <p className="mt-1 break-words text-sm text-gray-500">
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+            <span>
               Project:{" "}
               <span className="font-medium text-gray-700">
-                {projectName ||
-                  `Project #${projectId}`}
+                {projectName || `Project #${projectId}`}
               </span>
-            </p>
-          </div>
+            </span>
+
+            <button
+              type="button"
+              onClick={copyAdRuleSettings}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-gray-800"
+              title="Copy advertisement detection rules"
+            >
+              📋 Copy Ad Rules
+            </button>
+          </p>
+        </div>
 
          
           {/* BROADCAST HOUR */}

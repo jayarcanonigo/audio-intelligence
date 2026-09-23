@@ -668,3 +668,103 @@ export async function getApiHealth(): Promise<ApiHealthResponse> {
 
     return response.json();
 }
+
+// ============================================================
+// GET ADS RULE
+//
+// GET /system/settings/ads-rule
+//
+// Returns the advertisement detection rules.
+// ============================================================
+
+export async function getAdsRule(): Promise<SystemSetting> {
+
+    const response = await fetch(
+        `${API_URL}/system/settings/ads-rule`,
+        {
+            method: "GET",
+
+            headers:
+                getAuthHeaders(),
+
+            cache:
+                "no-store",
+        }
+    );
+
+    if (!response.ok) {
+
+        let message =
+            "Failed to load advertisement detection rules.";
+
+        try {
+
+            const data =
+                await response.json();
+
+            message =
+                data.detail || message;
+
+        } catch {
+            // Ignore JSON parsing error
+        }
+
+        throw new Error(message);
+    }
+
+    return response.json();
+}
+
+
+// ============================================================
+// UPDATE ADS RULE
+//
+// PUT /system/settings/ads-rule
+//
+// ADMIN ONLY
+// ============================================================
+
+export async function updateAdsRule(
+    rule: string
+): Promise<SystemSetting> {
+
+    const response = await fetch(
+        `${API_URL}/system/settings/ads-rule`,
+        {
+            method: "PUT",
+
+            headers:
+                getAuthHeaders(),
+
+            body: JSON.stringify({
+                value:
+                    rule,
+
+                description:
+                    "Advertisement detection rules used by the ad detection engine.",
+            }),
+        }
+    );
+
+    if (!response.ok) {
+
+        let message =
+            "Failed to update advertisement detection rules.";
+
+        try {
+
+            const data =
+                await response.json();
+
+            message =
+                data.detail || message;
+
+        } catch {
+            // Ignore JSON parsing error
+        }
+
+        throw new Error(message);
+    }
+
+    return response.json();
+}
