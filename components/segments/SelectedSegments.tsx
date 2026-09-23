@@ -2,7 +2,6 @@
 
 import {
   useEffect,
-  useRef,
   useState,
 } from "react";
 
@@ -84,18 +83,6 @@ interface Props {
   ) => void | Promise<void>;
 }
 
-const DURATION_OPTIONS = [
-  5,
-  10,
-  15,
-  20,
-  25,
-  30,
-  35,
-  40,
-  45,
-];
-
 export default function SelectedSegments({
   segments,
   transcriptSegments = [],
@@ -129,15 +116,6 @@ export default function SelectedSegments({
   const [editBrand, setEditBrand] =
     useState("");
 
-  const [customDurations, setCustomDurations] =
-    useState<Record<number, number>>({});
-
-  const [durationOpenId, setDurationOpenId] =
-    useState<number | null>(null);
-
-  const [durationSearch, setDurationSearch] =
-    useState("");
-
   const [saving, setSaving] =
     useState(false);
 
@@ -158,9 +136,6 @@ export default function SelectedSegments({
 
   const [keywordSaving, setKeywordSaving] =
     useState(false);
-
-  const durationDropdownRef =
-    useRef<HTMLDivElement | null>(null);
 
   /*
    * ============================================================
@@ -766,56 +741,12 @@ export default function SelectedSegments({
               return updated;
             }
 
-            const updated: Segment =
-              {
-                ...incoming,
-                status,
-              };
-
-            return updated;
+            return {
+              ...incoming,
+              status,
+            };
           }
         );
-      }
-    );
-
-    setCustomDurations(
-      (previous) => {
-        const next = {
-          ...previous,
-        };
-
-        let changed = false;
-
-        segments.forEach(
-          (segment) => {
-            if (
-              next[segment.id] ===
-              undefined
-            ) {
-              const duration =
-                getDuration(
-                  segment.start,
-                  segment.end
-                );
-
-              if (
-                duration > 0 &&
-                !DURATION_OPTIONS.includes(
-                  duration
-                )
-              ) {
-                next[segment.id] =
-                  duration;
-
-                changed = true;
-              }
-            }
-          }
-        );
-
-        return changed
-          ? next
-          : previous;
       }
     );
   }, [segments]);
@@ -834,7 +765,6 @@ export default function SelectedSegments({
 
     setEditingId(null);
     setBrandOpenId(null);
-    setDurationOpenId(null);
   }
 
   function closeKeywordModal() {
@@ -926,75 +856,13 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * CLOSE DROPDOWN
-   * ============================================================
-   */
-
-  useEffect(() => {
-    function handleOutsideClick(
-      event: MouseEvent
-    ) {
-      if (
-        durationDropdownRef.current &&
-        !durationDropdownRef.current.contains(
-          event.target as Node
-        )
-      ) {
-        setDurationOpenId(
-          null
-        );
-
-        setDurationSearch(
-          ""
-        );
-      }
-    }
-
-    document.addEventListener(
-      "mousedown",
-      handleOutsideClick
-    );
-
-    return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleOutsideClick
-      );
-    };
-  }, []);
-
-  /*
-   * ============================================================
-   * DURATION OPTIONS
-   * ============================================================
-   */
-
-  function getDurationOptions(
-    id: number
-  ): number[] {
-    const custom =
-      customDurations[id];
-
-    if (
-      custom === undefined ||
-      DURATION_OPTIONS.includes(
-        custom
-      )
-    ) {
-      return DURATION_OPTIONS;
-    }
-
-    return [
-      ...DURATION_OPTIONS,
-      custom,
-    ].sort(
-      (a, b) => a - b
-    );
-  }
-
-  /*
-   * ============================================================
    * CHANGE DURATION
+   *
+   * ONLY changes END.
+   * START remains unchanged.
+   * Transcript remains unchanged.
+   * segment_ids remain unchanged.
+   * detection_key remains unchanged.
    * ============================================================
    */
 
@@ -1009,49 +877,15 @@ export default function SelectedSegments({
       return;
     }
 
-    const originalStart =
+    const start =
       row.start ||
       "00:00:00";
 
-    const merged =
-      mergeTranscriptLikeBackend(
-        row,
-        originalStart,
-        duration
+    const newEnd =
+      secondsToTime(
+        toSeconds(start) +
+          duration
       );
-
-    let detectionKey:
-      string | null =
-      row.detection_key ||
-      null;
-
-    const projectId =
-      getProjectIdFromRow(row);
-
-    if (
-      projectId !== null &&
-      merged.startSegmentId !==
-        null &&
-      merged.endSegmentId !==
-        null
-    ) {
-      detectionKey =
-        makeDetectionKey(
-          projectId,
-          merged.startSegmentId,
-          merged.endSegmentId
-        );
-    }
-
-    const segmentIds =
-      merged.segmentIds;
-
-    setCustomDurations(
-      (previous) => ({
-        ...previous,
-        [row.id]: duration,
-      })
-    );
 
     setSegmentList(
       (previous): Segment[] =>
@@ -1060,22 +894,18 @@ export default function SelectedSegments({
             item.id === row.id
               ? {
                   ...item,
-
                   start:
-                    merged.startTime,
-
+                    item.start,
                   end:
-                    merged.endTime,
-
+                    newEnd,
                   text:
-                    merged.text,
-
-                  detection_key:
-                    detectionKey,
-
+                    item.text,
                   segment_ids:
-                    segmentIds,
-
+                    item.segment_ids,
+                  detection_key:
+                    item.detection_key,
+                  brand_name:
+                    item.brand_name,
                   status:
                     "NEW" as AdvertisementStatus,
                 }
@@ -1087,13 +917,13 @@ export default function SelectedSegments({
       row.id,
       {
         text:
-          merged.text,
+          row.text,
 
         start:
-          merged.startTime,
+          start,
 
         end:
-          merged.endTime,
+          newEnd,
 
         brand_name:
           row.brand_name ||
@@ -1103,19 +933,11 @@ export default function SelectedSegments({
           "NEW" as AdvertisementStatus,
 
         detection_key:
-          detectionKey,
+          row.detection_key,
 
         segment_ids:
-          segmentIds,
+          row.segment_ids,
       }
-    );
-
-    setDurationOpenId(
-      null
-    );
-
-    setDurationSearch(
-      ""
     );
   }
 
@@ -1149,265 +971,222 @@ export default function SelectedSegments({
 
   /*
    * ============================================================
-   * CUSTOM DURATION
+   * CHANGE START BY 1 SECOND
+   *
+   * START -1 / +1 moves BOTH start and end.
+   *
+   * Duration remains exactly the same.
+   *
+   * No transcript rebuilding.
+   * No segment_ids rebuilding.
+   * No detection_key rebuilding.
    * ============================================================
    */
 
-  function applyCustomDuration(
-    row: Segment
+  function changeStartBy(
+    row: Segment,
+    amount: number
   ) {
-    const value =
-      Number(durationSearch);
+    const currentStart =
+      toSeconds(
+        row.start ||
+          "00:00:00"
+      );
+
+    const currentEnd =
+      toSeconds(
+        row.end ||
+          "00:00:00"
+      );
+
+    const currentDuration =
+      currentEnd -
+      currentStart;
 
     if (
-      !Number.isFinite(value) ||
-      value <= 0
+      !Number.isFinite(
+        currentDuration
+      ) ||
+      currentDuration <= 0
     ) {
       return;
     }
 
-    changeDuration(
-      row,
-      Math.floor(value)
+    const newStartSeconds =
+      Math.max(
+        0,
+        currentStart + amount
+      );
+
+    const newEndSeconds =
+      newStartSeconds +
+      currentDuration;
+
+    const newStart =
+      secondsToTime(
+        newStartSeconds
+      );
+
+    const newEnd =
+      secondsToTime(
+        newEndSeconds
+      );
+
+    setSegmentList(
+      (previous): Segment[] =>
+        previous.map(
+          (item): Segment =>
+            item.id === row.id
+              ? {
+                  ...item,
+
+                  start:
+                    newStart,
+
+                  end:
+                    newEnd,
+
+                  text:
+                    item.text,
+
+                  segment_ids:
+                    item.segment_ids,
+
+                  detection_key:
+                    item.detection_key,
+
+                  brand_name:
+                    item.brand_name,
+
+                  status:
+                    "NEW" as AdvertisementStatus,
+                }
+              : item
+        )
+    );
+
+    onUpdate?.(
+      row.id,
+      {
+        text:
+          row.text,
+
+        start:
+          newStart,
+
+        end:
+          newEnd,
+
+        brand_name:
+          row.brand_name ||
+          "",
+
+        status:
+          "NEW" as AdvertisementStatus,
+
+        detection_key:
+          row.detection_key,
+
+        segment_ids:
+          row.segment_ids,
+      }
     );
   }
 
   /*
    * ============================================================
-   * DURATION DROPDOWN
+   * CHANGE END BY 1 SECOND
+   *
+   * End -1 / +1 changes ONLY the end time.
    * ============================================================
    */
 
-  function DurationDropdown({
-    row,
-    duration,
-    overlapping,
-    isNew,
-  }: {
-    row: Segment;
-    duration: number;
-    overlapping: boolean;
-    isNew: boolean;
-  }) {
-    const open =
-      durationOpenId === row.id;
-
-    const search =
-      durationSearch
-        .trim()
-        .toLowerCase();
-
-    const options =
-      getDurationOptions(
-        row.id
+  function changeEndBy(
+    row: Segment,
+    amount: number
+  ) {
+    const currentStart =
+      toSeconds(
+        row.start ||
+          "00:00:00"
       );
 
-    const filtered =
-      search
-        ? options.filter(
-            (value) =>
-              String(value).includes(
-                search
-              )
-          )
-        : options;
+    const currentEnd =
+      toSeconds(
+        row.end ||
+          "00:00:00"
+      );
 
-    return (
-      <div
-        className="relative w-full sm:w-auto"
-        ref={
-          open
-            ? durationDropdownRef
-            : undefined
-        }
-        onClick={(e) =>
-          e.stopPropagation()
-        }
-      >
-        <button
-          type="button"
-          onClick={() => {
-            setDurationOpenId(
-              open
-                ? null
-                : row.id
-            );
+    const newEndSeconds =
+      Math.max(
+        currentStart + 1,
+        currentEnd + amount
+      );
 
-            setDurationSearch(
-              ""
-            );
-          }}
-          className={`
-            flex
-            h-10
-            w-full
-            min-w-0
-            items-center
-            justify-between
-            rounded-lg
-            border
-            px-3
-            text-sm
-            font-semibold
-            shadow-sm
-            ${
-              overlapping
-                ? "border-red-500 bg-red-50 text-red-700"
-                : isNew
-                  ? "border-orange-400 bg-orange-50 text-orange-700"
-                  : "border-gray-300 bg-white hover:border-blue-400"
-            }
-          `}
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            {overlapping && (
-              <span>⚠</span>
-            )}
+    const newEnd =
+      secondsToTime(
+        newEndSeconds
+      );
 
-            {!overlapping &&
-              isNew && (
-                <span>✨</span>
-              )}
+    setSegmentList(
+      (previous): Segment[] =>
+        previous.map(
+          (item): Segment =>
+            item.id === row.id
+              ? {
+                  ...item,
 
-            <span className="truncate">
-              {duration} seconds
-            </span>
-          </span>
+                  start:
+                    item.start,
 
-          <span
-            className={
-              open
-                ? "rotate-180"
-                : ""
-            }
-          >
-            ▼
-          </span>
-        </button>
+                  end:
+                    newEnd,
 
-        {open && (
-          <div className="absolute left-0 right-0 z-50 mt-2 w-full min-w-56 overflow-hidden rounded-xl border bg-white shadow-xl sm:right-auto sm:w-64">
-            <div className="border-b p-2">
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  🔍
-                </span>
+                  text:
+                    item.text,
 
-                <input
-                  autoFocus
-                  type="number"
-                  min={1}
-                  value={
-                    durationSearch
-                  }
-                  onChange={(e) =>
-                    setDurationSearch(
-                      e.target.value
-                    )
-                  }
-                  onKeyDown={(e) => {
-                    if (
-                      e.key ===
-                      "Enter"
-                    ) {
-                      applyCustomDuration(
-                        row
-                      );
-                    }
+                  segment_ids:
+                    item.segment_ids,
 
-                    if (
-                      e.key ===
-                      "Escape"
-                    ) {
-                      setDurationOpenId(
-                        null
-                      );
+                  detection_key:
+                    item.detection_key,
 
-                      setDurationSearch(
-                        ""
-                      );
-                    }
-                  }}
-                  placeholder="Type duration..."
-                  className="h-10 w-full rounded-lg border bg-gray-50 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
-                />
-              </div>
-            </div>
+                  brand_name:
+                    item.brand_name,
 
-            <div className="max-h-72 overflow-y-auto p-1">
-              {filtered.map(
-                (value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() =>
-                      changeDuration(
-                        row,
-                        value
-                      )
-                    }
-                    className={`
-                      flex
-                      w-full
-                      items-center
-                      justify-between
-                      rounded-lg
-                      px-3
-                      py-2.5
-                      text-left
-                      text-sm
-                      ${
-                        value ===
-                        duration
-                          ? "bg-blue-50 font-semibold text-blue-700"
-                          : "hover:bg-gray-50"
-                      }
-                    `}
-                  >
-                    <span>
-                      {value} seconds
-                    </span>
-
-                    {value ===
-                      duration && (
-                      <span>
-                        ✓
-                      </span>
-                    )}
-                  </button>
-                )
-              )}
-
-              {filtered.length ===
-                0 && (
-                <div className="px-3 py-3 text-sm text-gray-500">
-                  No preset duration found.
-                </div>
-              )}
-            </div>
-
-            <div className="border-t p-2">
-              <button
-                type="button"
-                disabled={
-                  !durationSearch ||
-                  Number(
-                    durationSearch
-                  ) <= 0
+                  status:
+                    "NEW" as AdvertisementStatus,
                 }
-                onClick={() =>
-                  applyCustomDuration(
-                    row
-                  )
-                }
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-semibold hover:bg-gray-50 disabled:opacity-40"
-              >
-                ✏ Custom duration
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+              : item
+        )
+    );
+
+    onUpdate?.(
+      row.id,
+      {
+        text:
+          row.text,
+
+        start:
+          row.start ||
+          "00:00:00",
+
+        end:
+          newEnd,
+
+        brand_name:
+          row.brand_name ||
+          "",
+
+        status:
+          "NEW" as AdvertisementStatus,
+
+        detection_key:
+          row.detection_key,
+
+        segment_ids:
+          row.segment_ids,
+      }
     );
   }
 
@@ -1422,9 +1201,7 @@ export default function SelectedSegments({
   ) {
     setEditingId(row.id);
 
-    setBrandOpenId(
-      null
-    );
+    setBrandOpenId(null);
 
     setEditText(
       row.text || ""
@@ -1455,6 +1232,13 @@ export default function SelectedSegments({
   function changeEditDuration(
     duration: number
   ) {
+    if (
+      !Number.isFinite(duration) ||
+      duration <= 0
+    ) {
+      return;
+    }
+
     const start =
       editStart ||
       "00:00:00";
@@ -1774,34 +1558,10 @@ export default function SelectedSegments({
       }
 
       if (
-        durationOpenId === id
-      ) {
-        setDurationOpenId(
-          null
-        );
-      }
-
-      if (
         keywordRow?.id === id
       ) {
         closeKeywordModal();
       }
-
-      setDurationSearch(
-        ""
-      );
-
-      setCustomDurations(
-        (previous) => {
-          const next = {
-            ...previous,
-          };
-
-          delete next[id];
-
-          return next;
-        }
-      );
     } catch (error) {
       console.error(
         "DATABASE DELETE FAILED:",
@@ -2918,7 +2678,9 @@ export default function SelectedSegments({
                           Duration
                         </span>
 
-                        <select
+                        <input
+                          type="number"
+                          min={1}
                           value={
                             editDuration
                           }
@@ -2940,33 +2702,14 @@ export default function SelectedSegments({
                             border
                             bg-white
                             px-3
+                            text-center
                             text-sm
                             font-semibold
-                            sm:min-w-32
+                            outline-none
+                            focus:border-blue-400
+                            sm:w-32
                           "
-                        >
-                          {getDurationOptions(
-                            row.id
-                          ).map(
-                            (
-                              value
-                            ) => (
-                              <option
-                                key={
-                                  value
-                                }
-                                value={
-                                  value
-                                }
-                              >
-                                {
-                                  value
-                                }{" "}
-                                seconds
-                              </option>
-                            )
-                          )}
-                        </select>
+                        />
                       </div>
 
                       <div className="hidden pb-2 text-gray-400 sm:block">
@@ -2991,172 +2734,280 @@ export default function SelectedSegments({
                     </div>
                   ) : (
 
-                    <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2 sm:flex sm:flex-wrap sm:gap-3">
+                    /*
+                     * ==================================================
+                     * NON-EDIT TIME
+                     *
+                     * ONE ROW ON MOBILE AND DESKTOP:
+                     *
+                     * [−1] [START] [+1]  DURATION  [−1] [END] [+1]
+                     *
+                     * START +/-:
+                     *   Moves BOTH start and end.
+                     *
+                     * DURATION:
+                     *   Display only.
+                     *
+                     * END +/-:
+                     *   Moves ONLY end.
+                     * ==================================================
+                     */
+
+                    <div
+                      className="
+                        flex
+                        w-full
+                        items-center
+                        justify-center
+                        gap-1
+                        overflow-x-auto
+                        whitespace-nowrap
+                        sm:gap-2
+                      "
+                    >
+
+                      {/* START -1 */}
+
+                      <button
+                        type="button"
+                        disabled={
+                          toSeconds(
+                            row.start
+                          ) <= 0
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+
+                          changeStartBy(
+                            row,
+                            -1
+                          );
+                        }}
+                        className="
+                          flex
+                          h-9
+                          w-9
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-lg
+                          border
+                          border-gray-300
+                          bg-white
+                          text-xs
+                          font-bold
+                          text-gray-700
+                          shadow-sm
+                          hover:bg-gray-100
+                          active:bg-gray-200
+                          disabled:cursor-not-allowed
+                          disabled:opacity-40
+                          sm:h-10
+                          sm:w-10
+                        "
+                        title="Move start backward by 1 second"
+                      >
+                        −1
+                      </button>
 
                       {/* START */}
 
-                      <div className="min-w-0">
-                        <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
-                          Start
-                        </span>
+                      <span
+                        className="
+                          flex
+                          h-9
+                          min-w-[82px]
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-lg
+                          border
+                          border-gray-300
+                          bg-white
+                          px-2
+                          text-[11px]
+                          font-semibold
+                          text-gray-700
+                          shadow-sm
+                          sm:h-10
+                          sm:min-w-[96px]
+                          sm:px-3
+                          sm:text-sm
+                        "
+                      >
+                        {row.start ||
+                          "00:00:00"}
+                      </span>
 
-                        <span
-                          className="
-                            flex
-                            h-10
-                            w-full
-                            items-center
-                            justify-center
-                            overflow-hidden
-                            rounded-lg
-                            border
-                            bg-white
-                            px-1
-                            text-[11px]
-                            font-semibold
-                            sm:w-auto
-                            sm:px-3
-                            sm:text-sm
-                          "
-                        >
-                          {row.start ||
-                            "00:00:00"}
-                        </span>
-                      </div>
+                      {/* START +1 */}
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+
+                          changeStartBy(
+                            row,
+                            1
+                          );
+                        }}
+                        className="
+                          flex
+                          h-9
+                          w-9
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-lg
+                          border
+                          border-gray-300
+                          bg-white
+                          text-xs
+                          font-bold
+                          text-gray-700
+                          shadow-sm
+                          hover:bg-gray-100
+                          active:bg-gray-200
+                          sm:h-10
+                          sm:w-10
+                        "
+                        title="Move start forward by 1 second"
+                      >
+                        +1
+                      </button>
 
                       {/* DURATION */}
 
-                      <div className="min-w-0">
-                        <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
-                          Duration
-                        </span>
+                      <span
+                        className="
+                          mx-1
+                          flex
+                          h-9
+                          min-w-[54px]
+                          shrink-0
+                          items-center
+                          justify-center
+                          px-1
+                          text-[11px]
+                          font-bold
+                          text-gray-600
+                          sm:mx-2
+                          sm:h-10
+                          sm:min-w-[72px]
+                          sm:text-sm
+                        "
+                      >
+                        {duration} sec
+                      </span>
 
-                        <div className="flex items-center gap-1">
+                      {/* END -1 */}
 
-                          {/* BACKWARD 1 SECOND */}
+                      <button
+                        type="button"
+                        disabled={
+                          duration <=
+                          1
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
 
-                          <button
-                            type="button"
-                            disabled={
-                              duration <=
-                              1
-                            }
-                            onClick={(e) => {
-                              e.stopPropagation();
-
-                              changeDurationBy(
-                                row,
-                                -1
-                              );
-                            }}
-                            className="
-                              flex
-                              h-10
-                              w-10
-                              shrink-0
-                              items-center
-                              justify-center
-                              rounded-lg
-                              border
-                              border-gray-300
-                              bg-white
-                              text-xs
-                              font-bold
-                              text-gray-700
-                              shadow-sm
-                              hover:bg-gray-100
-                              disabled:cursor-not-allowed
-                              disabled:opacity-40
-                            "
-                            title="Decrease duration by 1 second"
-                          >
-                            −1
-                          </button>
-
-                          {/* DURATION DROPDOWN */}
-
-                          <div className="min-w-0 flex-1">
-                            <DurationDropdown
-                              row={row}
-                              duration={
-                                duration
-                              }
-                              overlapping={
-                                overlapping
-                              }
-                              isNew={
-                                isNew
-                              }
-                            />
-                          </div>
-
-                          {/* FORWARD 1 SECOND */}
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-
-                              changeDurationBy(
-                                row,
-                                1
-                              );
-                            }}
-                            className="
-                              flex
-                              h-10
-                              w-10
-                              shrink-0
-                              items-center
-                              justify-center
-                              rounded-lg
-                              border
-                              border-gray-300
-                              bg-white
-                              text-xs
-                              font-bold
-                              text-gray-700
-                              shadow-sm
-                              hover:bg-gray-100
-                            "
-                            title="Increase duration by 1 second"
-                          >
-                            +1
-                          </button>
-
-                        </div>
-                      </div>
+                          changeEndBy(
+                            row,
+                            -1
+                          );
+                        }}
+                        className="
+                          flex
+                          h-9
+                          w-9
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-lg
+                          border
+                          border-gray-300
+                          bg-white
+                          text-xs
+                          font-bold
+                          text-gray-700
+                          shadow-sm
+                          hover:bg-gray-100
+                          active:bg-gray-200
+                          disabled:cursor-not-allowed
+                          disabled:opacity-40
+                          sm:h-10
+                          sm:w-10
+                        "
+                        title="Move end backward by 1 second"
+                      >
+                        −1
+                      </button>
 
                       {/* END */}
 
-                      <div className="min-w-0">
-                        <span className="mb-1 block text-[10px] text-gray-500 sm:text-xs">
-                          End
-                        </span>
+                      <span
+                        className="
+                          flex
+                          h-9
+                          min-w-[82px]
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-lg
+                          border
+                          border-gray-300
+                          bg-white
+                          px-2
+                          text-[11px]
+                          font-semibold
+                          text-gray-700
+                          shadow-sm
+                          sm:h-10
+                          sm:min-w-[96px]
+                          sm:px-3
+                          sm:text-sm
+                        "
+                      >
+                        {row.end ||
+                          "00:00:00"}
+                      </span>
 
-                        <span
-                          className="
-                            flex
-                            h-10
-                            w-full
-                            items-center
-                            justify-center
-                            overflow-hidden
-                            rounded-lg
-                            border
-                            bg-white
-                            px-1
-                            text-[11px]
-                            font-semibold
-                            sm:w-auto
-                            sm:px-3
-                            sm:text-sm
-                          "
-                        >
-                          {row.end ||
-                            "00:00:00"}
-                        </span>
-                      </div>
+                      {/* END +1 */}
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+
+                          changeEndBy(
+                            row,
+                            1
+                          );
+                        }}
+                        className="
+                          flex
+                          h-9
+                          w-9
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-lg
+                          border
+                          border-gray-300
+                          bg-white
+                          text-xs
+                          font-bold
+                          text-gray-700
+                          shadow-sm
+                          hover:bg-gray-100
+                          active:bg-gray-200
+                          sm:h-10
+                          sm:w-10
+                        "
+                        title="Move end forward by 1 second"
+                      >
+                        +1
+                      </button>
 
                     </div>
                   )}
