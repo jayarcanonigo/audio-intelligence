@@ -18,7 +18,6 @@ import {
   Clock,
   Download,
   Eye,
-  Layers,
   Plus,
   Trash2,
   Upload,
@@ -873,11 +872,6 @@ export default function ProjectsPage() {
             }),
           );
 
-          console.log(
-            "Loading advertisements:",
-            projectId,
-          );
-
           const response =
             await getAdvertisements(
               projectId,
@@ -892,17 +886,6 @@ export default function ProjectsPage() {
             advertisements.filter(
               isSavedAdvertisement,
             );
-
-          console.log(
-            "Saved ads loaded:",
-            {
-              projectId,
-              total:
-                advertisements.length,
-              saved:
-                savedAdvertisements.length,
-            },
-          );
 
           setSavedAdsByProject(
             (previous) => ({
@@ -943,55 +926,6 @@ export default function ProjectsPage() {
       },
       [savedAdsByProject],
     );
-
-  /* ============================================================
-     AUTOMATICALLY LOAD SAVED ADS
-  ============================================================ */
-
-  const filteredProjectIds =
-    useMemo(
-      () =>
-        filteredProjects.map(
-          (project) =>
-            project.id,
-        ),
-      [filteredProjects],
-    );
-
-  useEffect(() => {
-    if (
-      loading ||
-      filteredProjectIds.length ===
-        0
-    ) {
-      return;
-    }
-
-    filteredProjectIds.forEach(
-      (projectId) => {
-        const key =
-          String(projectId);
-
-        if (
-          savedAdsByProject[
-            key
-          ] === undefined &&
-          !loadingAdsRef.current[
-            key
-          ]
-        ) {
-          void loadSavedAds(
-            projectId,
-          );
-        }
-      },
-    );
-  }, [
-    loading,
-    filteredProjectIds,
-    savedAdsByProject,
-    loadSavedAds,
-  ]);
 
   /* ============================================================
      LOAD UPLOAD HISTORY
@@ -1060,26 +994,15 @@ export default function ProjectsPage() {
                       0,
                   );
 
-                /*
-                 * Broadcast hour DESCENDING:
-                 *
-                 * 24 -> 23 -> 22 -> ...
-                 * -> 03 -> 02 -> 01
-                 */
                 if (
                   firstHour !==
                   secondHour
                 ) {
                   return (
-                    secondHour -
-                    firstHour
+                    secondHour - firstHour
                   );
                 }
 
-                /*
-                 * Same hour:
-                 * newest upload first.
-                 */
                 const firstTime =
                   new Date(
                     first.created_at ||
@@ -1095,8 +1018,7 @@ export default function ProjectsPage() {
                   ).getTime();
 
                 return (
-                  secondTime -
-                  firstTime
+                  secondTime - firstTime
                 );
               },
             );
@@ -1136,6 +1058,98 @@ export default function ProjectsPage() {
       },
       [uploadStatusesByProject],
     );
+
+  /* ============================================================
+     AUTOMATICALLY LOAD SAVED ADS
+  ============================================================ */
+
+  const filteredProjectIds =
+    useMemo(
+      () =>
+        filteredProjects.map(
+          (project) =>
+            project.id,
+        ),
+      [filteredProjects],
+    );
+
+  useEffect(() => {
+    if (
+      loading ||
+      filteredProjectIds.length ===
+        0
+    ) {
+      return;
+    }
+
+    filteredProjectIds.forEach(
+      (projectId) => {
+        const key =
+          String(projectId);
+
+        if (
+          savedAdsByProject[
+            key
+          ] === undefined &&
+          !loadingAdsRef.current[
+            key
+          ]
+        ) {
+          void loadSavedAds(
+            projectId,
+          );
+        }
+      },
+    );
+  }, [
+    loading,
+    filteredProjectIds,
+    savedAdsByProject,
+    loadSavedAds,
+  ]);
+
+  /* ============================================================
+     AUTOMATICALLY LOAD UPLOAD STATUSES
+     
+     Needed for the Completed Uploads
+     dashboard count.
+  ============================================================ */
+
+  useEffect(() => {
+    if (
+      loading ||
+      filteredProjectIds.length ===
+        0
+    ) {
+      return;
+    }
+
+    filteredProjectIds.forEach(
+      (projectId) => {
+        const key =
+          String(projectId);
+
+        if (
+          uploadStatusesByProject[
+            key
+          ] === undefined &&
+          !loadingUploadStatuses[
+            key
+          ]
+        ) {
+          void loadUploadStatuses(
+            projectId,
+          );
+        }
+      },
+    );
+  }, [
+    loading,
+    filteredProjectIds,
+    uploadStatusesByProject,
+    loadingUploadStatuses,
+    loadUploadStatuses,
+  ]);
 
   /* ============================================================
      TOGGLE UPLOAD HISTORY
@@ -1856,7 +1870,7 @@ export default function ProjectsPage() {
         ) : filteredProjects.length ===
           0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center sm:p-12">
-            <Layers
+            <Upload
               size={42}
               className="mx-auto mb-4 text-slate-300"
             />
@@ -1967,6 +1981,20 @@ export default function ProjectsPage() {
                       },
                     );
 
+                  /* =================================================
+                     NEW SUMMARY COUNTS
+                  ================================================= */
+
+                  const completedUploads =
+                    uploadHistory.filter(
+                      (upload) =>
+                        String(
+                          upload.status ??
+                            "",
+                        ).toUpperCase() ===
+                        "COMPLETED",
+                    ).length;
+
                   const savedAdHours =
                     getSavedAdHours(
                       savedAds,
@@ -1977,9 +2005,6 @@ export default function ProjectsPage() {
                    *
                    * This is the URL used by
                    * Open Project.
-                   *
-                   * Example:
-                   * /projects/20?name=test
                    */
                   const projectUrl =
                     `/projects/${project.id}?name=${encodeURIComponent(
@@ -2035,26 +2060,35 @@ export default function ProjectsPage() {
                         </div>
                       </div>
 
-                      {/* COUNTS */}
+                      {/* =================================================
+                          COUNTS
+                      ================================================= */}
 
                       <div className="grid grid-cols-2 gap-2.5 p-4 sm:gap-3 sm:p-5">
+
+                        {/* COMPLETED UPLOADS */}
+
                         <div className="rounded-xl bg-slate-50 p-3 sm:p-3.5">
                           <div className="mb-1.5 flex items-center gap-2 text-slate-500">
-                            <Layers
+                            <Upload
                               size={15}
                             />
 
                             <span className="text-[10px] font-medium sm:text-xs">
-                              Segments
+                              Completed Uploads
                             </span>
                           </div>
 
                           <p className="text-lg font-bold tabular-nums text-slate-900 sm:text-xl">
-                            {project.total_segments ??
-                              project.segment_count ??
-                              0}
+                            {loadingUploadStatuses[
+                              projectId
+                            ]
+                              ? "..."
+                              : completedUploads}
                           </p>
                         </div>
+
+                        {/* SAVED HOURS */}
 
                         <div className="rounded-xl bg-slate-50 p-3 sm:p-3.5">
                           <div className="mb-1.5 flex items-center gap-2 text-slate-500">
@@ -2063,7 +2097,7 @@ export default function ProjectsPage() {
                             />
 
                             <span className="text-[10px] font-medium sm:text-xs">
-                              Saved Ads
+                              Hours with Advertisements
                             </span>
                           </div>
 
@@ -2072,9 +2106,10 @@ export default function ProjectsPage() {
                               projectId
                             ]
                               ? "..."
-                              : savedAds.length}
+                              : savedAdHours.length}
                           </p>
                         </div>
+
                       </div>
 
                       {/* MOBILE DATE */}
@@ -2474,8 +2509,7 @@ export default function ProjectsPage() {
 
                       <div className="grid grid-cols-2 gap-2 border-t border-slate-200 p-3.5 sm:p-4">
 
-                        {/* OPEN PROJECT
-                            NOW INCLUDES PROJECT NAME */}
+                        {/* OPEN PROJECT */}
 
                         <Link
                           href={
