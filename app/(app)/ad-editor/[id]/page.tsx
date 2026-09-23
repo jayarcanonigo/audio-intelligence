@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -853,9 +852,18 @@ export default function AdEditorPage() {
 
   // ============================================================
   // COPY PARTS
+  // Each part now tracks its own start/end time range so the
+  // copy buttons can show "HH:MM:SS – HH:MM:SS" instead of a
+  // generic "PART N" label.
   // ============================================================
 
-  const copyParts =
+  type CopyPart = {
+    text: string;
+    start: string;
+    end: string;
+  };
+
+  const copyParts: CopyPart[] =
     useMemo(() => {
       if (
         !Array.isArray(logs) ||
@@ -864,10 +872,16 @@ export default function AdEditorPage() {
         return [];
       }
 
-      const lines =
+      type Line = {
+        line: string;
+        start: string;
+        end: string;
+      };
+
+      const lines: Line[] =
         logs
           .map(
-            (log: any) => {
+            (log: any): Line | null => {
               const start =
                 log.start_time ||
                 log.start ||
@@ -891,25 +905,26 @@ export default function AdEditorPage() {
                 return null;
               }
 
-              if (
-                start &&
-                end
-              ) {
-                return `${start} - ${end} | ${text}`;
+              let line = String(text);
+
+              if (start && end) {
+                line = `${start} - ${end} | ${text}`;
+              } else if (start) {
+                line = `${start} | ${text}`;
               }
 
-              if (start) {
-                return `${start} | ${text}`;
-              }
-
-              return String(text);
+              return {
+                line,
+                start,
+                end,
+              };
             }
           )
           .filter(
             (
-              line
-            ): line is string =>
-              Boolean(line)
+              l
+            ): l is Line =>
+              Boolean(l)
           );
 
       if (
@@ -918,66 +933,89 @@ export default function AdEditorPage() {
         return [];
       }
 
-      const parts: string[] =
+      const parts: CopyPart[] =
         [];
 
-      let currentPart =
+      let currentText =
         "";
 
+      let currentStart =
+        "";
+
+      let currentEnd =
+        "";
+
+      const flush = () => {
+        if (currentText) {
+          parts.push({
+            text: currentText,
+            start: currentStart,
+            end: currentEnd,
+          });
+
+          currentText = "";
+          currentStart = "";
+          currentEnd = "";
+        }
+      };
+
       for (
-        const line of lines
+        const {
+          line,
+          start,
+          end,
+        } of lines
       ) {
         if (
           line.length >
           MAX_COPY_CHARS
         ) {
-          if (
-            currentPart
-          ) {
-            parts.push(
-              currentPart
-            );
+          flush();
 
-            currentPart =
-              "";
-          }
-
-          parts.push(
-            line
-          );
+          parts.push({
+            text: line,
+            start,
+            end,
+          });
 
           continue;
         }
 
         const candidate =
-          currentPart
-            ? `${currentPart}\n${line}`
+          currentText
+            ? `${currentText}\n${line}`
             : line;
 
         if (
           candidate.length >
             MAX_COPY_CHARS &&
-          currentPart
+          currentText
         ) {
-          parts.push(
-            currentPart
-          );
+          flush();
 
-          currentPart =
+          currentText =
             line;
+
+          currentStart =
+            start;
+
+          currentEnd =
+            end;
         } else {
-          currentPart =
+          currentText =
             candidate;
+
+          if (!currentStart) {
+            currentStart =
+              start;
+          }
+
+          currentEnd =
+            end;
         }
       }
 
-      if (
-        currentPart
-      ) {
-        parts.push(
-          currentPart
-        );
-      }
+      flush();
 
       return parts;
     }, [logs]);
@@ -990,7 +1028,7 @@ export default function AdEditorPage() {
     useMemo(() => {
       const groups: {
         startIndex: number;
-        parts: string[];
+        parts: CopyPart[];
       }[] = [];
 
       for (
@@ -1224,6 +1262,9 @@ const handleCopySavedAdsJson = async () => {
 
   // ============================================================
   // COPY PART GROUP
+  // Copies the joined text of the group and shows the covered
+  // time range (start of first part -> end of last part) in
+  // the toast instead of "PART N & M".
   // ============================================================
 
   const handleCopyPartGroup =
@@ -1251,29 +1292,31 @@ const handleCopySavedAdsJson = async () => {
 
       try {
         await navigator.clipboard.writeText(
-          partsToCopy.join("\n")
+          partsToCopy
+            .map((p) => p.text)
+            .join("\n")
         );
 
         setCopiedPartGroup(
           groupIndex
         );
 
-        const firstPart =
-          startIndex + 1;
+        const groupStart =
+          partsToCopy[0]?.start ||
+          "";
 
-        const lastPart =
-          startIndex +
-          partsToCopy.length;
+        const groupEnd =
+          partsToCopy[
+            partsToCopy.length - 1
+          ]?.end || "";
 
-        if (
-          partsToCopy.length === 2
-        ) {
+        if (groupStart && groupEnd) {
           toast.success(
-            `📋 PART ${firstPart} & ${lastPart} copied`
+            `📋 ${groupStart} – ${groupEnd} copied`
           );
         } else {
           toast.success(
-            `📋 PART ${firstPart} copied`
+            "📋 Transcript part copied"
           );
         }
 
@@ -1322,7 +1365,9 @@ const handleCopySavedAdsJson = async () => {
 
       try {
         await navigator.clipboard.writeText(
-          copyParts.join("\n")
+          copyParts
+            .map((p) => p.text)
+            .join("\n")
         );
 
         toast.success(
@@ -3817,7 +3862,18 @@ const handleCopySavedAdsJson = async () => {
 
   // ============================================================
   // COPY BUTTONS UI
+  // Buttons now show the covered time range ("HH:MM:SS – HH:MM:SS")
+  // in place of "PART N & M" to save space and make each group
+  // identifiable at a glance.
   // ============================================================
+
+  const shortTime = (t: string) => {
+    if (!t) return "";
+    const parts = t.split(":");
+    return parts.length === 3
+      ? `${parts[1]}:${parts[2]}`
+      : t;
+  };
 
   const CopyPartButtons = () => {
     if (
@@ -3844,8 +3900,32 @@ const handleCopySavedAdsJson = async () => {
               copiedPartGroup ===
               groupIndex;
 
-            const hasTwoParts =
-              group.parts.length === 2;
+            const groupStart =
+              group.parts[0]?.start ||
+              "";
+
+            const groupEnd =
+              group.parts[
+                group.parts.length - 1
+              ]?.end || "";
+
+            const hasRange =
+              Boolean(
+                groupStart &&
+                  groupEnd
+              );
+
+            const label = hasRange
+              ? `${shortTime(
+                  groupStart
+                )}–${shortTime(
+                  groupEnd
+                )}`
+              : `PART ${firstPart}`;
+
+            const title = hasRange
+              ? `Copy ${groupStart} – ${groupEnd}`
+              : `Copy PART ${firstPart}`;
 
             return (
               <button
@@ -3858,11 +3938,7 @@ const handleCopySavedAdsJson = async () => {
                     groupIndex
                   )
                 }
-                title={
-                  hasTwoParts
-                    ? `Copy PART ${firstPart} and PART ${lastPart}`
-                    : `Copy PART ${firstPart}`
-                }
+                title={title}
                 className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all active:scale-[0.97] ${
                   isCopied
                     ? "border-green-200 bg-green-50 text-green-700"
@@ -3879,9 +3955,7 @@ const handleCopySavedAdsJson = async () => {
                   />
                 )}
 
-                {hasTwoParts
-                  ? `PART ${firstPart} & ${lastPart}`
-                  : `PART ${firstPart}`}
+                {label}
               </button>
             );
           }
