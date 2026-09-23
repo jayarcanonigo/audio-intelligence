@@ -4455,15 +4455,15 @@ const handleCopySavedAdsJson = async () => {
             </button>
           )}
 
-          {/* Last */}
-          <button
-            onClick={handleCenterLastCompleted}
-            className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700 active:scale-[0.98]"
-          >
-            <span>🎯</span>
-
-            <span>Last</span>
-          </button>
+         {/* Save */}
+        <button
+          onClick={handleSaveAllSegments}
+          disabled={results.length === 0}
+          className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+        >
+          <Save size={14} />
+          <span>Save</span>
+        </button>
 
           {/* Upload JSON */}
           {isAdmin && (
@@ -4560,7 +4560,7 @@ const handleCopySavedAdsJson = async () => {
                 {/* Save */}
                 <button
                   onClick={() => {
-                    handleSaveAllSegments();
+                    handleCenterLastCompleted();
 
                     setShowMenu(
                       false
@@ -4573,7 +4573,7 @@ const handleCopySavedAdsJson = async () => {
                 >
                   <Save size={16} />
 
-                  Save
+                  Last
                 </button>
 
                 {/* Download */}
