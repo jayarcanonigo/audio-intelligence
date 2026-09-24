@@ -3,7 +3,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Pencil, Trash2, SquarePen, X } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  SquarePen,
+  X,
+  Copy,
+} from "lucide-react";
+
 import {
   getProjects,
   deleteProject,
@@ -42,39 +49,54 @@ interface UploadStatus {
 }
 
 export default function AdEditorPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [projects, setProjects] =
+    useState<Project[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
 
   // ============================================================
   // PROJECT STATS
   // ============================================================
 
-  const [projectStats, setProjectStats] = useState<
-    Record<number, ProjectStats>
-  >({});
+  const [projectStats, setProjectStats] =
+    useState<Record<number, ProjectStats>>({});
 
-  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsLoading, setStatsLoading] =
+    useState(false);
 
   // ============================================================
   // EDIT PROJECT STATE
   // ============================================================
 
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editDate, setEditDate] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [editingProject, setEditingProject] =
+    useState<Project | null>(null);
+
+  const [editName, setEditName] =
+    useState("");
+
+  const [editDate, setEditDate] =
+    useState("");
+
+  const [saving, setSaving] =
+    useState(false);
 
   // ============================================================
   // GET AD START
   // ============================================================
 
-  function getAdStart(ad: SavedAdView): string | null {
+  function getAdStart(
+    ad: SavedAdView,
+  ): string | null {
     const value =
       ad.start ??
       ad.start_time ??
       null;
 
-    if (value === null || value === undefined) {
+    if (
+      value === null ||
+      value === undefined
+    ) {
       return null;
     }
 
@@ -147,7 +169,7 @@ export default function AdEditorPage() {
     } catch (error) {
       console.error(
         "Failed to load projects:",
-        error
+        error,
       );
     } finally {
       setLoading(false);
@@ -171,22 +193,25 @@ export default function AdEditorPage() {
               advertisements,
               uploadStatuses,
             ] = await Promise.all([
-              getAdvertisements(project.id).catch(
-                () => [],
-              ),
-              getUploadStatuses(project.id).catch(
-                () => [],
-              ),
+              getAdvertisements(
+                project.id,
+              ).catch(() => []),
+
+              getUploadStatuses(
+                project.id,
+              ).catch(() => []),
             ]);
 
             const ads =
-              (advertisements || []) as SavedAdView[];
+              (advertisements ||
+                []) as SavedAdView[];
 
             const uploads =
-              (uploadStatuses || []) as UploadStatus[];
+              (uploadStatuses ||
+                []) as UploadStatus[];
 
             // ==================================================
-            // COMPLETED UPLOADS
+            // COMPLETED UPLOADS / HOURS
             // ==================================================
 
             const completedUploads =
@@ -201,43 +226,31 @@ export default function AdEditorPage() {
             // ==================================================
             // ONLY SAVED ADVERTISEMENTS
             //
-            // Keep the same saved logic:
             // status = SAVED
             // OR is_saved = true
             // OR saved = true
             // ==================================================
 
-            const savedAds = ads.filter((ad) => {
-              return (
-                String(
-                  ad.status || "",
-                ).toUpperCase() === "SAVED" ||
-                ad.is_saved === true ||
-                ad.saved === true
-              );
-            });
+            const savedAds =
+              ads.filter((ad) => {
+                return (
+                  String(
+                    ad.status || "",
+                  ).toUpperCase() ===
+                    "SAVED" ||
+                  ad.is_saved === true ||
+                  ad.saved === true
+                );
+              });
 
             // ==================================================
-            // SAVED ADVERTISEMENT HOURS
-            //
-            // IMPORTANT:
-            // This uses the advertisement START timestamp,
-            // NOT broadcast_hour.
-            //
-            // Example:
-            //
-            // 01:05:20
-            // 01:15:40
-            // 01:59:10
-            // 04:10:20
-            //
-            // Result:
-            //
-            // [1, 4]
+            // SAVED / PROCESSED ADVERTISEMENT HOURS
             // ==================================================
 
             const savedAdvertisementHours =
-              getSavedAdHours(savedAds);
+              getSavedAdHours(
+                savedAds,
+              );
 
             return {
               projectId: project.id,
@@ -287,6 +300,90 @@ export default function AdEditorPage() {
   }
 
   // ============================================================
+  // COPY PROJECT LIST
+  //
+  // ONLY PROJECTS WITH COMPLETED HOURS
+  //
+  // COPY FORMAT:
+  //
+  // Project: Project Name
+  // Completed Hours: 8
+  // Processed Hours Ads: 3
+  // ============================================================
+
+  async function handleCopyProjectList() {
+    const completedProjects =
+      projects.filter((project) => {
+        const stats =
+          projectStats[project.id];
+
+        return (
+          (stats?.completedUploads ?? 0) >
+          0
+        );
+      });
+
+    if (
+      completedProjects.length === 0
+    ) {
+      alert(
+        "No projects with completed hours.",
+      );
+
+      return;
+    }
+
+    const text =
+      completedProjects
+        .map((project) => {
+          const stats =
+            projectStats[
+              project.id
+            ];
+
+          const completedHours =
+            stats?.completedUploads ??
+            0;
+
+          const processedHoursAds =
+            stats
+              ?.savedAdvertisementHours
+              ?.length ?? 0;
+
+          return [
+            `Project: ${project.name}`,
+            `Completed Hours: ${completedHours}`,
+            `Processed Hours Ads: ${processedHoursAds}`,
+          ].join("\n");
+        })
+        .join("\n\n");
+
+    try {
+      await navigator.clipboard.writeText(
+        text,
+      );
+
+      alert(
+        `${completedProjects.length} project${
+          completedProjects.length !==
+          1
+            ? "s"
+            : ""
+        } copied.`,
+      );
+    } catch (error) {
+      console.error(
+        "Failed to copy project list:",
+        error,
+      );
+
+      alert(
+        "Failed to copy project list.",
+      );
+    }
+  }
+
+  // ============================================================
   // DELETE PROJECT
   // ============================================================
 
@@ -297,10 +394,14 @@ export default function AdEditorPage() {
       "Delete this project?\n\nThis will permanently delete:\n\n• Project\n• Segments\n• Advertisements",
     );
 
-    if (!ok) return;
+    if (!ok) {
+      return;
+    }
 
     try {
-      await deleteProject(projectId);
+      await deleteProject(
+        projectId,
+      );
 
       setProjects((prev) =>
         prev.filter(
@@ -310,7 +411,9 @@ export default function AdEditorPage() {
       );
 
       setProjectStats((prev) => {
-        const next = { ...prev };
+        const next = {
+          ...prev,
+        };
 
         delete next[projectId];
 
@@ -319,7 +422,9 @@ export default function AdEditorPage() {
     } catch (error) {
       console.error(error);
 
-      alert("Failed to delete project.");
+      alert(
+        "Failed to delete project.",
+      );
     }
   }
 
@@ -352,7 +457,9 @@ export default function AdEditorPage() {
   // ============================================================
 
   function handleCloseEdit() {
-    if (saving) return;
+    if (saving) {
+      return;
+    }
 
     setEditingProject(null);
     setEditName("");
@@ -407,9 +514,11 @@ export default function AdEditorPage() {
           editingProject.id
             ? {
                 ...project,
+
                 name:
                   updated?.name ??
                   trimmedName,
+
                 created_at:
                   updated?.created_at ??
                   `${editDate}T00:00:00`,
@@ -433,30 +542,6 @@ export default function AdEditorPage() {
   }
 
   // ============================================================
-  // FORMAT SAVED HOURS
-  // ============================================================
-
-  function formatSavedHours(
-    hours: number[],
-  ) {
-    if (
-      !hours ||
-      hours.length === 0
-    ) {
-      return "None";
-    }
-
-    return hours
-      .map((hour) =>
-        String(hour).padStart(
-          2,
-          "0",
-        ),
-      )
-      .join(", ");
-  }
-
-  // ============================================================
   // RENDER
   // ============================================================
 
@@ -467,13 +552,37 @@ export default function AdEditorPage() {
       ======================================================== */}
 
       <div className="border-b border-slate-200 bg-white px-8 py-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Ad Editor
-        </h1>
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+              Ad Editor
+            </h1>
 
-        <p className="mt-1 text-sm text-slate-500">
-          Select a project to edit advertisement segments.
-        </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Select a project to edit
+              advertisement segments.
+            </p>
+          </div>
+
+          {/* COPY PROJECT LIST */}
+
+          <button
+            type="button"
+            onClick={
+              handleCopyProjectList
+            }
+            disabled={
+              loading ||
+              statsLoading
+            }
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            title="Copy projects with completed hours"
+          >
+            <Copy size={16} />
+
+            Copy List
+          </button>
+        </div>
       </div>
 
       <div className="mx-auto max-w-5xl p-8">
@@ -517,9 +626,9 @@ export default function AdEditorPage() {
                       key={project.id}
                       className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md"
                     >
-                      {/* ==========================================
+                      {/* ========================================
                           LEFT
-                      ========================================== */}
+                      ======================================== */}
 
                       <div className="min-w-0">
                         {/* PROJECT NAME */}
@@ -553,16 +662,17 @@ export default function AdEditorPage() {
                           </span>
                         </div>
 
-                        {/* ==========================================
+                        {/* ========================================
                             PROJECT STATISTICS
-                        ========================================== */}
+                        ======================================== */}
 
                         <div className="mt-4 flex flex-wrap gap-2">
                           {/* COMPLETED UPLOADS */}
 
                           <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
                             <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600">
-                              Completed Uploads
+                              Completed
+                              Uploads
                             </div>
 
                             <div className="mt-0.5 text-sm font-bold text-emerald-800">
@@ -574,36 +684,43 @@ export default function AdEditorPage() {
                             </div>
                           </div>
 
-                          {/* SAVED ADVERTISEMENT HOURS */}
+                          {/* PROCESSED HOURS ADS */}
 
-                     <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-600">
-                        Processed Hours Ads
-                      </div>
+                          <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-600">
+                              Processed
+                              Hours Ads
+                            </div>
 
-                      <div className="mt-0.5 text-sm font-bold text-blue-800">
-                        {statsLoading && !stats
-                          ? "..."
-                          : stats?.savedAdvertisementHours?.length ?? 0}
-                      </div>
-                    </div>
+                            <div className="mt-0.5 text-sm font-bold text-blue-800">
+                              {statsLoading &&
+                              !stats
+                                ? "..."
+                                : stats
+                                    ?.savedAdvertisementHours
+                                    ?.length ??
+                                  0}
+                            </div>
+                          </div>
                         </div>
                       </div>
 
-                      {/* ==========================================
+                      {/* ========================================
                           RIGHT ACTIONS
-                      ========================================== */}
+                      ======================================== */}
 
                       <div className="ml-4 flex shrink-0 items-center gap-2">
                         {/* EDIT */}
 
                         <button
+                          type="button"
                           onClick={() =>
                             handleOpenEdit(
                               project,
                             )
                           }
                           aria-label="Edit project"
+                          title="Edit project"
                           className="flex items-center justify-center rounded-lg border border-slate-200 p-2.5 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
                         >
                           <SquarePen
@@ -622,18 +739,21 @@ export default function AdEditorPage() {
                           <Pencil
                             size={15}
                           />
+
                           Open Editor
                         </Link>
 
                         {/* DELETE */}
 
                         <button
+                          type="button"
                           onClick={() =>
                             handleDelete(
                               project.id,
                             )
                           }
                           aria-label="Delete project"
+                          title="Delete project"
                           className="flex items-center justify-center rounded-lg border border-slate-200 p-2.5 text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
                         >
                           <Trash2
@@ -664,6 +784,7 @@ export default function AdEditorPage() {
               </h3>
 
               <button
+                type="button"
                 onClick={
                   handleCloseEdit
                 }
