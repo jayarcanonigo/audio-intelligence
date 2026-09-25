@@ -3811,50 +3811,7 @@ const handleCopySavedAdsJson = async () => {
       }
     };
 
-  // ============================================================
-  // AUTO SCROLL
-  // ============================================================
 
-  useEffect(() => {
-    const current =
-      logs.find(
-        (log) => {
-          const start =
-            toSeconds(
-              log.start_time
-            );
-
-          const end =
-            toSeconds(
-              log.end_time
-            );
-
-          return (
-            start !== null &&
-            end !== null &&
-            currentAudioTime >=
-              start &&
-            currentAudioTime <=
-              end
-          );
-        }
-      );
-
-    if (current) {
-      logRefs.current[
-        current.id
-      ]?.scrollIntoView({
-        behavior:
-          "smooth",
-
-        block:
-          "center",
-      });
-    }
-  }, [
-    currentAudioTime,
-    logs,
-  ]);
 
   // ============================================================
   // MOBILE TAB TOGGLE
