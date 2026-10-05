@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { getWallet } from "@/services/wallet";
@@ -93,9 +92,6 @@ export default function DashboardPage() {
             cancelled: 0,
         });
 
-    const [statsLoading, setStatsLoading] =
-        useState(false);
-
     // ============================================================
     // ACTIVITY
     // ============================================================
@@ -152,7 +148,6 @@ export default function DashboardPage() {
         }
 
         setLoading(true);
-        setStatsLoading(true);
 
         try {
             const response =
@@ -216,7 +211,6 @@ export default function DashboardPage() {
             setActivities([]);
         } finally {
             setLoading(false);
-            setStatsLoading(false);
         }
     }
 
@@ -641,46 +635,6 @@ export default function DashboardPage() {
             }
         )}`;
     }
-
-    // ============================================================
-    // RECENT PROJECTS
-    // ============================================================
-
-    const recentProjects =
-        useMemo(() => {
-            return [
-                ...projects,
-            ]
-                .sort(
-                    (
-                        a,
-                        b
-                    ) => {
-                        if (
-                            !a.created_at ||
-                            !b.created_at
-                        ) {
-                            return (
-                                b.id -
-                                a.id
-                            );
-                        }
-
-                        return (
-                            new Date(
-                                b.created_at
-                            ).getTime() -
-                            new Date(
-                                a.created_at
-                            ).getTime()
-                        );
-                    }
-                )
-                .slice(
-                    0,
-                    6
-                );
-        }, [projects]);
 
     // ============================================================
     // RENDER
@@ -1258,131 +1212,6 @@ export default function DashboardPage() {
 
                     </div>
 
-                    {/* RECENT PROJECTS */}
-
-                    <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mb-6">
-
-                        <div className="px-5 sm:px-6 py-5 border-b border-slate-200 flex items-center justify-between">
-
-                            <div>
-
-                                <h2 className="font-bold">
-                                    Recent Projects
-                                </h2>
-
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Your most recently created projects.
-                                </p>
-
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={
-                                    openProjects
-                                }
-                                className="text-xs sm:text-sm font-semibold text-indigo-600 hover:text-indigo-700"
-                            >
-                                View all →
-                            </button>
-
-                        </div>
-
-                        {loading ? (
-
-                            <div className="py-12 flex justify-center">
-                                <Spinner />
-                            </div>
-
-                        ) : recentProjects.length ===
-                          0 ? (
-
-                            <div className="py-14 px-6 text-center">
-
-                                <div className="mx-auto w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
-                                    <FolderIcon />
-                                </div>
-
-                                <h3 className="mt-3 font-semibold">
-                                    No projects yet
-                                </h3>
-
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Your radio projects will appear here.
-                                </p>
-
-                            </div>
-
-                        ) : (
-
-                            <div className="divide-y divide-slate-100">
-
-                                {recentProjects.map(
-                                    (
-                                        project
-                                    ) => (
-
-                                        <button
-                                            type="button"
-                                            key={
-                                                project.id
-                                            }
-                                            onClick={() =>
-                                                openProject(
-                                                    project
-                                                )
-                                            }
-                                            className="w-full text-left px-5 sm:px-6 py-4 flex items-center gap-4 hover:bg-slate-50 transition"
-                                        >
-
-                                            <div className="w-11 h-11 shrink-0 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                                <FolderIcon />
-                                            </div>
-
-                                            <div className="min-w-0 flex-1">
-
-                                                <p className="font-semibold text-sm truncate">
-                                                    {
-                                                        project.name
-                                                    }
-                                                </p>
-
-                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-
-                                                    <span className="text-xs text-slate-400">
-                                                        Project #
-                                                        {
-                                                            project.id
-                                                        }
-                                                    </span>
-
-                                                    {project.broadcast_date && (
-                                                        <span className="text-xs text-slate-400">
-                                                            {formatDate(
-                                                                project.broadcast_date
-                                                            )}
-                                                        </span>
-                                                    )}
-
-                                                </div>
-
-                                            </div>
-
-                                            <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-slate-300 hover:bg-indigo-50 hover:text-indigo-600">
-                                                <ArrowIcon />
-                                            </div>
-
-                                        </button>
-
-                                    )
-                                )}
-
-                            </div>
-
-                        )}
-
-                    </section>
-
                     {/* =================================================
                         RECENT ACTIVITY
                     ================================================== */}
@@ -1836,30 +1665,6 @@ function ActivityStatusIcon({
 /* ================================================================
    DATE HELPERS
 ================================================================ */
-
-function formatDate(
-    value?: string
-) {
-    if (!value) {
-        return "";
-    }
-
-    try {
-        return new Date(
-            value
-        ).toLocaleDateString(
-            "en-PH",
-            {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-            }
-        );
-    } catch {
-        return value;
-    }
-}
-
 
 function formatDateTime(
     value?: string
