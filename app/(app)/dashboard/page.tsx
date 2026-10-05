@@ -350,9 +350,6 @@ export default function DashboardPage() {
                                         {
                                             id: `${project.id}-${upload.id}`,
 
-                                            // IMPORTANT:
-                                            // Used to open the
-                                            // correct Ad Editor.
                                             projectId:
                                                 project.id,
 
@@ -843,7 +840,6 @@ export default function DashboardPage() {
 
             </header>
 
-
             {/* =====================================================
                 DESKTOP SIDEBAR
             ====================================================== */}
@@ -927,7 +923,6 @@ export default function DashboardPage() {
                 </div>
 
             </aside>
-
 
             {/* =====================================================
                 MAIN
@@ -1020,7 +1015,6 @@ export default function DashboardPage() {
 
                 </header>
 
-
                 {/* =================================================
                     CONTENT
                 ================================================== */}
@@ -1066,7 +1060,6 @@ export default function DashboardPage() {
                         </button>
 
                     </div>
-
 
                     {/* WELCOME CARD */}
 
@@ -1114,63 +1107,9 @@ export default function DashboardPage() {
 
                     </div>
 
-
-                    {/* STATISTICS */}
-
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-
-                        <StatCard
-                            title="Projects"
-                            value={
-                                statsLoading
-                                    ? "..."
-                                    : stats.projects
-                            }
-                            icon={
-                                <FolderIcon />
-                            }
-                        />
-
-                        <StatCard
-                            title="Broadcast Hours"
-                            value={
-                                statsLoading
-                                    ? "..."
-                                    : stats.broadcasts
-                            }
-                            icon={
-                                <RadioIcon />
-                            }
-                        />
-
-                        <StatCard
-                            title="Advertisements"
-                            value={
-                                statsLoading
-                                    ? "..."
-                                    : stats.advertisements
-                            }
-                            icon={
-                                <AdIcon />
-                            }
-                        />
-
-                        <StatCard
-                            title="Segments"
-                            value={
-                                statsLoading
-                                    ? "..."
-                                    : stats.segments
-                            }
-                            icon={
-                                <AudioIcon />
-                            }
-                        />
-
-                    </div>
-
-
-                    {/* PROCESSING + QUICK ACTIONS */}
+                    {/* =================================================
+                        PROCESSING + QUICK ACTIONS
+                    ================================================== */}
 
                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
 
@@ -1261,7 +1200,6 @@ export default function DashboardPage() {
 
                         </section>
 
-
                         {/* QUICK ACTIONS */}
 
                         <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
@@ -1319,7 +1257,6 @@ export default function DashboardPage() {
                         </section>
 
                     </div>
-
 
                     {/* RECENT PROJECTS */}
 
@@ -1445,7 +1382,6 @@ export default function DashboardPage() {
                         )}
 
                     </section>
-
 
                     {/* =================================================
                         RECENT ACTIVITY
@@ -1645,47 +1581,6 @@ export default function DashboardPage() {
             </div>
 
         </main>
-    );
-}
-
-
-/* ================================================================
-   STAT CARD
-================================================================ */
-
-function StatCard({
-    title,
-    value,
-    icon,
-}: {
-    title: string;
-    value: number | string;
-    icon: React.ReactNode;
-}) {
-    return (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm">
-
-            <div className="flex items-start justify-between">
-
-                <div>
-
-                    <p className="text-xs font-medium text-slate-500">
-                        {title}
-                    </p>
-
-                    <p className="mt-2 text-2xl sm:text-3xl font-bold">
-                        {value}
-                    </p>
-
-                </div>
-
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    {icon}
-                </div>
-
-            </div>
-
-        </div>
     );
 }
 
@@ -2261,32 +2156,6 @@ function RadioIcon() {
             <path d="M4.9 4.9a10 10 0 0 0 0 14.2" />
 
             <path d="M19.1 4.9a10 10 0 0 1 0 14.2" />
-        </svg>
-    );
-}
-
-
-/* ================================================================
-   AD ICON
-================================================================ */
-
-function AdIcon() {
-    return (
-        <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M4 5h16v14H4z" />
-
-            <path d="M8 9h8" />
-
-            <path d="M8 13h5" />
         </svg>
     );
 }
