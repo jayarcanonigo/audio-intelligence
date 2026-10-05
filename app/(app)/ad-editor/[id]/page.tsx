@@ -13,6 +13,7 @@ import { fetchFile } from "@ffmpeg/util";
 import SelectedSegments from "@/components/segments/SelectedSegments";
 import AudioPlayer from "@/components/audio/AudioPlayer";
 import { getAdsRule } from "@/services/settings";
+
 import {
   useParams,
   useSearchParams,
@@ -40,6 +41,8 @@ import {
   Copy,
   Upload,
   FileJson,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 import {
@@ -371,8 +374,6 @@ export default function AdEditorPage() {
         return;
       }
 
-      // Do not request hour 0 when no completed
-      // broadcast hour has been selected yet.
       if (
         !broadcastHour &&
         broadcastHour !== "all"
@@ -653,10 +654,6 @@ export default function AdEditorPage() {
           return;
         }
 
-        // ------------------------------------------------------
-        // Find upload hours with COMPLETED status
-        // ------------------------------------------------------
-
         const completedHours =
           new Set<number>();
 
@@ -702,13 +699,6 @@ export default function AdEditorPage() {
           );
         }
 
-        // ------------------------------------------------------
-        // Only use hours that have both:
-        //
-        // 1. Transcript segments
-        // 2. COMPLETED upload status
-        // ------------------------------------------------------
-
         const completedSegmentHours =
           (
             Array.isArray(
@@ -735,10 +725,6 @@ export default function AdEditorPage() {
         setHours(
           completedSegmentHours
         );
-
-        // ------------------------------------------------------
-        // Respect ?hour= only when that hour is COMPLETED
-        // ------------------------------------------------------
 
         const requestedHour =
           searchParams.get(
@@ -769,10 +755,6 @@ export default function AdEditorPage() {
           return;
         }
 
-        // ------------------------------------------------------
-        // Otherwise select first COMPLETED hour
-        // ------------------------------------------------------
-
         if (
           completedSegmentHours.length >
           0
@@ -783,7 +765,6 @@ export default function AdEditorPage() {
             )
           );
         } else {
-          // No completed uploads
           setBroadcastHour("");
           setLogs([]);
           setResults([]);
@@ -852,9 +833,6 @@ export default function AdEditorPage() {
 
   // ============================================================
   // COPY PARTS
-  // Each part now tracks its own start/end time range so the
-  // copy buttons can show "HH:MM:SS – HH:MM:SS" instead of a
-  // generic "PART N" label.
   // ============================================================
 
   type CopyPart = {
@@ -1048,223 +1026,257 @@ export default function AdEditorPage() {
       return groups;
     }, [copyParts]);
 
-
   // ============================================================
-// COPY ALL ADVERTISEMENTS AS JSON
-// SAVED + NEW + OVERLAPPING
-// ============================================================
+  // COPY ALL ADVERTISEMENTS AS JSON
+  // ============================================================
 
-const handleCopySavedAdsJson = async () => {
-  if (!results || results.length === 0) {
-    toast.warning("No advertisements to copy");
-    return;
-  }
+  const handleCopySavedAdsJson =
+    async () => {
+      if (
+        !results ||
+        results.length === 0
+      ) {
+        toast.warning(
+          "No advertisements to copy"
+        );
+        return;
+      }
 
-  const getSeconds = (
-    time?: string | number
-  ): number => {
-    if (
-      time === undefined ||
-      time === null ||
-      time === ""
-    ) {
-      return 0;
-    }
+      const getSeconds = (
+        time?: string | number
+      ): number => {
+        if (
+          time === undefined ||
+          time === null ||
+          time === ""
+        ) {
+          return 0;
+        }
 
-    // Already seconds
-    if (typeof time === "number") {
-      return Number.isFinite(time)
-        ? time
-        : 0;
-    }
+        if (typeof time === "number") {
+          return Number.isFinite(time)
+            ? time
+            : 0;
+        }
 
-    const value = String(time).trim();
+        const value =
+          String(time).trim();
 
-    if (!value) {
-      return 0;
-    }
+        if (!value) {
+          return 0;
+        }
 
-    // Numeric string
-    if (/^\d+(\.\d+)?$/.test(value)) {
-      const numeric = Number(value);
-
-      return Number.isFinite(numeric)
-        ? numeric
-        : 0;
-    }
-
-    const parts = value
-      .split(":")
-      .map(Number);
-
-    if (
-      parts.some(
-        (part) => !Number.isFinite(part)
-      )
-    ) {
-      return 0;
-    }
-
-    // HH:MM:SS
-    if (parts.length === 3) {
-      const [
-        hours,
-        minutes,
-        seconds,
-      ] = parts;
-
-      return (
-        hours * 3600 +
-        minutes * 60 +
-        seconds
-      );
-    }
-
-    // MM:SS
-    if (parts.length === 2) {
-      const [
-        minutes,
-        seconds,
-      ] = parts;
-
-      return (
-        minutes * 60 +
-        seconds
-      );
-    }
-
-    return parts[0] || 0;
-  };
-
-  const formatTime = (
-    time?: string | number
-  ): string => {
-    // Preserve existing timestamp format
-    // when available.
-    if (
-      typeof time === "string" &&
-      /^\d{2}:\d{2}:\d{2}$/.test(
-        time.trim()
-      )
-    ) {
-      return time.trim();
-    }
-
-    const totalSeconds = Math.max(
-      0,
-      Math.round(getSeconds(time))
-    );
-
-    const hours = Math.floor(
-      totalSeconds / 3600
-    );
-
-    const minutes = Math.floor(
-      (totalSeconds % 3600) / 60
-    );
-
-    const seconds =
-      totalSeconds % 60;
-
-    return [
-      String(hours).padStart(2, "0"),
-      String(minutes).padStart(2, "0"),
-      String(seconds).padStart(2, "0"),
-    ].join(":");
-  };
-
-  const advertisements = [...results]
-    .sort((a: any, b: any) => {
-      const aStart = getSeconds(
-        a.start ?? a.start_time
-      );
-
-      const bStart = getSeconds(
-        b.start ?? b.start_time
-      );
-
-      return aStart - bStart;
-    })
-    .map((ad: any) => {
-      const start =
-        ad.start ??
-        ad.start_time ??
-        "00:00:00";
-
-      const end =
-        ad.end ??
-        ad.end_time ??
-        "00:00:00";
-
-      const startSeconds =
-        getSeconds(start);
-
-      const endSeconds =
-        getSeconds(end);
-
-      return {
-        start: formatTime(start),
-        end: formatTime(end),
-
-        // IMPORTANT:
-        // actual_length is NUMBER of seconds
-        actual_length: Math.max(
-          0,
-          Math.round(
-            endSeconds -
-              startSeconds
+        if (
+          /^\d+(\.\d+)?$/.test(
+            value
           )
-        ),
+        ) {
+          const numeric =
+            Number(value);
 
-        brand:
-          ad.brand_name ??
-          ad.brand ??
-          "",
+          return Number.isFinite(
+            numeric
+          )
+            ? numeric
+            : 0;
+        }
 
-        copyline:
-          ad.text ??
-          ad.copyline ??
-          "",
+        const parts = value
+          .split(":")
+          .map(Number);
+
+        if (
+          parts.some(
+            (part) =>
+              !Number.isFinite(part)
+          )
+        ) {
+          return 0;
+        }
+
+        if (parts.length === 3) {
+          const [
+            hours,
+            minutes,
+            seconds,
+          ] = parts;
+
+          return (
+            hours * 3600 +
+            minutes * 60 +
+            seconds
+          );
+        }
+
+        if (parts.length === 2) {
+          const [
+            minutes,
+            seconds,
+          ] = parts;
+
+          return (
+            minutes * 60 +
+            seconds
+          );
+        }
+
+        return parts[0] || 0;
       };
-    });
 
-  const json = JSON.stringify(
-    {
-      advertisements,
-    },
-    null,
-    2
-  );
+      const formatTime = (
+        time?: string | number
+      ): string => {
+        if (
+          typeof time === "string" &&
+          /^\d{2}:\d{2}:\d{2}$/.test(
+            time.trim()
+          )
+        ) {
+          return time.trim();
+        }
 
-  try {
-    await navigator.clipboard.writeText(
-      json
-    );
+        const totalSeconds =
+          Math.max(
+            0,
+            Math.round(
+              getSeconds(time)
+            )
+          );
 
-    toast.success(
-      `📋 ${advertisements.length} advertisement${
-        advertisements.length === 1
-          ? ""
-          : "s"
-      } copied as JSON`
-    );
-  } catch (error) {
-    console.error(
-      "Failed to copy advertisements JSON:",
-      error
-    );
+        const hours =
+          Math.floor(
+            totalSeconds / 3600
+          );
 
-    toast.error(
-      "Failed to copy advertisements JSON"
-    );
-  }
-};
+        const minutes =
+          Math.floor(
+            (totalSeconds % 3600) /
+              60
+          );
+
+        const seconds =
+          totalSeconds % 60;
+
+        return [
+          String(hours).padStart(
+            2,
+            "0"
+          ),
+          String(minutes).padStart(
+            2,
+            "0"
+          ),
+          String(seconds).padStart(
+            2,
+            "0"
+          ),
+        ].join(":");
+      };
+
+      const advertisements =
+        [...results]
+          .sort(
+            (a: any, b: any) => {
+              const aStart =
+                getSeconds(
+                  a.start ??
+                    a.start_time
+                );
+
+              const bStart =
+                getSeconds(
+                  b.start ??
+                    b.start_time
+                );
+
+              return (
+                aStart - bStart
+              );
+            }
+          )
+          .map(
+            (ad: any) => {
+              const start =
+                ad.start ??
+                ad.start_time ??
+                "00:00:00";
+
+              const end =
+                ad.end ??
+                ad.end_time ??
+                "00:00:00";
+
+              const startSeconds =
+                getSeconds(start);
+
+              const endSeconds =
+                getSeconds(end);
+
+              return {
+                start:
+                  formatTime(start),
+
+                end:
+                  formatTime(end),
+
+                actual_length:
+                  Math.max(
+                    0,
+                    Math.round(
+                      endSeconds -
+                        startSeconds
+                    )
+                  ),
+
+                brand:
+                  ad.brand_name ??
+                  ad.brand ??
+                  "",
+
+                copyline:
+                  ad.text ??
+                  ad.copyline ??
+                  "",
+              };
+            }
+          );
+
+      const json =
+        JSON.stringify(
+          {
+            advertisements,
+          },
+          null,
+          2
+        );
+
+      try {
+        await navigator.clipboard.writeText(
+          json
+        );
+
+        toast.success(
+          `📋 ${advertisements.length} advertisement${
+            advertisements.length ===
+            1
+              ? ""
+              : "s"
+          } copied as JSON`
+        );
+      } catch (error) {
+        console.error(
+          "Failed to copy advertisements JSON:",
+          error
+        );
+
+        toast.error(
+          "Failed to copy advertisements JSON"
+        );
+      }
+    };
 
   // ============================================================
   // COPY PART GROUP
-  // Copies the joined text of the group and shows the covered
-  // time range (start of first part -> end of last part) in
-  // the toast instead of "PART N & M".
   // ============================================================
 
   const handleCopyPartGroup =
@@ -1332,9 +1344,7 @@ const handleCopySavedAdsJson = async () => {
           },
           1500
         );
-      } catch (
-        error
-      ) {
+      } catch (error) {
         console.error(
           "Failed to copy part group:",
           error
@@ -1353,8 +1363,7 @@ const handleCopySavedAdsJson = async () => {
   const handleCopyAll =
     async () => {
       if (
-        copyParts.length ===
-        0
+        copyParts.length === 0
       ) {
         toast.warning(
           "No transcript available"
@@ -1373,9 +1382,7 @@ const handleCopySavedAdsJson = async () => {
         toast.success(
           "📋 Complete transcript copied"
         );
-      } catch (
-        error
-      ) {
+      } catch (error) {
         console.error(
           "Failed to copy transcript:",
           error
@@ -1387,18 +1394,35 @@ const handleCopySavedAdsJson = async () => {
       }
     };
 
-    const copyAdRuleSettings = async () => {
-    try {
-      const setting = await getAdsRule();
+  // ============================================================
+  // COPY AD RULE SETTINGS
+  // ============================================================
 
-      await navigator.clipboard.writeText(setting.value);
+  const copyAdRuleSettings =
+    async () => {
+      try {
+        const setting =
+          await getAdsRule();
 
-      toast.success("Ad rule settings copied");
-    } catch (error) {
-      console.error("Failed to copy ad rule settings:", error);
-      toast.error("Failed to copy ad rule settings");
-    }
-  };
+        await navigator.clipboard.writeText(
+          setting.value
+        );
+
+        toast.success(
+          "Ad rule settings copied"
+        );
+      } catch (error) {
+        console.error(
+          "Failed to copy ad rule settings:",
+          error
+        );
+
+        toast.error(
+          "Failed to copy ad rule settings"
+        );
+      }
+    };
+
   // ============================================================
   // JSON IMPORT HELPERS
   // ============================================================
@@ -3626,6 +3650,30 @@ const handleCopySavedAdsJson = async () => {
     };
 
   // ============================================================
+  // SCROLL TOP / BOTTOM
+  // ============================================================
+
+  const handleScrollTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+
+    setShowMenu(false);
+  };
+
+  const handleScrollBottom = () => {
+    window.scrollTo({
+      top:
+        document.documentElement
+          .scrollHeight,
+      behavior: "smooth",
+    });
+
+    setShowMenu(false);
+  };
+
+  // ============================================================
   // AUDIO URL
   // ============================================================
 
@@ -3811,8 +3859,6 @@ const handleCopySavedAdsJson = async () => {
       }
     };
 
-
-
   // ============================================================
   // MOBILE TAB TOGGLE
   // ============================================================
@@ -3831,14 +3877,14 @@ const handleCopySavedAdsJson = async () => {
 
   // ============================================================
   // COPY BUTTONS UI
-  // Buttons now show the covered time range ("HH:MM:SS – HH:MM:SS")
-  // in place of "PART N & M" to save space and make each group
-  // identifiable at a glance.
   // ============================================================
 
   const shortTime = (t: string) => {
     if (!t) return "";
-    const parts = t.split(":");
+
+    const parts =
+      t.split(":");
+
     return parts.length === 3
       ? `${parts[1]}:${parts[2]}`
       : t;
@@ -3860,10 +3906,6 @@ const handleCopySavedAdsJson = async () => {
           ) => {
             const firstPart =
               group.startIndex + 1;
-
-            const lastPart =
-              group.startIndex +
-              group.parts.length;
 
             const isCopied =
               copiedPartGroup ===
@@ -3951,30 +3993,32 @@ const handleCopySavedAdsJson = async () => {
       <div className="rounded-xl bg-white p-4 shadow-sm md:p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-          <h1 className="text-xl font-bold text-gray-800 md:text-2xl">
-            🎧 Ad Editor
-          </h1>
+            <h1 className="text-xl font-bold text-gray-800 md:text-2xl">
+              🎧 Ad Editor
+            </h1>
 
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-            <span>
-              Project:{" "}
-              <span className="font-medium text-gray-700">
-                {projectName || `Project #${projectId}`}
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+              <span>
+                Project:{" "}
+                <span className="font-medium text-gray-700">
+                  {projectName ||
+                    `Project #${projectId}`}
+                </span>
               </span>
-            </span>
 
-            <button
-              type="button"
-              onClick={copyAdRuleSettings}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-gray-800"
-              title="Copy advertisement detection rules"
-            >
-              📋 Copy Ad Rules
-            </button>
-          </p>
-        </div>
+              <button
+                type="button"
+                onClick={
+                  copyAdRuleSettings
+                }
+                className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-600 shadow-sm transition hover:bg-gray-50 hover:text-gray-800"
+                title="Copy advertisement detection rules"
+              >
+                📋 Copy Ad Rules
+              </button>
+            </p>
+          </div>
 
-         
           {/* BROADCAST HOUR */}
 
           <div className="w-full md:w-auto">
@@ -3986,34 +4030,56 @@ const handleCopySavedAdsJson = async () => {
 
               <div className="flex items-center gap-2">
                 <select
-                  value={broadcastHour}
-                  onChange={(e) =>
-                    setBroadcastHour(e.target.value)
+                  value={
+                    broadcastHour
                   }
-                  disabled={hours.length === 0}
+                  onChange={(e) =>
+                    setBroadcastHour(
+                      e.target.value
+                    )
+                  }
+                  disabled={
+                    hours.length ===
+                    0
+                  }
                   className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
                 >
-                  {hours.length === 0 ? (
+                  {hours.length ===
+                  0 ? (
                     <option value="">
-                      No completed uploads
+                      No completed
+                      uploads
                     </option>
                   ) : (
-                    hours.map((hour) => (
-                      <option
-                        key={hour}
-                        value={String(hour)}
-                      >
-                        {String(hour).padStart(2, "0")}:00
-                      </option>
-                    ))
+                    hours.map(
+                      (hour) => (
+                        <option
+                          key={hour}
+                          value={String(
+                            hour
+                          )}
+                        >
+                          {String(
+                            hour
+                          ).padStart(
+                            2,
+                            "0"
+                          )}
+                          :00
+                        </option>
+                      )
+                    )
                   )}
                 </select>
 
-                {/* REFRESH */}
                 <button
                   type="button"
-                  onClick={handleRefresh}
-                  disabled={refreshing}
+                  onClick={
+                    handleRefresh
+                  }
+                  disabled={
+                    refreshing
+                  }
                   title="Refresh"
                   aria-label="Refresh broadcast hour"
                   className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
@@ -4029,10 +4095,16 @@ const handleCopySavedAdsJson = async () => {
                 </button>
               </div>
 
-              {hours.length > 0 && (
+              {hours.length >
+                0 && (
                 <div className="mt-1 text-[11px] text-gray-400">
-                  {hours.length} completed hour
-                  {hours.length !== 1 ? "s" : ""} available
+                  {hours.length}{" "}
+                  completed hour
+                  {hours.length !==
+                  1
+                    ? "s"
+                    : ""}{" "}
+                  available
                 </div>
               )}
             </div>
@@ -4045,42 +4117,55 @@ const handleCopySavedAdsJson = async () => {
 
               <div className="flex max-w-[700px] items-center gap-2">
                 <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto rounded-xl border border-gray-200 bg-gray-50 p-2">
-                  {hours.length === 0 ? (
+                  {hours.length ===
+                  0 ? (
                     <div className="px-3 py-2 text-sm text-gray-400">
-                      No completed uploads
+                      No completed
+                      uploads
                     </div>
                   ) : (
-                    hours.map((hour) => (
-                      <button
-                        key={hour}
-                        type="button"
-                        onClick={() =>
-                          setBroadcastHour(
-                            String(hour)
-                          )
-                        }
-                        className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-                          broadcastHour ===
-                          String(hour)
-                            ? "bg-blue-600 text-white shadow"
-                            : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
-                        }`}
-                      >
-                        {String(hour).padStart(
-                          2,
-                          "0"
-                        )}
-                        :00
-                      </button>
-                    ))
+                    hours.map(
+                      (hour) => (
+                        <button
+                          key={hour}
+                          type="button"
+                          onClick={() =>
+                            setBroadcastHour(
+                              String(
+                                hour
+                              )
+                            )
+                          }
+                          className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-all ${
+                            broadcastHour ===
+                            String(
+                              hour
+                            )
+                              ? "bg-blue-600 text-white shadow"
+                              : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          {String(
+                            hour
+                          ).padStart(
+                            2,
+                            "0"
+                          )}
+                          :00
+                        </button>
+                      )
+                    )
                   )}
                 </div>
 
-                {/* DESKTOP REFRESH */}
                 <button
                   type="button"
-                  onClick={handleRefresh}
-                  disabled={refreshing}
+                  onClick={
+                    handleRefresh
+                  }
+                  disabled={
+                    refreshing
+                  }
                   title="Refresh"
                   aria-label="Refresh broadcast hour"
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
@@ -4097,7 +4182,6 @@ const handleCopySavedAdsJson = async () => {
               </div>
             </div>
           </div>
-     
         </div>
       </div>
 
@@ -4108,7 +4192,8 @@ const handleCopySavedAdsJson = async () => {
       {isMobile ? (
         <div className="pb-48">
           {mobileTab ===
-            "logs" && isAdmin ? (
+            "logs" &&
+          isAdmin ? (
             <div className="rounded-xl bg-white p-4 shadow-sm">
               <div className="mb-4">
                 <div className="flex items-center justify-between">
@@ -4394,7 +4479,8 @@ const handleCopySavedAdsJson = async () => {
                   </span>
 
                   <span className="mt-1 text-xs text-gray-400">
-                    Click to browse .json files
+                    Click to browse
+                    .json files
                   </span>
                 </button>
               </div>
@@ -4474,266 +4560,58 @@ const handleCopySavedAdsJson = async () => {
       ======================================================== */}
 
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur">
-  <div className="mx-auto w-full max-w-[1800px] px-3 py-2 md:px-5 md:py-3">
+        <div className="mx-auto w-full max-w-[1800px] px-3 py-2 md:px-5 md:py-3">
 
-    {/* ============================================================
-        MOBILE FOOTER
-    ============================================================ */}
+          {/* ====================================================
+              MOBILE FOOTER
+          ==================================================== */}
 
-    {isMobile ? (
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
+          {isMobile ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
 
-          {/* Logs / Segments */}
-          {isAdmin && (
-            <button
-              onClick={toggleMobileTab}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-700 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-800 active:scale-[0.98]"
-            >
-              <span>
-                {mobileTab === "logs"
-                  ? "📝"
-                  : "🎧"}
-              </span>
-
-              <span>
-                {mobileTab === "logs"
-                  ? "Logs"
-                  : "Segments"}
-              </span>
-
-              <span className="text-[10px] opacity-70">
-                ⇄
-              </span>
-            </button>
-          )}
-
-         {/* Save */}
-        <button
-          onClick={handleSaveAllSegments}
-          disabled={results.length === 0}
-          className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-        >
-          <Save size={14} />
-          <span>Save</span>
-        </button>
-
-          {/* Upload JSON */}
-          {isAdmin && (
-            <button
-              onClick={() =>
-                setShowJsonImport(true)
-              }
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
-            >
-              <FileJson size={14} />
-
-              <span>
-                Upload JSON
-              </span>
-            </button>
-          )}
-
-          {/* Copy JSON */}
-          <button
-            onClick={handleCopySavedAdsJson}
-            disabled={results.length === 0}
-            className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Copy size={14} />
-
-            <span>
-              Copy JSON
-            </span>
-          </button>
-
-          {/* More */}
-          <div className="relative">
-            <button
-              onClick={() =>
-                setShowMenu(
-                  (prev) => !prev
-                )
-              }
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
-            >
-              <MoreVertical size={18} />
-            </button>
-
-            {showMenu && (
-              <div className="absolute bottom-11 right-0 z-50 w-60 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
-
-                {/* Add Segment */}
+                {/* Logs / Segments */}
                 {isAdmin && (
                   <button
-                    onClick={() => {
-                      handleAddRange();
-
-                      setShowMenu(
-                        false
-                      );
-                    }}
-                    disabled={
-                      selectedP1Id ===
-                        null ||
-                      selectedP2Id ===
-                        null
+                    onClick={
+                      toggleMobileTab
                     }
-                    className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-700 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-800 active:scale-[0.98]"
                   >
-                    <Plus size={16} />
+                    <span>
+                      {mobileTab ===
+                      "logs"
+                        ? "📝"
+                        : "🎧"}
+                    </span>
 
-                    Add Segment
-                  </button>
-                )}
+                    <span>
+                      {mobileTab ===
+                      "logs"
+                        ? "Logs"
+                        : "Segments"}
+                    </span>
 
-                {/* Reprocess */}
-                {isAdmin && (
-                  <button
-                    onClick={() => {
-                      handleReprocessAds();
-
-                      setShowMenu(
-                        false
-                      );
-                    }}
-                    disabled={
-                      !broadcastHour
-                    }
-                    className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <RefreshCw
-                      size={16}
-                    />
-
-                    Reprocess
+                    <span className="text-[10px] opacity-70">
+                      ⇄
+                    </span>
                   </button>
                 )}
 
                 {/* Save */}
                 <button
-                  onClick={() => {
-                    handleCenterLastCompleted();
-
-                    setShowMenu(
-                      false
-                    );
-                  }}
-                  disabled={
-                    results.length === 0
-                  }
-                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-green-700 transition hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Save size={16} />
-
-                  Last
-                </button>
-
-                {/* Download */}
-                <button
-                  onClick={() => {
-                    handleDownloadExcel();
-
-                    setShowMenu(
-                      false
-                    );
-                  }}
-                  disabled={
-                    results.length === 0
-                  }
-                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Download
-                    size={16}
-                  />
-
-                  Download Excel
-                </button>
-
-                {/* Delete */}
-                {isAdmin && (
-                  <>
-                    <div className="border-t border-gray-100" />
-
-                    <button
-                      onClick={() => {
-                        handleDeleteAllAdvertisements();
-
-                        setShowMenu(
-                          false
-                        );
-                      }}
-                      disabled={
-                        results.length ===
-                        0
-                      }
-                      className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Trash2
-                        size={16}
-                      />
-
-                      Delete All
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    ) : (
-
-      /* ============================================================
-          DESKTOP FOOTER
-      ============================================================ */
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-4">
-
-              {/* LEFT ACTIONS */}
-              <div className="flex items-center gap-2">
-
-                {/* Last */}
-                <button
                   onClick={
-                    handleCenterLastCompleted
+                    handleSaveAllSegments
                   }
-                  className="flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700 active:scale-[0.98]"
+                  disabled={
+                    results.length ===
+                    0
+                  }
+                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 px-2 text-xs font-semibold text-white shadow-sm transition hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                 >
-                  <span>🎯</span>
-
-                  <span>
-                    Last
-                  </span>
+                  <Save size={14} />
+                  <span>Save</span>
                 </button>
-
-                {/* Add */}
-                {isAdmin && (
-                  <button
-                    onClick={
-                      handleAddRange
-                    }
-                    disabled={
-                      selectedP1Id ===
-                        null ||
-                      selectedP2Id ===
-                        null
-                    }
-                    className={`flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-sm transition active:scale-[0.98] ${
-                      selectedP1Id !==
-                        null &&
-                      selectedP2Id !==
-                        null
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "cursor-not-allowed bg-gray-200 text-gray-400"
-                    }`}
-                  >
-                    <Plus size={14} />
-
-                    Add
-                  </button>
-                )}
 
                 {/* Upload JSON */}
                 {isAdmin && (
@@ -4743,13 +4621,13 @@ const handleCopySavedAdsJson = async () => {
                         true
                       )
                     }
-                    className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
+                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
                   >
-                    <FileJson
-                      size={14}
-                    />
+                    <FileJson size={14} />
 
-                    Upload JSON
+                    <span>
+                      Upload JSON
+                    </span>
                   </button>
                 )}
 
@@ -4762,107 +4640,415 @@ const handleCopySavedAdsJson = async () => {
                     results.length ===
                     0
                   }
-                  className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Copy size={14} />
 
-                  Copy JSON
+                  <span>
+                    Copy JSON
+                  </span>
                 </button>
-              </div>
 
-              {/* RIGHT ACTIONS */}
-              <div className="flex items-center gap-2">
-
-                {/* Reprocess */}
-                {isAdmin && (
+                {/* More */}
+                <div className="relative">
                   <button
-                    onClick={
-                      handleReprocessAds
+                    onClick={() =>
+                      setShowMenu(
+                        (prev) =>
+                          !prev
+                      )
                     }
-                    disabled={
-                      !broadcastHour
-                    }
-                    className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
                   >
-                    <RefreshCw
-                      size={14}
+                    <MoreVertical
+                      size={18}
                     />
-
-                    Reprocess
                   </button>
-                )}
 
-                {/* Save */}
-                <button
-                  onClick={
-                    handleSaveAllSegments
-                  }
-                  disabled={
-                    results.length === 0
-                  }
-                  className="flex h-9 items-center gap-1.5 rounded-lg bg-green-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-                >
-                  <Save size={14} />
+                  {showMenu && (
+                    <div className="absolute bottom-11 right-0 z-50 w-60 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
 
-                  Save
-                </button>
+                      {/* TOP */}
+                      <button
+                        onClick={
+                          handleScrollTop
+                        }
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                      >
+                        <ArrowUp
+                          size={16}
+                        />
 
-                {/* Download */}
-                <button
-                  onClick={
-                    handleDownloadExcel
-                  }
-                  disabled={
-                    results.length === 0
-                  }
-                  className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-                >
-                  <Download
-                    size={14}
-                  />
+                        Go to Top
+                      </button>
 
-                  Download
-                </button>
+                      {/* BOTTOM */}
+                      <button
+                        onClick={
+                          handleScrollBottom
+                        }
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                      >
+                        <ArrowDown
+                          size={16}
+                        />
 
-                {/* Delete */}
-                {isAdmin && (
-                  <button
-                    onClick={
-                      handleDeleteAllAdvertisements
-                    }
-                    disabled={
-                      results.length === 0
-                    }
-                    className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-                  >
-                    <Trash2
-                      size={14}
-                    />
+                        Go to Bottom
+                      </button>
 
-                    Delete
-                  </button>
-                )}
+                      <div className="border-t border-gray-100" />
+
+                      {/* Add Segment */}
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            handleAddRange();
+
+                            setShowMenu(
+                              false
+                            );
+                          }}
+                          disabled={
+                            selectedP1Id ===
+                              null ||
+                            selectedP2Id ===
+                              null
+                          }
+                          className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Plus
+                            size={16}
+                          />
+
+                          Add Segment
+                        </button>
+                      )}
+
+                      {/* Reprocess */}
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            handleReprocessAds();
+
+                            setShowMenu(
+                              false
+                            );
+                          }}
+                          disabled={
+                            !broadcastHour
+                          }
+                          className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <RefreshCw
+                            size={16}
+                          />
+
+                          Reprocess
+                        </button>
+                      )}
+
+                      {/* Last */}
+                      <button
+                        onClick={() => {
+                          handleCenterLastCompleted();
+
+                          setShowMenu(
+                            false
+                          );
+                        }}
+                        disabled={
+                          results.length ===
+                          0
+                        }
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-green-700 transition hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Save
+                          size={16}
+                        />
+
+                        Last
+                      </button>
+
+                      {/* Download */}
+                      <button
+                        onClick={() => {
+                          handleDownloadExcel();
+
+                          setShowMenu(
+                            false
+                          );
+                        }}
+                        disabled={
+                          results.length ===
+                          0
+                        }
+                        className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Download
+                          size={16}
+                        />
+
+                        Download Excel
+                      </button>
+
+                      {/* Delete */}
+                      {isAdmin && (
+                        <>
+                          <div className="border-t border-gray-100" />
+
+                          <button
+                            onClick={() => {
+                              handleDeleteAllAdvertisements();
+
+                              setShowMenu(
+                                false
+                              );
+                            }}
+                            disabled={
+                              results.length ===
+                              0
+                            }
+                            className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <Trash2
+                              size={16}
+                            />
+
+                            Delete All
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+          ) : (
+
+            /* ==================================================
+                DESKTOP FOOTER
+            ================================================== */
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-4">
+
+                {/* LEFT ACTIONS */}
+                <div className="flex items-center gap-2">
+
+                  {/* TOP */}
+                  <button
+                    type="button"
+                    onClick={
+                      handleScrollTop
+                    }
+                    className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
+                    title="Go to top"
+                  >
+                    <ArrowUp
+                      size={14}
+                    />
+
+                    <span>
+                      Top
+                    </span>
+                  </button>
+
+                  {/* BOTTOM */}
+                  <button
+                    type="button"
+                    onClick={
+                      handleScrollBottom
+                    }
+                    className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
+                    title="Go to bottom"
+                  >
+                    <ArrowDown
+                      size={14}
+                    />
+
+                    <span>
+                      Bottom
+                    </span>
+                  </button>
+
+                  {/* LAST */}
+                  <button
+                    onClick={
+                      handleCenterLastCompleted
+                    }
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700 active:scale-[0.98]"
+                  >
+                    <span>🎯</span>
+
+                    <span>
+                      Last
+                    </span>
+                  </button>
+
+                  {/* ADD */}
+                  {isAdmin && (
+                    <button
+                      onClick={
+                        handleAddRange
+                      }
+                      disabled={
+                        selectedP1Id ===
+                          null ||
+                        selectedP2Id ===
+                          null
+                      }
+                      className={`flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-sm transition active:scale-[0.98] ${
+                        selectedP1Id !==
+                          null &&
+                        selectedP2Id !==
+                          null
+                          ? "bg-blue-600 text-white hover:bg-blue-700"
+                          : "cursor-not-allowed bg-gray-200 text-gray-400"
+                      }`}
+                    >
+                      <Plus
+                        size={14}
+                      />
+
+                      Add
+                    </button>
+                  )}
+
+                  {/* UPLOAD JSON */}
+                  {isAdmin && (
+                    <button
+                      onClick={() =>
+                        setShowJsonImport(
+                          true
+                        )
+                      }
+                      className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
+                    >
+                      <FileJson
+                        size={14}
+                      />
+
+                      Upload JSON
+                    </button>
+                  )}
+
+                  {/* COPY JSON */}
+                  <button
+                    onClick={
+                      handleCopySavedAdsJson
+                    }
+                    disabled={
+                      results.length ===
+                      0
+                    }
+                    className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Copy size={14} />
+
+                    Copy JSON
+                  </button>
+                </div>
+
+                {/* RIGHT ACTIONS */}
+                <div className="flex items-center gap-2">
+
+                  {/* REPROCESS */}
+                  {isAdmin && (
+                    <button
+                      onClick={
+                        handleReprocessAds
+                      }
+                      disabled={
+                        !broadcastHour
+                      }
+                      className="flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <RefreshCw
+                        size={14}
+                      />
+
+                      Reprocess
+                    </button>
+                  )}
+
+                  {/* SAVE */}
+                  <button
+                    onClick={
+                      handleSaveAllSegments
+                    }
+                    disabled={
+                      results.length ===
+                      0
+                    }
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-green-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                  >
+                    <Save size={14} />
+
+                    Save
+                  </button>
+
+                  {/* DOWNLOAD */}
+                  <button
+                    onClick={
+                      handleDownloadExcel
+                    }
+                    disabled={
+                      results.length ===
+                      0
+                    }
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                  >
+                    <Download
+                      size={14}
+                    />
+
+                    Download
+                  </button>
+
+                  {/* DELETE */}
+                  {isAdmin && (
+                    <button
+                      onClick={
+                        handleDeleteAllAdvertisements
+                      }
+                      disabled={
+                        results.length ===
+                        0
+                      }
+                      className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                    >
+                      <Trash2
+                        size={14}
+                      />
+
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ====================================================
+              AUDIO PLAYER
+          ==================================================== */}
+
+          <div className="mt-2 border-t border-gray-100 pt-2">
+            <AudioPlayer
+              file={file}
+              setFile={setFile}
+              audioRef={audioRef}
+              audioUrl={audioUrl}
+              onChange={
+                handleAudioChange
+              }
+              onTimeUpdate={
+                handleTimeUpdate
+              }
+            />
           </div>
-        )}
-
-        {/* ============================================================
-            AUDIO PLAYER
-        ============================================================ */}
-
-        <div className="mt-2 border-t border-gray-100 pt-2">
-          <AudioPlayer
-            file={file}
-            setFile={setFile}
-            audioRef={audioRef}
-            audioUrl={audioUrl}
-            onChange={handleAudioChange}
-            onTimeUpdate={handleTimeUpdate}
-          />
         </div>
       </div>
-    </div>
     </div>
   );
 }
