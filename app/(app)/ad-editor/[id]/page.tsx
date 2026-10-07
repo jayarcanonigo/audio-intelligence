@@ -4589,7 +4589,7 @@ export default function AdEditorPage() {
                       {mobileTab ===
                       "logs"
                         ? "Logs"
-                        : "Segments"}
+                        : "ADS"}
                     </span>
 
                     <span className="text-[10px] opacity-70">
