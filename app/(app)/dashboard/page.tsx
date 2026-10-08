@@ -10,6 +10,7 @@ import {
     getUploadStatuses,
     type UploadStatus,
 } from "@/services/api";
+import { getSetting } from "@/services/settings";
 
 const API_URL =
     process.env.NEXT_PUBLIC_API_URL ||
@@ -67,6 +68,13 @@ export default function DashboardPage() {
         useState("USER");
 
     // ============================================================
+    // BETA
+    // ============================================================
+
+    const [betaEnabled, setBetaEnabled] =
+        useState(false);
+
+    // ============================================================
     // WALLET
     // ============================================================
 
@@ -104,35 +112,61 @@ export default function DashboardPage() {
     // ============================================================
 
     useEffect(() => {
-        const token =
-            localStorage.getItem(
-                "access_token"
-            );
+        const initializeDashboard = async () => {
+            const token =
+                localStorage.getItem(
+                    "access_token"
+                );
 
-        if (!token) {
-            router.replace("/login");
-            return;
-        }
+            if (!token) {
+                router.replace("/login");
+                return;
+            }
 
-        const savedUsername =
-            localStorage.getItem("username") ||
-            "User";
+            const savedUsername =
+                localStorage.getItem("username") ||
+                "User";
 
-        const savedRole =
-            localStorage.getItem("role") ||
-            "USER";
+            const savedRole =
+                localStorage.getItem("role") ||
+                "USER";
 
-        setUsername(savedUsername);
-        setRole(savedRole);
+            setUsername(savedUsername);
+            setRole(savedRole);
 
-        loadDashboard(token);
+            let isBeta = false;
 
-        if (
-            savedRole.toUpperCase() ===
-            "USER"
-        ) {
-            loadWallet();
-        }
+            try {
+                const betaSetting =
+                    await getSetting("beta");
+
+                isBeta =
+                    String(
+                        betaSetting.value
+                    ).toLowerCase() === "true";
+
+                setBetaEnabled(isBeta);
+            } catch (error) {
+                console.error(
+                    "Failed to load beta setting:",
+                    error
+                );
+
+                setBetaEnabled(false);
+            }
+
+            await loadDashboard(token);
+
+            if (
+                savedRole.toUpperCase() ===
+                    "USER" &&
+                !isBeta
+            ) {
+                loadWallet();
+            }
+        };
+
+        initializeDashboard();
     }, [router]);
 
     // ============================================================
@@ -497,7 +531,8 @@ export default function DashboardPage() {
 
             if (
                 role.toUpperCase() ===
-                "USER"
+                    "USER" &&
+                !betaEnabled
             ) {
                 await loadWallet();
             }
@@ -714,31 +749,32 @@ export default function DashboardPage() {
                         </div>
 
                         {role.toUpperCase() ===
-                            "USER" && (
-                            <div className="mb-3 p-4 rounded-xl bg-indigo-50 border border-indigo-100">
+                            "USER" &&
+                            !betaEnabled && (
+                                <div className="mb-3 p-4 rounded-xl bg-indigo-50 border border-indigo-100">
 
-                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center justify-between">
 
-                                    <div>
+                                        <div>
 
-                                        <p className="text-xs font-medium text-indigo-600">
-                                            Current Balance
-                                        </p>
+                                            <p className="text-xs font-medium text-indigo-600">
+                                                Current Balance
+                                            </p>
 
-                                        <p className="mt-1 text-xl font-bold text-indigo-900">
-                                            {formatBalance()}
-                                        </p>
+                                            <p className="mt-1 text-xl font-bold text-indigo-900">
+                                                {formatBalance()}
+                                            </p>
 
-                                    </div>
+                                        </div>
 
-                                    <div className="w-10 h-10 rounded-lg bg-white text-indigo-600 flex items-center justify-center">
-                                        <WalletIcon />
+                                        <div className="w-10 h-10 rounded-lg bg-white text-indigo-600 flex items-center justify-center">
+                                            <WalletIcon />
+                                        </div>
+
                                     </div>
 
                                 </div>
-
-                            </div>
-                        )}
+                            )}
 
                         <button
                             type="button"
@@ -925,27 +961,28 @@ export default function DashboardPage() {
                         </button>
 
                         {role.toUpperCase() ===
-                            "USER" && (
-                            <div className="flex items-center gap-3 pr-6 border-r border-slate-200">
+                            "USER" &&
+                            !betaEnabled && (
+                                <div className="flex items-center gap-3 pr-6 border-r border-slate-200">
 
-                                <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                    <WalletIcon />
+                                    <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                        <WalletIcon />
+                                    </div>
+
+                                    <div>
+
+                                        <p className="text-[11px] font-medium text-slate-400">
+                                            Current Balance
+                                        </p>
+
+                                        <p className="mt-0.5 text-sm font-bold text-slate-900">
+                                            {formatBalance()}
+                                        </p>
+
+                                    </div>
+
                                 </div>
-
-                                <div>
-
-                                    <p className="text-[11px] font-medium text-slate-400">
-                                        Current Balance
-                                    </p>
-
-                                    <p className="mt-0.5 text-sm font-bold text-slate-900">
-                                        {formatBalance()}
-                                    </p>
-
-                                </div>
-
-                            </div>
-                        )}
+                            )}
 
                         <div className="text-right">
 
